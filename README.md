@@ -4,9 +4,9 @@ Client-side Fabric mod for **Minecraft 26.3** (Java 25) that removes repeated pe
 
 ## Optimizations
 
-### Rain fog sky light
+### Rain fog
 
-Every frame, `AtmosphericFogEnvironment.updateRainFogState` looks up the sky light at the camera position to fade in rain fog. A spark profile showed this single lookup taking about 2.8% of the render thread. TxOptimizations looks it up once per client tick and reuses the result for the other frames of that tick, as long as the camera stays in the same block. The value only feeds a slowly fading fog multiplier, so the result is visually identical.
+Every frame, `AtmosphericFogEnvironment.updateRainFogState` looks up the biome and the sky light at the camera position to fade in rain fog. A spark profile showed the sky light lookup alone taking about 2.8% of the render thread. TxOptimizations looks both up once per client tick and reuses them for the other frames of that tick, as long as the camera stays in the same block of the same level. The values only feed a slowly fading fog multiplier, so the result is visually identical.
 
 ### Particle light
 

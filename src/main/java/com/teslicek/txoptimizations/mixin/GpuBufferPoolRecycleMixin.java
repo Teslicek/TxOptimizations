@@ -32,6 +32,9 @@ public abstract class GpuBufferPoolRecycleMixin {
     @Unique
     private Map<GpuBuffer, Integer> txoptimizations$idleFrames = new IdentityHashMap<>();
 
+    @Unique
+    private Map<GpuBuffer, Integer> txoptimizations$nextIdleFrames = new IdentityHashMap<>();
+
     @WrapOperation(method = "tryRecycleBuffers", at = @At(value = "INVOKE", target = "Ljava/util/List;removeIf(Ljava/util/function/Predicate;)Z"))
     private boolean txoptimizations$recycleUntilFirstPending(List<Object> pendingRecycle, Predicate<Object> tryRecycle, Operation<Boolean> original) {
         RecyclePolling.setActive(true);
@@ -62,25 +65,33 @@ public abstract class GpuBufferPoolRecycleMixin {
 
     @WrapOperation(method = "endFrame", at = @At(value = "INVOKE", target = "Ljava/util/List;forEach(Ljava/util/function/Consumer;)V"))
     private void txoptimizations$closeExpiredSpares(List<GpuBuffer> spares, Consumer<? super GpuBuffer> close, Operation<Void> original) {
-        Map<GpuBuffer, Integer> idleFrames = new IdentityHashMap<>();
-        List<GpuBuffer>         expired    = new ArrayList<>();
+        Map<GpuBuffer, Integer> idleFrames = this.txoptimizations$nextIdleFrames;
+        List<GpuBuffer>         expired    = null;
         Iterator<GpuBuffer>     iterator   = spares.iterator();
 
         while (iterator.hasNext()) {
             GpuBuffer spare  = iterator.next();
-            int       frames = this.txoptimizations$idleFrames.getOrDefault(spare, 0) + 1;
+            Integer   idle   = this.txoptimizations$idleFrames.get(spare);
+            int       frames = idle == null ? 1 : idle + 1;
 
-            if (frames > SPARE_FRAMES) {
-                expired.add(spare);
-                iterator.remove();
+            if (frames <= SPARE_FRAMES) {
+                idleFrames.put(spare, frames);
                 continue;
             }
 
-            idleFrames.put(spare, frames);
+            if (expired == null)
+                expired = new ArrayList<>();
+
+            expired.add(spare);
+            iterator.remove();
         }
 
-        this.txoptimizations$idleFrames = idleFrames;
-        original.call(expired, close);
+        this.txoptimizations$nextIdleFrames = this.txoptimizations$idleFrames;
+        this.txoptimizations$idleFrames     = idleFrames;
+        this.txoptimizations$nextIdleFrames.clear();
+
+        if (expired != null)
+            original.call(expired, close);
     }
 
     @WrapOperation(method = "endFrame", at = @At(value = "INVOKE", target = "Ljava/util/List;clear()V"))
