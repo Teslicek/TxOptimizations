@@ -4,11 +4,13 @@
   "compatibilityLevel": "JAVA_25",
   "client": [
     "AtmosphericFogTickCacheMixin",
+    "AvatarSkinCacheMixin",
     "BlockEntityRenderDispatcherCacheMixin",
     "BlockEntityRendererCacheMixin",
     "BufferBuilderElementCacheMixin",
     "CameraFluidCacheMixin",
     "DebugScreenEntryListLookupMixin",
+    "EntityRenderDispatcherSkinCacheMixin",
     "EnvironmentAttributeValueCacheMixin",
     "FormattedBidiReorderFastPathMixin",
     "GpuBufferPoolRecycleMixin",
