@@ -49,6 +49,7 @@ processResources {
 jar {
     from('LICENSE-OBE')
     from('LICENSE-ImmediatelyFast')
+    from('LICENSE-FerriteCore')
 }
 
 tasks.register('collectJars', Copy) {

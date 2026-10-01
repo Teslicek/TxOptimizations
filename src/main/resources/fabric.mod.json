@@ -3,7 +3,7 @@
   "id": "txoptimizations",
   "version": "${version}",
   "name": "TxOptimizations",
-  "description": "Client-side render thread optimizations for 26.3 that keep settings and visuals, including Optimized Block Entities (OBE) by maDU59_ and parts of ImmediatelyFast by RK_01.",
+  "description": "Client-side render thread optimizations for 26.3 that keep settings and visuals, including Optimized Block Entities (OBE) by maDU59_ parts of ImmediatelyFast by RK_01 and parts of FerriteCore by malte0811.",
   "authors": [
     "txslx"
   ],
@@ -19,6 +19,10 @@
     },
     {
       "config": "immediatelyfast.client.mixins.json",
+      "environment": "client"
+    },
+    {
+      "config": "ferritecore.mixins.json",
       "environment": "client"
     }
   ],
@@ -36,6 +40,7 @@
   },
   "accessWidener": "txoptimizations.classtweaker",
   "breaks": {
-    "immediatelyfast": "*"
+    "immediatelyfast": "*",
+    "ferritecore": "*"
   }
 }

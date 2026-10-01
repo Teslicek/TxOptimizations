@@ -102,6 +102,16 @@ Five features of [ImmediatelyFast](https://github.com/RaphiMC/ImmediatelyFast) 1
 
 The resource pack conflict handling is kept: when a loaded resource pack overrides the `core/text` shader without declaring compatibility, font atlas resizing is switched off (and map atlas generation if the pack declares it incompatible), so server resource packs with custom text shaders look the same as without these features. Removed from the original: the config file, the OpenGL-only fixes, the forced reordering half of enhanced batching (it overrides vanilla's strictly ordered groups), the text translucency sorting skip (on 26.3 its targets point at beacon beams instead of text, and vanilla 26.3 no longer sorts plain text), sign text buffering and the debug screen entry. TxOptimizations declares ImmediatelyFast as incompatible so both cannot hook the same code. The ImmediatelyFast code is licensed by its author under LGPL-3.0-or-later, see `LICENSE-ImmediatelyFast`.
 
+### FerriteCore (partial)
+
+Three memory savings from [FerriteCore](https://github.com/malte0811/FerriteCore) 9.0.0 by malte0811 (commit `0cef1f2`), kept in its original `malte0811.ferritecore` packages. Less live memory means shorter and rarer garbage collections:
+
+- Block state neighbor table: instead of every block state holding its own table of neighbor states, all states of a block share one bit-packed table that `setValue` indexes into.
+- Block state cache deduplication: identical collision shapes and face sturdiness arrays in the per-state cache are shared instead of stored once per state.
+- Empty item component patches: items with no changed components share one empty map instead of each allocating their own.
+
+Removed from the original: the config file, the compact neighbor table mode, the property map replacement (it saves memory by dropping the per-state value array, which makes every `getValue` call decode the value from the shared table instead of reading an array) and the threading detector. TxOptimizations declares FerriteCore as incompatible so both cannot overwrite the same code. The FerriteCore code is licensed by its author under the MIT license, see `LICENSE-FerriteCore`.
+
 ## Build
 
 ```
