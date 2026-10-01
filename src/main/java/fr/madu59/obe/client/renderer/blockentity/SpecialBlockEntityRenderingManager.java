@@ -2,6 +2,7 @@ package fr.madu59.obe.client.renderer.blockentity;
 
 import java.util.List;
 
+import com.teslicek.txoptimizations.ClientClock;
 import fr.madu59.obe.client.config.SettingsManager;
 import fr.madu59.obe.client.renderer.blockentity.sign.ext.SignTextExt;
 import net.minecraft.client.Minecraft;
@@ -15,6 +16,9 @@ import net.minecraft.world.level.block.entity.SignText;
 import net.minecraft.world.level.block.entity.SignTextSlot;
 
 public class SpecialBlockEntityRenderingManager {
+
+    private static long    textFilteringFrame = -1L;
+    private static boolean textFiltering;
     public static boolean shouldSkipRendering(BlockEntity be) {
         if(!SettingsManager.MOD_TOGGLE.getValue()) return false;
         else if(be instanceof SignBlockEntity signBe){
@@ -42,8 +46,19 @@ public class SpecialBlockEntityRenderingManager {
     }
 
     private static boolean isEmpty(SignBlockEntity be){
-        boolean shouldFilter = Minecraft.getInstance().isTextFilteringEnabled();
+        boolean shouldFilter = isTextFilteringEnabled();
         return !hasMessage(be.getText(SignTextSlot.FRONT), shouldFilter) && !hasMessage(be.getText(SignTextSlot.BACK), shouldFilter);
+    }
+
+    private static boolean isTextFilteringEnabled() {
+        long frame = ClientClock.frame();
+
+        if (frame != textFilteringFrame) {
+            textFiltering      = Minecraft.getInstance().isTextFilteringEnabled();
+            textFilteringFrame = frame;
+        }
+
+        return textFiltering;
     }
 
     private static boolean hasMessage(SignText text, boolean filtered){

@@ -52,7 +52,7 @@ Every frame, each particle quad is added to `QuadParticleRenderState`, which loo
 
 ### Buffer builder elements
 
-Every new `BufferBuilder` looks up up to eight vertex elements (position, color, UVs, normal, line width) by name in its vertex format, and the format's element map compares the names one by one. Vertex formats never change, so TxOptimizations resolves those eight elements once per vertex format with the vanilla lookup and reuses the result for every later `BufferBuilder` of that format.
+Every new `BufferBuilder` looks up up to eight vertex elements (position, color, UVs, normal, line width) by name in its vertex format, and the format's element map compares the names one by one. Vertex formats never change, so TxOptimizations resolves those eight elements once per vertex format with the vanilla lookup and reuses the result for every later `BufferBuilder` of that format, including the constructor's check that the format has a position element.
 
 ### FPS counter
 
@@ -64,7 +64,7 @@ Sodium Extra records every frame and sorts the last 5 seconds of frame times twi
 
 Chests, ender chests, shulker boxes, signs, banners, beds, bells, skulls, decorated pots, lecterns, shelves, campfires, beacons, copper golem statues and cushions are baked into the chunk mesh like normal blocks instead of being rendered again every frame, and only switch back to per-frame rendering while they animate (for example while a chest opens). In a server lobby profile this cut block entity rendering from about 4.1% to 0.35% of the render thread.
 
-This is a trimmed copy of [Optimized Block Entities](https://github.com/maDU59/OptimisedBlockEntities) 1.1.50 by maDU59_ (commit `f186eae`), kept in its original `fr.madu59.obe` packages. Removed from the original: the config screen, ModMenu and Sodium options pages, the public API, and the compatibility code for Iris, Lootr, Entity Model Features, BCLib and VulkanMod. OBE's settings still load from `config/obe.json` with OBE's defaults. The OBE code is licensed by its author under LGPL-3.0-or-later, see `LICENSE-OBE`. It requires Fabric API and Sodium.
+This is a trimmed copy of [Optimized Block Entities](https://github.com/maDU59/OptimisedBlockEntities) 1.1.50 by maDU59_ (commit `f186eae`), kept in its original `fr.madu59.obe` packages. Removed from the original: the config screen, ModMenu and Sodium options pages, the public API, and the compatibility code for Iris, Lootr, Entity Model Features, BCLib and VulkanMod. OBE's settings still load from `config/obe.json` with OBE's defaults. The empty sign check reads the text filtering flag once per frame instead of once per sign. The OBE code is licensed by its author under LGPL-3.0-or-later, see `LICENSE-OBE`. It requires Fabric API and Sodium.
 
 ## Build
 
