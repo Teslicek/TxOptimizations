@@ -16,7 +16,7 @@ repositories {
 }
 
 loom {
-    accessWidenerPath = file('src/main/resources/obe.classtweaker')
+    accessWidenerPath = file('src/main/resources/txoptimizations.classtweaker')
 }
 
 java {
@@ -48,6 +48,7 @@ processResources {
 
 jar {
     from('LICENSE-OBE')
+    from('LICENSE-ImmediatelyFast')
 }
 
 tasks.register('collectJars', Copy) {

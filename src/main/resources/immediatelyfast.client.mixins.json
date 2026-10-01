@@ -1,0 +1,19 @@
+{
+  "required": true,
+  "package": "net.raphimc.immediatelyfast.injection.mixins",
+  "compatibilityLevel": "JAVA_25",
+  "client": [
+    "batch_animated_item_updates.MixinGuiRenderer",
+    "fast_text_lookup.MixinTextFeatureRenderer_GlyphRenderer",
+    "font_atlas_resizing.MixinFontTexture",
+    "map_atlas_generation.MixinGuiGraphicsExtractor",
+    "map_atlas_generation.MixinMapRenderState",
+    "map_atlas_generation.MixinMapRenderer",
+    "map_atlas_generation.MixinMapTextureManager",
+    "map_atlas_generation.MixinMapTextureManager_MapInstance",
+    "resource_pack_conflict_handling.MixinMinecraft"
+  ],
+  "injectors": {
+    "defaultRequire": 1
+  }
+}
