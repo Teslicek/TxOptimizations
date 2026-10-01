@@ -6,10 +6,14 @@
     "AtmosphericFogSkyLightMixin",
     "BlockEntityRenderDispatcherCacheMixin",
     "BlockEntityRendererCacheMixin",
+    "CameraFluidCacheMixin",
+    "DebugScreenEntryListLookupMixin",
+    "FormattedBidiReorderFastPathMixin",
     "GpuBufferPoolRecycleMixin",
     "MinecraftClockMixin",
     "ParticleLightCacheMixin",
     "SoundEngineListenerMixin",
+    "TranslatableTemplateCacheMixin",
     "VulkanCommandEncoderPollMixin"
   ],
   "injectors": {
