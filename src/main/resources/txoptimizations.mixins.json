@@ -39,6 +39,7 @@
     "PatchedDataComponentMapEmptyPatchMixin",
     "QuadParticleLayerCacheMixin",
     "ScissorStateEqualityMixin",
+    "ShapeOutlineEdgeCacheMixin",
     "SodiumExtraFrameCounterMixin",
     "SoundEngineListenerMixin",
     "StateDefinitionNeighborTableMixin",
