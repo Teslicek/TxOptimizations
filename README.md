@@ -86,6 +86,10 @@ Every camera-facing particle allocated a new rotation quaternion and rotated it 
 
 Preparing each frame walked the list of feature renderers through a freshly built Guava filter that skips empty slots, three times per frame preparation. The filtered list only changes when a renderer is registered, so it is built once at registration and reused.
 
+### Entity visibility reuse
+
+With entity hitboxes shown (F3+B), the hitbox renderer runs the same visibility check for every entity that entity extraction already ran earlier in the frame. Each entity remembers its result for the frame, and a second check with the same frustum, camera position, partial tick and fade setting reuses it. Any call with different inputs computes normally.
+
 ### FPS counter
 
 TxOptimizations draws its own FPS counter in the top left corner (`123 FPS`, white, no shadow, at 2,2), hidden while the F3 screen is open or the HUD is hidden. The number is the average frame rate over the last 0.5 seconds and updates every 0.5 seconds, the same as Sodium Extra's FPS overlay. It only counts frames, and the text is rebuilt only when the number changes, so drawing it skips the per-frame translation and text-direction work that Sodium Extra's overlay goes through.
