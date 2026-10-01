@@ -100,6 +100,10 @@ Block entities with nothing to draw are skipped: signs without text, beacons wit
 
 When a loaded resource pack overrides the `core/text` shader, the font atlas stays at 256x256 unless the pack lists `font_atlas_resizing` under `compatible_features` in an `immediatelyfast` metadata section, and the map atlas is switched off when the pack lists `map_atlas_generation` under `incompatible_features`. Server resource packs with custom text shaders therefore look the same as in vanilla.
 
+### HUD cache
+
+The HUD is drawn into an offscreen framebuffer at up to 60 frames per second (20 while a screen is open), and every frame only blends that cached image over the world. Each HUD frame is spread over 3 render frames: HUD layers are split into 3 groups of roughly equal measured cost, and each frame redraws one group, so no single frame pays for the whole HUD. Animations inside cached layers advance by the summed frame time of the cycle. Layers whose blending reads the color underneath them, like the crosshair, switch to being drawn every frame the first time they appear, and so does anything drawn outside a registered HUD layer, including the FPS counter. Resizing the window, opening or closing a screen or hiding the HUD redraws the HUD directly for two cached frames so nothing shows stale.
+
 ### Memory
 
 Less live memory means shorter and rarer garbage collections.

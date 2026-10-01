@@ -30,6 +30,7 @@
   "breaks": {
     "immediatelyfast": "*",
     "obe": "*",
-    "ferritecore": "*"
+    "ferritecore": "*",
+    "gnetum": "*"
   }
 }

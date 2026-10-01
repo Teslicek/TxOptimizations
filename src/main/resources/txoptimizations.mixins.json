@@ -63,7 +63,16 @@
     "bake.SignTextCullingMixin",
     "bake.SignTextMessageCacheMixin",
     "bake.SkullBlockEntityBakeMixin",
-    "bake.SodiumWorldRendererBakeMixin"
+    "bake.SodiumWorldRendererBakeMixin",
+    "hud.GameRendererHudCacheMixin",
+    "hud.GpuBufferPoolHudCacheMixin",
+    "hud.GuiRenderStateHudCacheMixin",
+    "hud.HudCacheMixin",
+    "hud.HudElementRegistryAccessor",
+    "hud.MappableRingBufferHudCacheMixin",
+    "hud.MinecraftHudCacheMixin",
+    "hud.RootLayerHudCacheMixin",
+    "hud.TimerHudCacheMixin"
   ],
   "injectors": {
     "defaultRequire": 1

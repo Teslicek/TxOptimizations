@@ -49,3 +49,11 @@ accessible field net/minecraft/world/phys/shapes/VoxelShape faces [Lnet/minecraf
 
 # Baked block entity kinds
 accessible field net/minecraft/world/level/block/entity/BlockEntityType validBlocks Ljava/util/Set;
+
+# HUD cache
+accessible field net/minecraft/client/renderer/GameRenderer mainRenderTarget Lcom/mojang/blaze3d/pipeline/RenderTarget;
+mutable field net/minecraft/client/renderer/GameRenderer mainRenderTarget Lcom/mojang/blaze3d/pipeline/RenderTarget;
+accessible field net/minecraft/client/renderer/GameRenderer guiRenderer Lnet/minecraft/client/gui/render/GuiRenderer;
+accessible field net/minecraft/client/gui/GuiGraphicsExtractor guiRenderState Lnet/minecraft/client/renderer/state/gui/GuiRenderState;
+accessible field com/mojang/renderpearl/api/pipeline/RenderPipeline colorTargetStates Ljava/util/List;
+mutable field com/mojang/renderpearl/api/pipeline/RenderPipeline colorTargetStates Ljava/util/List;
