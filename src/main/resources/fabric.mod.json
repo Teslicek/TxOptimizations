@@ -1,0 +1,21 @@
+{
+  "schemaVersion": 1,
+  "id": "txoptimizations",
+  "version": "${version}",
+  "name": "TxOptimizations",
+  "description": "Client-side render thread optimizations for 26.3 that cache per-frame light lookups once per tick, without changing settings or visuals.",
+  "authors": ["txslx"],
+  "license": "MIT",
+  "environment": "client",
+  "mixins": [
+    {
+      "config": "txoptimizations.mixins.json",
+      "environment": "client"
+    }
+  ],
+  "depends": {
+    "fabricloader": ">=0.19.5",
+    "minecraft": "~26.3",
+    "java": ">=25"
+  }
+}

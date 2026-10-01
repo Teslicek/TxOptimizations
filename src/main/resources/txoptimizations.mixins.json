@@ -1,0 +1,18 @@
+{
+  "required": true,
+  "package": "com.teslicek.txoptimizations.mixin",
+  "compatibilityLevel": "JAVA_25",
+  "client": [
+    "AtmosphericFogSkyLightMixin",
+    "BlockEntityRenderDispatcherCacheMixin",
+    "BlockEntityRendererCacheMixin",
+    "GpuBufferPoolRecycleMixin",
+    "MinecraftClockMixin",
+    "ParticleLightCacheMixin",
+    "SoundEngineListenerMixin",
+    "VulkanCommandEncoderPollMixin"
+  ],
+  "injectors": {
+    "defaultRequire": 1
+  }
+}
