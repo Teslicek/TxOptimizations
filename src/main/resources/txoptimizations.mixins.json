@@ -9,6 +9,7 @@
     "BufferBuilderElementCacheMixin",
     "CameraFluidCacheMixin",
     "DebugScreenEntryListLookupMixin",
+    "EnvironmentAttributeValueCacheMixin",
     "FormattedBidiReorderFastPathMixin",
     "GpuBufferPoolRecycleMixin",
     "HudFpsCounterMixin",
@@ -19,6 +20,7 @@
     "SoundEngineListenerMixin",
     "TranslatableTemplateCacheMixin",
     "VertexFormatElementCacheMixin",
+    "VulkanBackendCheckpointMixin",
     "VulkanCommandEncoderPollMixin"
   ],
   "injectors": {

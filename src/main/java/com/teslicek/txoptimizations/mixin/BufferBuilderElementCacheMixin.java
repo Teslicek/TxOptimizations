@@ -1,7 +1,5 @@
 package com.teslicek.txoptimizations.mixin;
 
-import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
-import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
 import com.mojang.blaze3d.vertex.BufferBuilder;
 import com.mojang.renderpearl.api.vertex.VertexFormat;
 import com.mojang.renderpearl.api.vertex.VertexFormatElement;
@@ -11,6 +9,7 @@ import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;
+import org.spongepowered.asm.mixin.injection.Redirect;
 
 @Mixin(BufferBuilder.class)
 public abstract class BufferBuilderElementCacheMixin {
@@ -19,13 +18,13 @@ public abstract class BufferBuilderElementCacheMixin {
     @Final
     private static String[] elementNames;
 
-    @WrapOperation(method = "<init>", at = @At(value = "INVOKE", target = "Lcom/mojang/renderpearl/api/vertex/VertexFormat;contains(Ljava/lang/String;)Z"))
-    private boolean txoptimizations$cachedContains(VertexFormat format, String name, Operation<Boolean> original) {
+    @Redirect(method = "<init>", at = @At(value = "INVOKE", target = "Lcom/mojang/renderpearl/api/vertex/VertexFormat;contains(Ljava/lang/String;)Z"))
+    private boolean txoptimizations$cachedContains(VertexFormat format, String name) {
         return txoptimizations$element(format, name) != null;
     }
 
-    @WrapOperation(method = "<init>", at = @At(value = "INVOKE", target = "Lcom/mojang/renderpearl/api/vertex/VertexFormat;getElement(Ljava/lang/String;)Lcom/mojang/renderpearl/api/vertex/VertexFormatElement;"))
-    private VertexFormatElement txoptimizations$cachedElement(VertexFormat format, String name, Operation<VertexFormatElement> original) {
+    @Redirect(method = "<init>", at = @At(value = "INVOKE", target = "Lcom/mojang/renderpearl/api/vertex/VertexFormat;getElement(Ljava/lang/String;)Lcom/mojang/renderpearl/api/vertex/VertexFormatElement;"))
+    private VertexFormatElement txoptimizations$cachedElement(VertexFormat format, String name) {
         return txoptimizations$element(format, name);
     }
 
