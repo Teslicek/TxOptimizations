@@ -43,6 +43,7 @@
     "VertexFormatElementCacheMixin",
     "VulkanBackendCheckpointMixin",
     "VulkanCommandEncoderPollMixin",
+    "WeatherColumnCullMixin",
     "bake.BannerRendererBakeMixin",
     "bake.BellBlockEntityBakeMixin",
     "bake.BlockEntityBakeStateMixin",

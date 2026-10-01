@@ -104,6 +104,10 @@ When a loaded resource pack overrides the `core/text` shader, the font atlas sta
 
 The HUD is drawn into an offscreen framebuffer at up to 60 frames per second (20 while a screen is open), and every frame only blends that cached image over the world. Each HUD frame is spread over 3 render frames: HUD layers are split into 3 groups of roughly equal measured cost, and each frame redraws one group, so no single frame pays for the whole HUD. Animations inside cached layers advance by the summed frame time of the cycle. Layers whose blending reads the color underneath them, like the crosshair, switch to being drawn every frame the first time they appear, and so does anything drawn outside a registered HUD layer, including the FPS counter. Resizing the window, opening or closing a screen or hiding the HUD redraws the HUD directly for two cached frames so nothing shows stale.
 
+### Rain culling
+
+Rain and snow are built column by column around the camera every frame. Columns whose vertical span lies outside the camera's view are skipped. Each column draws with its own position-seeded randomness, so the visible rain looks exactly the same.
+
 ### Memory
 
 Less live memory means shorter and rarer garbage collections.
