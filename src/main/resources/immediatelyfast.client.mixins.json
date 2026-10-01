@@ -4,6 +4,7 @@
   "compatibilityLevel": "JAVA_25",
   "client": [
     "batch_animated_item_updates.MixinGuiRenderer",
+    "enhanced_batching.MixinScissorState",
     "fast_text_lookup.MixinTextFeatureRenderer_GlyphRenderer",
     "font_atlas_resizing.MixinFontTexture",
     "map_atlas_generation.MixinGuiGraphicsExtractor",

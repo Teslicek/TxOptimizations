@@ -92,14 +92,15 @@ This is a trimmed copy of [Optimized Block Entities](https://github.com/maDU59/O
 
 ### ImmediatelyFast (partial)
 
-Four exact features of [ImmediatelyFast](https://github.com/RaphiMC/ImmediatelyFast) 1.17.1 by RK_01 (tag `v1.17.1`), kept in its original `net.raphimc.immediatelyfast` packages:
+Five features of [ImmediatelyFast](https://github.com/RaphiMC/ImmediatelyFast) 1.17.1 by RK_01 (tag `v1.17.1`), kept in its original `net.raphimc.immediatelyfast` packages:
 
 - Font atlas resizing: font glyph textures are 1024x1024 instead of 256x256, so text spans far fewer textures and needs fewer texture switches and draw calls.
 - Map atlas generation: map images are packed into shared 2048x2048 textures, so walls of maps in item frames draw in a few calls instead of one per map.
 - Fast text lookup: consecutive glyphs of the same render type reuse the same vertex builder instead of looking it up for every glyph.
 - Animated item batching: animated item icons in the GUI share one atlas that is cleared once per frame instead of slot by slot.
+- Scissor state equality: vanilla merges draws of the same prepared render type inside groups it marks as reorderable, but `RenderType.prepare` copies the scissor state every time and `ScissorState` has no value equality, so two prepared render types never compare equal and the merge almost never happens. Comparing scissor states by value lets that vanilla merge work, which cuts draw calls. Strictly ordered groups are untouched.
 
-The resource pack conflict handling is kept: when a loaded resource pack overrides the `core/text` shader without declaring compatibility, font atlas resizing is switched off (and map atlas generation if the pack declares it incompatible), so server resource packs with custom text shaders look the same as without these features. Removed from the original: the config file, the OpenGL-only fixes, enhanced batching (it reorders draws and can change how translucent geometry overlaps), the text translucency sorting skip (on 26.3 its targets point at beacon beams instead of text, and vanilla 26.3 no longer sorts plain text), sign text buffering and the debug screen entry. TxOptimizations declares ImmediatelyFast as incompatible so both cannot hook the same code. The ImmediatelyFast code is licensed by its author under LGPL-3.0-or-later, see `LICENSE-ImmediatelyFast`.
+The resource pack conflict handling is kept: when a loaded resource pack overrides the `core/text` shader without declaring compatibility, font atlas resizing is switched off (and map atlas generation if the pack declares it incompatible), so server resource packs with custom text shaders look the same as without these features. Removed from the original: the config file, the OpenGL-only fixes, the forced reordering half of enhanced batching (it overrides vanilla's strictly ordered groups), the text translucency sorting skip (on 26.3 its targets point at beacon beams instead of text, and vanilla 26.3 no longer sorts plain text), sign text buffering and the debug screen entry. TxOptimizations declares ImmediatelyFast as incompatible so both cannot hook the same code. The ImmediatelyFast code is licensed by its author under LGPL-3.0-or-later, see `LICENSE-ImmediatelyFast`.
 
 ## Build
 
