@@ -84,33 +84,29 @@ TxOptimizations draws its own FPS counter in the top left corner (`123 FPS`, whi
 
 Sodium Extra records every frame and sorts the last 5 seconds of frame times twice every 0.5 seconds for its 1% and 0.1% low values, even when its overlay is off, which took about 0.8% of the render thread at high frame rates. When Sodium Extra is installed, TxOptimizations skips that recording, so Sodium Extra's own FPS overlay (its Show FPS option, `show_fps` in `config/sodium-extra-options.json`) should be switched off.
 
-### Optimized Block Entities (OBE)
+### Baked block entities
 
-Chests, ender chests, shulker boxes, signs, banners, beds, bells, skulls, decorated pots, lecterns, shelves, campfires, beacons, copper golem statues and cushions are baked into the chunk mesh like normal blocks instead of being rendered again every frame, and only switch back to per-frame rendering while they animate (for example while a chest opens). In a server lobby profile this cut block entity rendering from about 4.1% to 0.35% of the render thread.
+Chests, ender chests, shulker boxes, bells, skulls, banner poles, decorated pots, copper golem statues and cushions are baked into the chunk mesh like normal blocks instead of being drawn again every frame. They switch back to per-frame rendering only while they move: a chest or shulker box while its lid is open, a bell while it swings, a decorated pot while it wobbles, an animated dragon or piglin head. Banner flags keep waving because only the pole and bar are baked. Player heads and decorated pots with sherds stay per-frame, and a named cushion only draws its name tag per frame. In a server lobby profile this cut block entity rendering from about 4.1% to 0.35% of the render thread.
 
-This is a trimmed copy of [Optimized Block Entities](https://github.com/maDU59/OptimisedBlockEntities) 1.1.50 by maDU59_ (commit `f186eae`), kept in its original `fr.madu59.obe` packages. Removed from the original: the config screen, ModMenu and Sodium options pages, the public API, and the compatibility code for Iris, Lootr, Entity Model Features, BCLib and VulkanMod. OBE's settings still load from `config/obe.json` with OBE's defaults. The empty sign check reads the text filtering flag once per frame instead of once per sign. The OBE code is licensed by its author under LGPL-3.0-or-later, see `LICENSE-OBE`. It requires Fabric API and Sodium.
+Block entities with nothing to draw are skipped: signs without text, beacons without a beam, campfires and shelves without items and lecterns without a book. Sign text facing away from the camera is not drawn.
 
-### ImmediatelyFast (partial)
+### Atlases and batching
 
-Five features of [ImmediatelyFast](https://github.com/RaphiMC/ImmediatelyFast) 1.17.1 by RK_01 (tag `v1.17.1`), kept in its original `net.raphimc.immediatelyfast` packages:
-
-- Font atlas resizing: font glyph textures are 1024x1024 instead of 256x256, so text spans far fewer textures and needs fewer texture switches and draw calls.
-- Map atlas generation: map images are packed into shared 2048x2048 textures, so walls of maps in item frames draw in a few calls instead of one per map.
-- Fast text lookup: consecutive glyphs of the same render type reuse the same vertex builder instead of looking it up for every glyph.
-- Animated item batching: animated item icons in the GUI share one atlas that is cleared once per frame instead of slot by slot.
+- Font atlas: font glyph textures are 1024x1024 instead of 256x256, so text spans far fewer textures and needs fewer texture switches and draw calls.
+- Map atlas: map images are packed into shared 2048x2048 textures, so walls of maps in item frames draw in a few calls instead of one per map.
+- Glyph vertex builder: consecutive glyphs of the same render type reuse the same vertex builder instead of looking it up for every glyph.
+- Animated item atlas: animated item icons in the GUI share one atlas that is cleared once per frame instead of slot by slot.
 - Scissor state equality: vanilla merges draws of the same prepared render type inside groups it marks as reorderable, but `RenderType.prepare` copies the scissor state every time and `ScissorState` has no value equality, so two prepared render types never compare equal and the merge almost never happens. Comparing scissor states by value lets that vanilla merge work, which cuts draw calls. Strictly ordered groups are untouched.
 
-The resource pack conflict handling is kept: when a loaded resource pack overrides the `core/text` shader without declaring compatibility, font atlas resizing is switched off (and map atlas generation if the pack declares it incompatible), so server resource packs with custom text shaders look the same as without these features. Removed from the original: the config file, the OpenGL-only fixes, the forced reordering half of enhanced batching (it overrides vanilla's strictly ordered groups), the text translucency sorting skip (on 26.3 its targets point at beacon beams instead of text, and vanilla 26.3 no longer sorts plain text), sign text buffering and the debug screen entry. TxOptimizations declares ImmediatelyFast as incompatible so both cannot hook the same code. The ImmediatelyFast code is licensed by its author under LGPL-3.0-or-later, see `LICENSE-ImmediatelyFast`.
+When a loaded resource pack overrides the `core/text` shader, the font atlas stays at 256x256 unless the pack lists `font_atlas_resizing` under `compatible_features` in an `immediatelyfast` metadata section, and the map atlas is switched off when the pack lists `map_atlas_generation` under `incompatible_features`. Server resource packs with custom text shaders therefore look the same as in vanilla.
 
-### FerriteCore (partial)
+### Memory
 
-Three memory savings from [FerriteCore](https://github.com/malte0811/FerriteCore) 9.0.0 by malte0811 (commit `0cef1f2`), kept in its original `malte0811.ferritecore` packages. Less live memory means shorter and rarer garbage collections:
+Less live memory means shorter and rarer garbage collections.
 
-- Block state neighbor table: instead of every block state holding its own table of neighbor states, all states of a block share one bit-packed table that `setValue` indexes into.
+- Block state neighbor table: instead of every block state holding its own table of neighbor states, all states of a block share one bit-packed table that `setValue` indexes into. `getValue` keeps reading vanilla's per-state value array.
 - Block state cache deduplication: identical collision shapes and face sturdiness arrays in the per-state cache are shared instead of stored once per state.
 - Empty item component patches: items with no changed components share one empty map instead of each allocating their own.
-
-Removed from the original: the config file, the compact neighbor table mode, the property map replacement (it saves memory by dropping the per-state value array, which makes every `getValue` call decode the value from the shared table instead of reading an array) and the threading detector. TxOptimizations declares FerriteCore as incompatible so both cannot overwrite the same code. The FerriteCore code is licensed by its author under the MIT license, see `LICENSE-FerriteCore`.
 
 ## Build
 

@@ -1,11 +1,9 @@
 {
   "sources": [
-    { "type": "directory", "source": "entity/signs", "prefix": "entity/signs/" },
     { "type": "directory", "source": "entity/chest", "prefix": "entity/chest/" },
     { "type": "directory", "source": "entity/shulker", "prefix": "entity/shulker/" },
     { "type": "directory", "source": "entity/bell", "prefix": "entity/bell/" },
     { "type": "directory", "source": "entity/decorated_pot", "prefix": "entity/decorated_pot/" },
-    { "type": "directory", "source": "entity/bed", "prefix": "entity/bed/" },
     { "type": "directory", "source": "entity/banner", "prefix": "entity/banner/" },
     { "type": "directory", "source": "entity/copper_golem", "prefix": "entity/copper_golem/" },
     { "type": "directory", "source": "entity/zombie", "prefix": "entity/zombie/" },
@@ -15,20 +13,6 @@
     { "type": "directory", "source": "entity/piglin", "prefix": "entity/piglin/" },
     { "type": "directory", "source": "entity/creeper", "prefix": "entity/creeper/" },
     { "type": "directory", "source": "entity/enderdragon", "prefix": "entity/enderdragon/" },
-    { "type": "directory", "source": "entity/cushion", "prefix": "entity/cushion/" },
-    { "type": "directory", "source": "quark_variant_chests", "prefix": "quark_variant_chests/" },
-    { "type": "directory", "source": "entity/shulker_box", "prefix": "entity/shulker_box/" },
-    { "type": "single", "resource": "lootr:chest" },
-    { "type": "single", "resource": "lootr:chest_opened" },
-    { "type": "single", "resource": "lootr:chest_trapped" },
-    { "type": "single", "resource": "lootr:chest_trapped_opened" },
-    { "type": "single", "resource": "lootr:old_chest" },
-    { "type": "single", "resource": "lootr:old_chest_opened" },
-    { "type": "single", "resource": "lootr:old_chest_trapped" },
-    { "type": "single", "resource": "lootr:old_chest_trapped_opened" },
-    { "type": "single", "resource": "lootr:shulker" },
-    { "type": "single", "resource": "lootr:shulker_opened" },
-    { "type": "single", "resource": "lootr:old_shulker" },
-    { "type": "single", "resource": "lootr:old_shulker_opened" }
+    { "type": "directory", "source": "entity/cushion", "prefix": "entity/cushion/" }
   ]
 }
