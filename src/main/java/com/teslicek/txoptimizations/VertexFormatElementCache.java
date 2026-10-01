@@ -7,4 +7,6 @@ public interface VertexFormatElementCache {
     VertexFormatElement[] txoptimizations$getBufferElements();
 
     void txoptimizations$setBufferElements(VertexFormatElement[] elements);
+
+    VertexFormatElement txoptimizations$getPositionElement();
 }

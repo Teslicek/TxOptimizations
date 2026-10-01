@@ -4,6 +4,7 @@ import com.mojang.blaze3d.vertex.CompactVectorArray;
 import com.mojang.blaze3d.vertex.MeshData;
 import com.mojang.renderpearl.api.vertex.VertexFormat;
 import com.mojang.renderpearl.api.vertex.VertexFormatElement;
+import com.teslicek.txoptimizations.VertexFormatElementCache;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import org.lwjgl.system.MemoryUtil;
@@ -24,7 +25,7 @@ public abstract class MeshDataCentroidMixin {
         if (!buffer.isDirect() || buffer.order() != ByteOrder.nativeOrder())
             return;
 
-        VertexFormatElement position = format.getElement("Position");
+        VertexFormatElement position = ((VertexFormatElementCache) format).txoptimizations$getPositionElement();
 
         if (position == null)
             throw new IllegalArgumentException("Cannot identify quad centers with no position element");
