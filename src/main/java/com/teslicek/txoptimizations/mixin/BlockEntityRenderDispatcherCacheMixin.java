@@ -1,6 +1,6 @@
 package com.teslicek.txoptimizations.mixin;
 
-import com.teslicek.txoptimizations.BlockEntityRendererCache;
+import com.teslicek.txoptimizations.RendererCache;
 import java.util.Map;
 import net.minecraft.client.renderer.blockentity.BlockEntityRenderDispatcher;
 import net.minecraft.world.level.block.entity.BlockEntity;
@@ -19,7 +19,7 @@ public abstract class BlockEntityRenderDispatcherCacheMixin {
         )
     )
     private Object txoptimizations$cachedRenderer(Map<?, ?> renderers, Object blockEntityType, BlockEntity blockEntity) {
-        BlockEntityRendererCache cache = (BlockEntityRendererCache) blockEntity;
+        RendererCache cache = (RendererCache) blockEntity;
 
         if (cache.txoptimizations$getRendererSource() == renderers)
             return cache.txoptimizations$getRenderer();

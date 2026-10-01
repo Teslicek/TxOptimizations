@@ -2,7 +2,7 @@ package com.teslicek.txoptimizations;
 
 import java.util.Map;
 
-public interface BlockEntityRendererCache {
+public interface RendererCache {
 
     Map<?, ?> txoptimizations$getRendererSource();
 
