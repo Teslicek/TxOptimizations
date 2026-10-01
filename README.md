@@ -78,6 +78,14 @@ Sky color, fog color and other environment attributes are read through `Environm
 
 When the GPU supports `VK_AMD_buffer_marker` or `VK_NV_device_diagnostic_checkpoints`, renderpearl writes a marker into the command buffer at every render pass so a driver crash report can name the last pass that ran. That took about 0.4% of the render thread. TxOptimizations makes renderpearl use its built-in no-op checkpoint storage, the same one it uses on GPUs without those extensions. Rendering is unchanged, but a GPU driver crash report no longer lists the last render passes.
 
+### Particle rotation
+
+Every camera-facing particle allocated a new rotation quaternion and rotated it around Z by its roll angle, which costs a sine and a square root even when the roll is 0. The quaternion is now reused (reset to identity first, as the new one was), and a roll of exactly 0 skips the rotation. Most particles never roll.
+
+### Feature renderer list
+
+Preparing each frame walked the list of feature renderers through a freshly built Guava filter that skips empty slots, three times per frame preparation. The filtered list only changes when a renderer is registered, so it is built once at registration and reused.
+
 ### FPS counter
 
 TxOptimizations draws its own FPS counter in the top left corner (`123 FPS`, white, no shadow, at 2,2), hidden while the F3 screen is open or the HUD is hidden. The number is the average frame rate over the last 0.5 seconds and updates every 0.5 seconds, the same as Sodium Extra's FPS overlay. It only counts frames, and the text is rebuilt only when the number changes, so drawing it skips the per-frame translation and text-direction work that Sodium Extra's overlay goes through.
