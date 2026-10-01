@@ -13,20 +13,26 @@ import net.minecraft.world.level.block.entity.SignTextSlot;
 
 public final class EmptyBlockEntities {
 
-    private static long    textFilteringFrame = -1L;
+    private static long    textFilteringTick = -1L;
     private static boolean textFiltering;
 
     private EmptyBlockEntities() {
     }
 
     public static boolean isEmpty(BlockEntity blockEntity) {
-        return switch (blockEntity) {
-            case SignBlockEntity sign -> !hasMessage(sign, SignTextSlot.FRONT) && !hasMessage(sign, SignTextSlot.BACK);
-            case BeaconBlockEntity beacon -> beacon.getBeamSections().isEmpty();
-            case CampfireBlockEntity campfire -> isEmpty(campfire.getItems());
-            case ShelfBlockEntity shelf -> isEmpty(shelf.getItems());
-            default -> false;
-        };
+        if (blockEntity instanceof SignBlockEntity sign)
+            return !hasMessage(sign, SignTextSlot.FRONT) && !hasMessage(sign, SignTextSlot.BACK);
+
+        if (blockEntity instanceof CampfireBlockEntity campfire)
+            return isEmpty(campfire.getItems());
+
+        if (blockEntity instanceof ShelfBlockEntity shelf)
+            return isEmpty(shelf.getItems());
+
+        if (blockEntity instanceof BeaconBlockEntity beacon)
+            return beacon.getBeamSections().isEmpty();
+
+        return false;
     }
 
     private static boolean hasMessage(SignBlockEntity sign, SignTextSlot slot) {
@@ -34,19 +40,19 @@ public final class EmptyBlockEntities {
     }
 
     private static boolean isEmpty(List<ItemStack> items) {
-        for (ItemStack item : items)
-            if (!item.isEmpty())
+        for (int i = 0; i < items.size(); i ++)
+            if (!items.get(i).isEmpty())
                 return false;
 
         return true;
     }
 
     private static boolean isTextFilteringEnabled() {
-        long frame = ClientClock.frame();
+        long tick = ClientClock.tick();
 
-        if (frame != textFilteringFrame) {
-            textFiltering      = Minecraft.getInstance().isTextFilteringEnabled();
-            textFilteringFrame = frame;
+        if (tick != textFilteringTick) {
+            textFiltering     = Minecraft.getInstance().isTextFilteringEnabled();
+            textFilteringTick = tick;
         }
 
         return textFiltering;
