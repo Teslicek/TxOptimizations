@@ -9,6 +9,16 @@ base {
     archivesName = "txoptimizations-${project.minecraft_version}"
 }
 
+repositories {
+    maven {
+        url = 'https://maven.caffeinemc.net/releases'
+    }
+}
+
+loom {
+    accessWidenerPath = file('src/main/resources/obe.classtweaker')
+}
+
 java {
     toolchain {
         languageVersion = JavaLanguageVersion.of(25)
@@ -23,6 +33,8 @@ tasks.withType(JavaCompile).configureEach {
 dependencies {
     minecraft      "com.mojang:minecraft:${project.minecraft_version}"
     implementation "net.fabricmc:fabric-loader:${project.loader_version}"
+    implementation "net.fabricmc.fabric-api:fabric-api:${project.fabric_api_version}"
+    compileOnly    "net.caffeinemc:sodium-fabric:${project.sodium_version}"
 }
 
 processResources {
@@ -32,6 +44,10 @@ processResources {
     filesMatching("fabric.mod.json") {
         expand version: project.version
     }
+}
+
+jar {
+    from('LICENSE-OBE')
 }
 
 tasks.register('collectJars', Copy) {

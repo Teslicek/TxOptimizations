@@ -26,6 +26,12 @@ Every frame, every block entity (chests, signs, heads, banners) asks `BlockEntit
 
 Every frame, `SoundEngine.updateSource` sends the camera's position and direction to the sound thread, and every send wakes that thread from sleep. At thousands of frames per second this took about 1% of the render thread. TxOptimizations skips the update when the camera has not moved or turned since the last one that was sent, and otherwise sends at most one update every 5 ms. Each frame compares against the last update actually sent, so the final position after you stop moving is always sent within 5 ms. OpenAL applies listener changes once per mixing block, which is normally longer than 5 ms, so the limit is not audible. When the sound system restarts (`loadLibrary`), the last sent update is forgotten so the listener is set again on the next frame.
 
+### Optimized Block Entities (OBE)
+
+Chests, ender chests, shulker boxes, signs, banners, beds, bells, skulls, decorated pots, lecterns, shelves, campfires, beacons, copper golem statues and cushions are baked into the chunk mesh like normal blocks instead of being rendered again every frame, and only switch back to per-frame rendering while they animate (for example while a chest opens). In a server lobby profile this cut block entity rendering from about 4.1% to 0.35% of the render thread.
+
+This is a trimmed copy of [Optimized Block Entities](https://github.com/maDU59/OptimisedBlockEntities) 1.1.50 by maDU59_ (commit `f186eae`), kept in its original `fr.madu59.obe` packages. Removed from the original: the config screen, ModMenu and Sodium options pages, the public API, and the compatibility code for Iris, Lootr, Entity Model Features, BCLib and VulkanMod. OBE's settings still load from `config/obe.json` with OBE's defaults. The OBE code is licensed by its author under LGPL-3.0-or-later, see `LICENSE-OBE`. It requires Fabric API and Sodium.
+
 ## Build
 
 ```

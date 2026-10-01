@@ -1,0 +1,122 @@
+package fr.madu59.obe.client.mixin.renderer.compat.sodium;
+
+import java.util.Collection;
+
+import org.spongepowered.asm.mixin.Mixin;
+import org.spongepowered.asm.mixin.Pseudo;
+import org.spongepowered.asm.mixin.Unique;
+import org.spongepowered.asm.mixin.injection.At;
+import org.spongepowered.asm.mixin.injection.Inject;
+import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
+
+import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
+import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
+import com.llamalad7.mixinextras.sugar.Local;
+import com.llamalad7.mixinextras.sugar.Share;
+import com.llamalad7.mixinextras.sugar.ref.LocalRef;
+
+import fr.madu59.obe.client.chunk.ChunkTaskHolder;
+import fr.madu59.obe.client.config.SettingsManager;
+import fr.madu59.obe.client.model.BlockEntityStateModel;
+import fr.madu59.obe.client.renderer.blockentity.BlockEntityModelsManager;
+import fr.madu59.obe.client.renderer.blockentity.ext.BlockEntityExt;
+import fr.madu59.obe.client.renderer.entity.MeshableEntityTracker;
+import fr.madu59.obe.client.renderer.entity.MeshableEntityTracker.MeshableEntityData;
+import fr.madu59.obe.client.renderer.entity.ext.EntityExt;
+import fr.madu59.obe.client.renderer.misc.RenderModeManager.RenderMode;
+import fr.madu59.obe.client.util.meshing.SectionMeshingUtil;
+import net.caffeinemc.mods.sodium.client.render.chunk.compile.ChunkBuildOutput;
+import net.caffeinemc.mods.sodium.client.render.chunk.compile.pipeline.BlockRenderer;
+import net.caffeinemc.mods.sodium.client.render.chunk.compile.tasks.ChunkBuilderMeshingTask;
+import net.caffeinemc.mods.sodium.client.world.LevelSlice;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.renderer.block.dispatch.BlockStateModel;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.SectionPos;
+import net.minecraft.core.BlockPos.MutableBlockPos;
+import net.minecraft.world.level.BlockGetter;
+import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.level.block.RenderShape;
+import net.minecraft.world.level.block.entity.BlockEntity;
+import net.minecraft.world.level.block.entity.BlockEntityType;
+import net.minecraft.world.level.block.state.BlockState;
+
+@Pseudo
+@Mixin(value = ChunkBuilderMeshingTask.class, remap = false)
+public class ChunkBuilderMeshingTaskMixin {
+
+    @Unique private final BlockEntityModelsManager blockEntityModelsManager = new BlockEntityModelsManager();
+    @Unique private final SectionPos sectionPos = ((ChunkBuilderMeshingTask)(Object) this).getRenderSection().getPosition();
+
+    @WrapOperation(method = "execute", at = @At(value = "INVOKE", target = "Lnet/caffeinemc/mods/sodium/client/world/LevelSlice;getBlockState(III)Lnet/minecraft/world/level/block/state/BlockState;"))
+    private BlockState obe$getBlockState(LevelSlice slice, int x, int y, int z, Operation<BlockState> original, @Share("be") LocalRef<BlockEntity> beRef){
+        beRef.set(slice.getBlockEntity(x, y, z));
+        return original.call(slice, x, y, z);
+    }
+
+    @WrapOperation(method = "execute", at = @At(value = "INVOKE", target = "Lnet/minecraft/world/level/block/state/BlockState;getRenderShape()Lnet/minecraft/world/level/block/RenderShape;"))
+    private RenderShape obe$getRenderShape(BlockState state, Operation<RenderShape> original, @Share("be") LocalRef<BlockEntity> beRef){
+        return SectionMeshingUtil.getCorrectedRenderShape(state, beRef.get(), sectionPos, original.call(state));
+    }
+
+    @WrapOperation(
+        method = "execute",
+        at = @At(
+            value = "INVOKE",
+            target = "Lnet/caffeinemc/mods/sodium/client/render/chunk/compile/pipeline/BlockRenderer;renderModel(Lnet/minecraft/client/renderer/block/dispatch/BlockStateModel;Lnet/minecraft/world/level/block/state/BlockState;Lnet/minecraft/core/BlockPos;Lnet/minecraft/core/BlockPos;)V"
+        )
+    )
+    public void obe$wrapRenderModel(BlockRenderer instance, BlockStateModel originalModel, BlockState state, BlockPos pos, BlockPos origin, Operation<Void> original, @Share("be") LocalRef<BlockEntity> beRef) {
+        BlockStateModel model = SectionMeshingUtil.getCorrectedModel(state, beRef.get(), originalModel, pos);
+        
+        original.call(instance, model, state, pos, origin);
+    }
+
+    @WrapOperation(
+        method = "execute",
+        at = @At(
+            value = "INVOKE",
+            target = "Lnet/caffeinemc/mods/sodium/client/render/chunk/ExtendedBlockEntityType;shouldRender(Lnet/minecraft/world/level/block/entity/BlockEntityType;Lnet/minecraft/world/level/BlockGetter;Lnet/minecraft/core/BlockPos;Lnet/minecraft/world/level/block/entity/BlockEntity;)Z"
+        )
+    )
+    private boolean obe$wrapShouldRender(BlockEntityType<?> type, BlockGetter slice, BlockPos pos, BlockEntity be, Operation<Boolean> original) {
+        BlockEntityExt ext = (BlockEntityExt) be;
+        if(ext != null && ext.obe$isEnabled() && (!(ext.obe$forceEntity() || !ext.obe$isSupported() || ext.obe$renderModeDelayed() == RenderMode.ENTITY || ext.obe$renderBoth()) || ext.obe$shouldSkipRendering())) {
+            return false;
+        }
+        return original.call(type, slice, pos, be);
+    }
+
+    @Inject(method = "execute", at = @At(value = "INVOKE", target = "Lnet/caffeinemc/mods/sodium/client/render/chunk/compile/pipeline/BlockRenderer;release()V"))
+    private void obe$appendMeshData(CallbackInfoReturnable<ChunkBuildOutput> ci, @Local BlockRenderer blockRenderer, @Local LevelSlice slice){
+        if(!SettingsManager.MOD_TOGGLE.getValue()) return;
+
+        Collection<MeshableEntityData> entitiesData = MeshableEntityTracker.getMeshableEntities(sectionPos);
+        if(entitiesData == null) return;
+
+        MutableBlockPos pos = new MutableBlockPos();
+        MutableBlockPos modelOffset = new MutableBlockPos();
+
+        for(MeshableEntityData data : entitiesData){
+            if(!data.isEnabled()) continue;
+            if(data.level() != Minecraft.getInstance().level){
+                MeshableEntityTracker.deleteInvalidMeshableEntity(data.id(), data.blockPos());
+                continue;
+            }
+            BlockEntityStateModel model = data.getModel();
+            ChunkTaskHolder.addTask(sectionPos, () -> {
+                EntityExt ext = ((EntityExt)Minecraft.getInstance().level.getEntity(data.id()));
+                if(ext != null) ext.obe$renderMode(RenderMode.TERRAIN);
+            });
+            pos.set(data.blockPos());
+
+            int localX = pos.getX() & 15;
+            int localY = pos.getY() & 15;
+            int localZ = pos.getZ() & 15;
+            modelOffset.set(localX, localY, localZ);
+
+            blockRenderer.renderModel(model, Blocks.AIR.defaultBlockState(), pos, modelOffset);
+        }
+    }
+
+}

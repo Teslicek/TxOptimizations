@@ -3,19 +3,32 @@
   "id": "txoptimizations",
   "version": "${version}",
   "name": "TxOptimizations",
-  "description": "Client-side render thread optimizations for 26.3 that cache per-frame light lookups once per tick, without changing settings or visuals.",
-  "authors": ["txslx"],
-  "license": "MIT",
+  "description": "Client-side render thread optimizations for 26.3 that keep settings and visuals, including Optimized Block Entities (OBE) by maDU59_.",
+  "authors": [
+    "txslx"
+  ],
   "environment": "client",
   "mixins": [
     {
       "config": "txoptimizations.mixins.json",
+      "environment": "client"
+    },
+    {
+      "config": "obe.client.mixins.json",
       "environment": "client"
     }
   ],
   "depends": {
     "fabricloader": ">=0.19.5",
     "minecraft": "~26.3",
-    "java": ">=25"
-  }
+    "java": ">=25",
+    "fabric-api": "*",
+    "sodium": "*"
+  },
+  "entrypoints": {
+    "client": [
+      "fr.madu59.obe.client.OBEClient"
+    ]
+  },
+  "accessWidener": "obe.classtweaker"
 }
