@@ -36,6 +36,8 @@
     "GuiRendererAnimatedItemAtlasMixin",
     "HudFpsCounterMixin",
     "LevelExtractorEntityVisibilityMixin",
+    "LivingEntityNameTagAttributeMixin",
+    "LivingEntityRendererNameTagAttributeMixin",
     "MapInstanceAtlasMixin",
     "MapInstanceColorTableMixin",
     "MapRenderStateAtlasMixin",
