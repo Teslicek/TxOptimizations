@@ -118,6 +118,10 @@ Every frame cleared the world target, the depth before the held item and the dep
 
 The Vulkan backend follows every buffer upload with a barrier that makes the whole GPU finish all earlier work before anything else may start. Several uniform uploads happen back to back each frame (global settings, projection matrices, lighting), so the GPU drained once per upload. Consecutive uploads and buffer-to-buffer copies to separate buffer ranges now share a single barrier (a copy also waits when its source or destination overlaps a range still waiting), which is recorded before the next command of any other kind, before an upload that overlaps one still waiting for its barrier, and before the command buffer ends. Timestamp queries do not trigger it.
 
+### World text layout
+
+Name tags, holograms and other text in the world were laid out again every frame: each character looked up its glyph, built a positioned glyph instance and updated the text bounds. Components cache their visual-order sequence, so text the server has not changed arrives as the same sequence object every frame. The laid-out text is now kept per sequence object, position, colors, shadow and outline, and drawn again from the cache. Text with obfuscated characters or with player head and atlas sprite glyphs is never cached, unused layouts are dropped after 200 frames, and everything is dropped when fonts reload or font options change. Drawing a laid-out text only reads it, so the cached copy draws exactly like a fresh one.
+
 ### Feature renderer list
 
 Preparing each frame walked the list of feature renderers through a freshly built Guava filter that skips empty slots, three times per frame preparation. The filtered list only changes when a renderer is registered, so it is built once at registration and reused.
