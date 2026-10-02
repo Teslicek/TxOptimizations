@@ -38,6 +38,7 @@
     "ParticleLightCacheMixin",
     "ParticleRotationMixin",
     "PatchedDataComponentMapEmptyPatchMixin",
+    "QuadParticleCornerCacheMixin",
     "QuadParticleLayerCacheMixin",
     "ScissorStateEqualityMixin",
     "ShapeOutlineEdgeCacheMixin",
