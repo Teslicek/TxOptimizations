@@ -40,6 +40,15 @@ public abstract class VulkanCommandEncoderUploadBarrierMixin {
     @Unique
     private long txoptimizations$uploadEnd;
 
+    @Unique
+    private long txoptimizations$readBuffer;
+
+    @Unique
+    private long txoptimizations$readStart;
+
+    @Unique
+    private long txoptimizations$readEnd;
+
     @Inject(method = "writeToBuffer", at = @At("HEAD"))
     private void txoptimizations$beginUpload(GpuBufferSlice destination, ByteBuffer data, CallbackInfo ci) {
         long buffer = ((VulkanGpuBuffer) destination.buffer()).vkBuffer();
@@ -52,6 +61,7 @@ public abstract class VulkanCommandEncoderUploadBarrierMixin {
         this.txoptimizations$uploadBuffer = buffer;
         this.txoptimizations$uploadStart  = start;
         this.txoptimizations$uploadEnd    = end;
+        this.txoptimizations$readBuffer   = 0L;
         this.txoptimizations$deferDepth ++;
     }
 
@@ -60,12 +70,43 @@ public abstract class VulkanCommandEncoderUploadBarrierMixin {
         this.txoptimizations$deferDepth --;
     }
 
-    @Redirect(method = "writeToBuffer", at = @At(value = "INVOKE", target = "Lcom/mojang/renderpearl/backend/vulkan/VulkanCommandEncoder;memoryBarrier(Lorg/lwjgl/system/MemoryStack;)V"))
+    @Redirect(method = {"writeToBuffer", "copyToBuffer"}, at = @At(value = "INVOKE", target = "Lcom/mojang/renderpearl/backend/vulkan/VulkanCommandEncoder;memoryBarrier(Lorg/lwjgl/system/MemoryStack;)V"))
     private void txoptimizations$deferUploadBarrier(VulkanCommandEncoder encoder, MemoryStack stack) {
         this.txoptimizations$pendingRanges.add(this.txoptimizations$uploadBuffer);
         this.txoptimizations$pendingRanges.add(this.txoptimizations$uploadStart);
         this.txoptimizations$pendingRanges.add(this.txoptimizations$uploadEnd);
+
+        if (this.txoptimizations$readBuffer != 0L) {
+            this.txoptimizations$pendingRanges.add(this.txoptimizations$readBuffer);
+            this.txoptimizations$pendingRanges.add(this.txoptimizations$readStart);
+            this.txoptimizations$pendingRanges.add(this.txoptimizations$readEnd);
+        }
+
         this.txoptimizations$barrierPending = true;
+    }
+
+    @Inject(method = "copyToBuffer", at = @At("HEAD"))
+    private void txoptimizations$beginCopy(GpuBufferSlice source, GpuBufferSlice target, CallbackInfo ci) {
+        long sourceBuffer = ((VulkanGpuBuffer) source.buffer()).vkBuffer();
+        long targetBuffer = ((VulkanGpuBuffer) target.buffer()).vkBuffer();
+        long targetStart  = target.offset();
+        long targetEnd    = targetStart + source.length();
+
+        if (this.txoptimizations$overlapsPending(sourceBuffer, source.offset(), source.offset() + source.length()) || this.txoptimizations$overlapsPending(targetBuffer, targetStart, targetEnd))
+            this.txoptimizations$flushBarrier();
+
+        this.txoptimizations$uploadBuffer = targetBuffer;
+        this.txoptimizations$uploadStart  = targetStart;
+        this.txoptimizations$uploadEnd    = targetEnd;
+        this.txoptimizations$readBuffer   = sourceBuffer;
+        this.txoptimizations$readStart    = source.offset();
+        this.txoptimizations$readEnd      = source.offset() + source.length();
+        this.txoptimizations$deferDepth ++;
+    }
+
+    @Inject(method = "copyToBuffer", at = @At("RETURN"))
+    private void txoptimizations$endCopy(GpuBufferSlice source, GpuBufferSlice target, CallbackInfo ci) {
+        this.txoptimizations$deferDepth --;
     }
 
     @Inject(method = "writeTimestamp", at = @At("HEAD"))

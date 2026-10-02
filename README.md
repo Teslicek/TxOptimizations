@@ -116,7 +116,7 @@ Every frame cleared the world target, the depth before the held item and the dep
 
 ### Upload barriers
 
-The Vulkan backend follows every buffer upload with a barrier that makes the whole GPU finish all earlier work before anything else may start. Several uniform uploads happen back to back each frame (global settings, projection matrices, lighting), so the GPU drained once per upload. Consecutive uploads to separate buffer ranges now share a single barrier, which is recorded before the next command of any other kind, before an upload that overlaps one still waiting for its barrier, and before the command buffer ends. Timestamp queries do not trigger it.
+The Vulkan backend follows every buffer upload with a barrier that makes the whole GPU finish all earlier work before anything else may start. Several uniform uploads happen back to back each frame (global settings, projection matrices, lighting), so the GPU drained once per upload. Consecutive uploads and buffer-to-buffer copies to separate buffer ranges now share a single barrier (a copy also waits when its source or destination overlaps a range still waiting), which is recorded before the next command of any other kind, before an upload that overlaps one still waiting for its barrier, and before the command buffer ends. Timestamp queries do not trigger it.
 
 ### Feature renderer list
 
