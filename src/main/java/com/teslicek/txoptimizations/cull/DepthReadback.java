@@ -29,6 +29,7 @@ public final class DepthReadback {
     private static final int             TEXELS          = WIDTH * HEIGHT;
     private static final int             SLOTS           = 3;
     private static final int             STILL_INTERVAL  = 8;
+    private static final long            MIN_INTERVAL    = 4_000_000L;
     private static final int             PUSH_CONSTANTS  = 16;
     private static final int             TEXTURE_USAGE   = GpuTexture.USAGE_RENDER_ATTACHMENT | GpuTexture.USAGE_COPY_SRC;
     private static final int             BUFFER_USAGE    = GpuBuffer.USAGE_MAP_READ | GpuBuffer.USAGE_COPY_DST;
@@ -60,6 +61,7 @@ public final class DepthReadback {
     private static double         capturedY;
     private static double         capturedZ;
     private static int            framesSinceCapture = STILL_INTERVAL;
+    private static long           lastCaptureNanos;
     private static long           generation;
     private static long           latestVersion;
     private static double         latestX;
@@ -79,7 +81,7 @@ public final class DepthReadback {
     }
 
     public static boolean canCapture() {
-        if (!frameKnown || freeSlot() == null)
+        if (!frameKnown || freeSlot() == null || System.nanoTime() - lastCaptureNanos < MIN_INTERVAL)
             return false;
 
         boolean moved = frameX != capturedX || frameY != capturedY || frameZ != capturedZ || !Arrays.equals(FRAME_MATRIX, CAPTURED_MATRIX);
@@ -120,6 +122,7 @@ public final class DepthReadback {
         capturedY          = frameY;
         capturedZ          = frameZ;
         framesSinceCapture = 0;
+        lastCaptureNanos   = System.nanoTime();
         frameKnown         = false;
 
         RenderSystem.getDevice().createCommandEncoder().copyTextureToBuffer(target, slot.buffer, 0L, () -> complete(slot, captureGeneration), 0);

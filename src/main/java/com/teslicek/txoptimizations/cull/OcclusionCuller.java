@@ -39,6 +39,7 @@ public final class OcclusionCuller {
     private static boolean sectionsChanged;
     private static int     testGeneration;
     private static int     testedRegionCount;
+    private static long    testedVersion;
     private static double  testedX;
     private static double  testedY;
     private static double  testedZ;
@@ -143,13 +144,20 @@ public final class OcclusionCuller {
     }
 
     private static boolean isUnchanged() {
-        return culling && DepthReadback.latestX() == testedX && DepthReadback.latestY() == testedY && DepthReadback.latestZ() == testedZ && Arrays.equals(DepthReadback.latestMatrix(), TESTED_MATRIX) && !sectionsChanged && Arrays.equals(DepthReadback.latestDepth(), TESTED_DEPTH);
+        if (!culling || sectionsChanged)
+            return false;
+
+        if (DepthReadback.latestVersion() == testedVersion)
+            return true;
+
+        return DepthReadback.latestX() == testedX && DepthReadback.latestY() == testedY && DepthReadback.latestZ() == testedZ && Arrays.equals(DepthReadback.latestMatrix(), TESTED_MATRIX) && Arrays.equals(DepthReadback.latestDepth(), TESTED_DEPTH);
     }
 
     private static void remember() {
-        testedX = DepthReadback.latestX();
-        testedY = DepthReadback.latestY();
-        testedZ = DepthReadback.latestZ();
+        testedVersion = DepthReadback.latestVersion();
+        testedX       = DepthReadback.latestX();
+        testedY       = DepthReadback.latestY();
+        testedZ       = DepthReadback.latestZ();
 
         System.arraycopy(DepthReadback.latestMatrix(), 0, TESTED_MATRIX, 0, TESTED_MATRIX.length);
         System.arraycopy(DepthReadback.latestDepth(), 0, TESTED_DEPTH, 0, TESTED_DEPTH.length);
