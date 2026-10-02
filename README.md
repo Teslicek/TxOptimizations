@@ -82,6 +82,10 @@ When the GPU supports `VK_AMD_buffer_marker` or `VK_NV_device_diagnostic_checkpo
 
 Every camera-facing particle allocated a new rotation quaternion each frame. The quaternion is now reused, reset to identity first as the new one was.
 
+### Main target clear
+
+Every frame cleared the main color and depth target before rendering, and the world render cleared the same target again with the fog color before drawing anything. When a world is rendered, the first clear is skipped. Screens without a world still clear as before.
+
 ### Feature renderer list
 
 Preparing each frame walked the list of feature renderers through a freshly built Guava filter that skips empty slots, three times per frame preparation. The filtered list only changes when a renderer is registered, so it is built once at registration and reused.

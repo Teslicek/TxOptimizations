@@ -19,6 +19,7 @@
     "FeatureRendererMapValuesMixin",
     "FontTextureSizeMixin",
     "FormattedBidiReorderFastPathMixin",
+    "GameRendererLevelClearMixin",
     "GlyphRendererVertexBuilderMixin",
     "GpuBufferPoolRecycleMixin",
     "GuiGraphicsExtractorMapAtlasMixin",
