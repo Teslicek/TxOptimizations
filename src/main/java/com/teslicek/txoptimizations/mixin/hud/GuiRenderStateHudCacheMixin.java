@@ -1,6 +1,7 @@
 package com.teslicek.txoptimizations.mixin.hud;
 
 import com.teslicek.txoptimizations.hud.HudCache;
+import net.minecraft.client.renderer.state.gui.BlitRenderState;
 import net.minecraft.client.renderer.state.gui.GuiElementRenderState;
 import net.minecraft.client.renderer.state.gui.GuiItemRenderState;
 import net.minecraft.client.renderer.state.gui.GuiRenderState;
@@ -38,6 +39,7 @@ public abstract class GuiRenderStateHudCacheMixin {
 
         if (!HudCache.isCurrentUncached()) {
             HudCache.checkBlend(element.pipeline());
+            HudCache.include(element.bounds());
 
             return;
         }
@@ -46,10 +48,22 @@ public abstract class GuiRenderStateHudCacheMixin {
         ci.cancel();
     }
 
+    @Inject(method = "addBlitToCurrentLayer", at = @At("HEAD"))
+    private void txoptimizations$includeBlit(BlitRenderState blit, CallbackInfo ci) {
+        if (HudCache.isRendering())
+            HudCache.include(blit.bounds());
+    }
+
     @Unique
     private void txoptimizations$deferUncached(ScreenArea submission, CallbackInfo ci) {
-        if (!HudCache.isRendering() || !HudCache.isCurrentUncached())
+        if (!HudCache.isRendering())
             return;
+
+        if (!HudCache.isCurrentUncached()) {
+            HudCache.include(submission.bounds());
+
+            return;
+        }
 
         HudCache.defer(submission);
         ci.cancel();

@@ -11,6 +11,7 @@ import java.util.Map;
 import java.util.Optional;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.minecraft.client.gui.navigation.ScreenRectangle;
 import net.minecraft.client.renderer.state.gui.GuiElementRenderState;
 import net.minecraft.client.renderer.state.gui.GuiItemRenderState;
 import net.minecraft.client.renderer.state.gui.GuiRenderState;
@@ -139,7 +140,14 @@ public final class HudCache {
         }
 
         replayDeferred(graphics.guiRenderState);
-        graphics.guiRenderState.addGuiElement(new HudBlit(buffers.front()));
+        ScreenRectangle bounds = buffers.frontBounds();
+
+        if (bounds != null)
+            graphics.guiRenderState.addGuiElement(new HudBlit(buffers.front(), bounds));
+    }
+
+    public static void include(ScreenRectangle bounds) {
+        framebuffers().include(bounds);
     }
 
     public static void markForCatchUp() {

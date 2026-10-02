@@ -20,7 +20,7 @@ import net.minecraft.client.renderer.BindGroupLayouts;
 import net.minecraft.client.renderer.state.gui.GuiElementRenderState;
 import net.minecraft.resources.Identifier;
 
-record HudBlit(RenderTarget target) implements GuiElementRenderState {
+record HudBlit(RenderTarget target, ScreenRectangle area) implements GuiElementRenderState {
 
     private static final int COLOR_WRITE_MASK = 7;
 
@@ -34,15 +34,23 @@ record HudBlit(RenderTarget target) implements GuiElementRenderState {
         .withColorTargetState(new ColorTargetState(Optional.of(new BlendFunction(BlendFactor.ONE, BlendFactor.ONE_MINUS_SRC_ALPHA, BlendFactor.ONE, BlendFactor.ONE_MINUS_SRC_ALPHA)), GpuFormat.RGBA8_UNORM, COLOR_WRITE_MASK))
         .withDepthStencilState(new DepthStencilState(CompareOp.ALWAYS_PASS, false))
         .withPrimitiveTopology(PrimitiveTopology.TRIANGLES)
-        .withVertexShader(Identifier.fromNamespaceAndPath("txoptimizations", "shaderc/hud_fullscreen"))
+        .withVertexShader(Identifier.fromNamespaceAndPath("txoptimizations", "shaderc/hud_rect"))
         .withFragmentShader(Identifier.fromNamespaceAndPath("txoptimizations", "shaderc/hud_blit"))
         .build();
 
     @Override
     public void buildVertices(VertexConsumer vertices) {
-        vertices.addVertex(0.0F, 0.0F, 0.0F).setUv(0.0F, 0.0F);
-        vertices.addVertex(0.0F, 0.0F, 0.0F).setUv(0.0F, 0.0F);
-        vertices.addVertex(0.0F, 0.0F, 0.0F).setUv(0.0F, 0.0F);
+        float left   = this.area.left();
+        float top    = this.area.top();
+        float right  = this.area.right();
+        float bottom = this.area.bottom();
+
+        vertices.addVertex(left, top, 0.0F).setUv(0.0F, 0.0F);
+        vertices.addVertex(left, bottom, 0.0F).setUv(0.0F, 0.0F);
+        vertices.addVertex(right, bottom, 0.0F).setUv(0.0F, 0.0F);
+        vertices.addVertex(right, bottom, 0.0F).setUv(0.0F, 0.0F);
+        vertices.addVertex(right, top, 0.0F).setUv(0.0F, 0.0F);
+        vertices.addVertex(left, top, 0.0F).setUv(0.0F, 0.0F);
     }
 
     @Override
@@ -62,6 +70,6 @@ record HudBlit(RenderTarget target) implements GuiElementRenderState {
 
     @Override
     public ScreenRectangle bounds() {
-        return new ScreenRectangle(0, 0, this.target.width, this.target.height);
+        return this.area;
     }
 }
