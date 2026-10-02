@@ -13,14 +13,9 @@ import com.mojang.renderpearl.api.pipeline.RenderPipeline;
 import com.mojang.renderpearl.api.pipeline.UniformType;
 import com.teslicek.txoptimizations.mixin.gpu.FrontendRenderPassAccessor;
 import com.teslicek.txoptimizations.mixin.gpu.VulkanRenderPassAccessor;
-import java.io.IOException;
-import java.io.UncheckedIOException;
 import java.nio.ByteBuffer;
 import java.nio.LongBuffer;
-import java.nio.file.Files;
 import java.nio.file.Path;
-import java.time.LocalDateTime;
-import java.time.format.DateTimeFormatter;
 import java.util.Locale;
 import java.util.Optional;
 import net.caffeinemc.mods.sodium.client.model.quad.properties.ModelQuadFacing;
@@ -53,7 +48,6 @@ public final class OcclusionProbe {
     private static final int               PUSH_CONSTANTS = 16;
     private static final double            NEAR_MARGIN    = 2.0;
     private static final double            SECTION_SIZE   = 16.0;
-    private static final DateTimeFormatter FILE_TIME      = DateTimeFormatter.ofPattern("yyyy-MM-dd_HH.mm.ss");
     private static final BindGroupLayout   GLOBALS        = BindGroupLayout.builder().withUniform("u_Globals", UniformType.UNIFORM_BUFFER).build();
     private static final RenderPipeline    PIPELINE       = RenderPipeline.builder()
         .withLocation(Identifier.fromNamespaceAndPath("txoptimizations", "occlusion_probe"))
@@ -261,15 +255,8 @@ public final class OcclusionProbe {
             report.append(String.format(Locale.ROOT, "%s: %d vertices, %.1f%% drawn but hidden%n", terrainPass.getPipeline().getLocation().getPath(), total[index], total[index] == 0L ? 0.0 : hidden[index] * 100.0 / total[index]));
         }
 
-        Path file = Minecraft.getInstance().gameDirectory.toPath().resolve("logs").resolve("txocclusion-" + LocalDateTime.now().format(FILE_TIME) + ".txt");
-
-        try {
-            Files.writeString(file, report.toString());
-        } catch (IOException exception) {
-            throw new UncheckedIOException("Could not write the occlusion probe to " + file, exception);
-        }
-
-        Component message = Component.literal("Occlusion probe saved to logs/" + file.getFileName() + "\n" + report.toString().strip());
+        Path      file    = ReportFiles.write("txocclusion", report.toString());
+        Component message = ReportFiles.savedMessage("Occlusion probe", file).append("\n" + report.toString().strip());
 
         Minecraft.getInstance().schedule(() -> Minecraft.getInstance().gui.hud.getChat().addClientSystemMessage(message));
     }

@@ -3,18 +3,13 @@ package com.teslicek.txoptimizations.gpu;
 import com.mojang.renderpearl.api.commands.GpuQueryPool;
 import com.mojang.renderpearl.backend.api.CommandEncoderBackend;
 import com.mojang.renderpearl.backend.vulkan.VulkanDevice;
-import java.io.IOException;
-import java.io.UncheckedIOException;
-import java.nio.file.Files;
 import java.nio.file.Path;
-import java.time.LocalDateTime;
-import java.time.format.DateTimeFormatter;
 import java.util.HashMap;
 import java.util.Locale;
 import java.util.Map;
 import java.util.OptionalLong;
 import net.minecraft.client.Minecraft;
-import net.minecraft.network.chat.Component;
+import net.minecraft.network.chat.MutableComponent;
 
 public final class GpuPassProfiler {
 
@@ -23,7 +18,6 @@ public final class GpuPassProfiler {
     private static final long              DURATION   = 10_000_000_000L;
     private static final int               CHAT_LINES = 8;
     private static final String            FRAME_END  = "frame end";
-    private static final DateTimeFormatter FILE_TIME  = DateTimeFormatter.ofPattern("yyyy-MM-dd_HH.mm.ss");
     private static final GpuQueryPool[]    POOLS      = new GpuQueryPool[SLOTS];
     private static final String[][]        LABELS     = new String[SLOTS][CAPACITY];
     private static final int[]             COUNTS     = new int[SLOTS];
@@ -148,23 +142,16 @@ public final class GpuPassProfiler {
             POOLS[index] = null;
         }
 
-        double seconds = (System.nanoTime() - startNanos) / 1.0e9;
-        String report  = report(seconds);
-        Path   file    = Minecraft.getInstance().gameDirectory.toPath().resolve("logs").resolve("txgpu-" + LocalDateTime.now().format(FILE_TIME) + ".txt");
-
-        try {
-            Files.writeString(file, report);
-        } catch (IOException exception) {
-            throw new UncheckedIOException("Could not write GPU profile to " + file, exception);
-        }
-
-        String[]      lines = report.split("\n");
-        StringBuilder chat  = new StringBuilder("GPU profile saved to logs/" + file.getFileName());
+        double           seconds = (System.nanoTime() - startNanos) / 1.0e9;
+        String           report  = report(seconds);
+        Path             file    = ReportFiles.write("txgpu", report);
+        String[]         lines   = report.split("\n");
+        MutableComponent chat    = ReportFiles.savedMessage("GPU profile", file);
 
         for (int index = 0; index < Math.min(CHAT_LINES, lines.length); index ++)
-            chat.append("\n").append(lines[index]);
+            chat.append("\n" + lines[index]);
 
-        Minecraft.getInstance().gui.hud.getChat().addClientSystemMessage(Component.literal(chat.toString()));
+        Minecraft.getInstance().gui.hud.getChat().addClientSystemMessage(chat);
     }
 
     private static String report(double seconds) {
