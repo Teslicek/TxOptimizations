@@ -90,17 +90,6 @@ Every frame cleared the main color and depth target before rendering, and the wo
 
 For every particle, Sodium rotated the four corners of the quad by the particle rotation, four quaternion rotations per particle per frame. Camera-facing particles all carry the camera rotation, so the rotated corners are the same for each of them. The rotated corners are kept while the rotation stays bit-for-bit the same, and only the per-particle scale and offset are applied, in the same order as before, so every vertex is identical.
 
-### Terrain occlusion culling
-
-Sodium draws every terrain section that its visibility graph and the view frustum let through, even when other terrain completely hides it. At render distance 32 a GPU occlusion probe (`/txocclusion`) found a third of the drawn terrain vertices in fully hidden sections. While the render thread spends a noticeable share of its time waiting for the GPU, TxOptimizations skips those sections using the GPU's own depth:
-
-- The main render pass is split right after opaque terrain and solid entities, before water, translucent features and clouds. Between the two halves the depth buffer is reduced to 320x180, each texel keeping the farthest depth of its screen block, and copied to the CPU.
-- When a copy arrives, about two frames later, every drawn section's box is projected with the camera of that frame and tested against a farthest-depth pyramid of it, at the finest level where the rectangle spans at most 4x4 texels. Sections whose on-screen rectangle lies behind the stored depth are left out of Sodium's draw commands. Sections that were completely off screen in that frame are always drawn.
-- A new depth copy is taken at most every 4 ms, and less often when testing would take more than half of the time the render thread spends waiting for the GPU, so the test never costs more CPU time than the GPU wait it can remove. Terrain that comes out from behind something because the camera or an entity moved, or that enters the screen edge while turning, appears a few milliseconds plus two frames late.
-- The culler measures how long the render thread waits for the GPU over half-second windows and only runs while that wait is above 10 percent, switching off below 3 percent, so CPU-limited scenes pay nothing.
-
-`/txocclusion` reports the culled share and how many culled sections were visible.
-
 ### Debug lines
 
 Hitboxes and other debug lines are built with a pose that is always the identity, yet vanilla transformed every vertex position and normal through it, allocating a vector each time. With hitboxes shown this cost several percent of the render thread. The values are now written directly, and an error is thrown if the pose is ever anything but the identity.
