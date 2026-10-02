@@ -73,6 +73,7 @@
     "bake.SodiumWorldRendererBakeMixin",
     "cull.DefaultChunkRendererCullMixin",
     "cull.LevelRendererOcclusionMixin",
+    "cull.MinecraftOcclusionResetMixin",
     "cull.RenderRegionOcclusionMixin",
     "cull.RenderSectionManagerCullMixin",
     "cull.VulkanCommandEncoderWaitMixin",

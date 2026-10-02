@@ -6,7 +6,6 @@ import com.mojang.blaze3d.pipeline.RenderTarget;
 import com.mojang.blaze3d.systems.RenderSystem;
 import com.mojang.renderpearl.api.commands.RenderPass;
 import com.teslicek.txoptimizations.cull.DepthReadback;
-import com.teslicek.txoptimizations.cull.OcclusionCuller;
 import java.util.Optional;
 import java.util.OptionalDouble;
 import net.minecraft.client.Minecraft;
@@ -15,8 +14,6 @@ import net.minecraft.client.renderer.chunk.ChunkSectionsToRender;
 import net.minecraft.client.renderer.feature.FeatureRenderDispatcher;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
-import org.spongepowered.asm.mixin.injection.Inject;
-import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 @Mixin(LevelRenderer.class)
 public abstract class LevelRendererOcclusionMixin {
@@ -38,10 +35,5 @@ public abstract class LevelRendererOcclusionMixin {
             RenderSystem.bindDefaultUniforms(translucent);
             original.call(renderer, sections, frame, translucent);
         }
-    }
-
-    @Inject(method = "setLevel", at = @At("TAIL"))
-    private void txoptimizations$resetOcclusion(CallbackInfo ci) {
-        OcclusionCuller.reset();
     }
 }
