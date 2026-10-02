@@ -82,10 +82,6 @@ When the GPU supports `VK_AMD_buffer_marker` or `VK_NV_device_diagnostic_checkpo
 
 Every camera-facing particle allocated a new rotation quaternion each frame. The quaternion is now reused, reset to identity first as the new one was.
 
-### Particle vertices
-
-Sodium wrote the 4 vertices of every particle into a scratch buffer on the LWJGL memory stack, then copied the 112 bytes into the vertex buffer. They are now written straight into the vertex buffer, byte for byte the same.
-
 ### Feature renderer list
 
 Preparing each frame walked the list of feature renderers through a freshly built Guava filter that skips empty slots, three times per frame preparation. The filtered list only changes when a renderer is registered, so it is built once at registration and reused.
