@@ -32,9 +32,9 @@ public abstract class MapInstanceAtlasMixin {
     private int txoptimizations$atlasY;
 
     @Inject(method = "<init>", at = @At("RETURN"))
-    private void txoptimizations$findAtlasSlot(MapTextureManager manager, int id, MapItemSavedData data, CallbackInfo ci) {
+    private void txoptimizations$allocateAtlasSlot(MapTextureManager manager, int id, MapItemSavedData data, CallbackInfo ci) {
         MapAtlasSource source   = (MapAtlasSource) manager;
-        int            location = source.txoptimizations$getMapAtlasLocation(id);
+        int            location = source.txoptimizations$allocateMapAtlasLocation(id);
 
         if (location == MapAtlasSource.NO_LOCATION)
             return;

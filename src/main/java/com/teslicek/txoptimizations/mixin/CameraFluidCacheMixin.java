@@ -1,5 +1,6 @@
 package com.teslicek.txoptimizations.mixin;
 
+import com.llamalad7.mixinextras.injector.ModifyReturnValue;
 import com.teslicek.txoptimizations.ClientClock;
 import net.minecraft.client.Camera;
 import net.minecraft.world.level.Level;
@@ -65,14 +66,16 @@ public abstract class CameraFluidCacheMixin {
         cir.setReturnValue(this.txoptimizations$fluid);
     }
 
-    @Inject(method = "getFluidInCamera", at = @At("RETURN"))
-    private void txoptimizations$storeFrameFluid(CallbackInfoReturnable<FogType> cir) {
+    @ModifyReturnValue(method = "getFluidInCamera", at = @At("RETURN"))
+    private FogType txoptimizations$storeFrameFluid(FogType fluid) {
         this.txoptimizations$fluidFrame       = ClientClock.frame();
         this.txoptimizations$fluidInitialized = this.initialized;
         this.txoptimizations$fluidLevel       = this.level;
         this.txoptimizations$fluidPosition    = this.position;
         this.txoptimizations$fluidXRot        = this.xRot;
         this.txoptimizations$fluidYRot        = this.yRot;
-        this.txoptimizations$fluid            = cir.getReturnValue();
+        this.txoptimizations$fluid            = fluid;
+
+        return fluid;
     }
 }

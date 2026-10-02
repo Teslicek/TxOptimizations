@@ -1,5 +1,6 @@
 package com.teslicek.txoptimizations.mixin;
 
+import com.llamalad7.mixinextras.injector.v2.WrapWithCondition;
 import com.mojang.renderpearl.backend.vulkan.VulkanRenderPass;
 import com.mojang.renderpearl.backend.vulkan.VulkanRenderPipeline;
 import it.unimi.dsi.fastutil.objects.ReferenceList;
@@ -9,8 +10,6 @@ import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;
-import org.spongepowered.asm.mixin.injection.Inject;
-import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 @Mixin(VulkanRenderPass.class)
 public abstract class VulkanRenderPassDescriptorReuseMixin {
@@ -31,32 +30,26 @@ public abstract class VulkanRenderPassDescriptorReuseMixin {
     @Unique
     private long txoptimizations$pushedLayout;
 
-    @Unique
-    private boolean txoptimizations$pushing;
-
-    @Inject(method = "pushDescriptors", at = @At("HEAD"), cancellable = true)
-    private void txoptimizations$skipUnchangedPush(CallbackInfo ci) {
-        this.txoptimizations$pushing = false;
-
+    @WrapWithCondition(method = {"drawIndexed", "multiDrawIndexed", "drawIndexedIndirect", "draw", "multiDraw", "drawIndirect"}, at = @At(value = "INVOKE", target = "Lcom/mojang/renderpearl/backend/vulkan/VulkanRenderPass;pushDescriptors()V"))
+    private boolean txoptimizations$pushChangedDescriptors(VulkanRenderPass pass) {
         if (!this.anyDescriptorDirty)
-            return;
+            return false;
 
         if (this.txoptimizations$matchesPushed()) {
             this.anyDescriptorDirty = false;
-            ci.cancel();
-            return;
+
+            return false;
         }
 
-        this.txoptimizations$pushing = true;
-    }
+        int size = this.uniforms.size();
 
-    @Inject(method = "pushDescriptors", at = @At("TAIL"))
-    private void txoptimizations$rememberPush(CallbackInfo ci) {
-        if (!this.txoptimizations$pushing)
-            return;
+        if (this.txoptimizations$pushedUniforms == null || this.txoptimizations$pushedUniforms.length != size)
+            this.txoptimizations$pushedUniforms = new Object[size];
 
-        this.txoptimizations$pushedUniforms = this.uniforms.toArray();
-        this.txoptimizations$pushedLayout   = this.pipeline.pipelineLayout();
+        this.uniforms.getElements(0, this.txoptimizations$pushedUniforms, 0, size);
+        this.txoptimizations$pushedLayout = this.pipeline.pipelineLayout();
+
+        return true;
     }
 
     @Unique

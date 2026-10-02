@@ -2,11 +2,9 @@ package com.teslicek.txoptimizations.mixin;
 
 import net.minecraft.world.attribute.EnvironmentAttribute;
 import org.spongepowered.asm.mixin.Mixin;
+import org.spongepowered.asm.mixin.Overwrite;
 import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.Unique;
-import org.spongepowered.asm.mixin.injection.At;
-import org.spongepowered.asm.mixin.injection.Inject;
-import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 @Mixin(targets = "net.minecraft.world.attribute.EnvironmentAttributeProbe$ValueProbe")
 public abstract class EnvironmentAttributeValueCacheMixin {
@@ -29,22 +27,23 @@ public abstract class EnvironmentAttributeValueCacheMixin {
     @Unique
     private Object txoptimizations$cachedResult;
 
-    @Inject(method = "get", at = @At("HEAD"), cancellable = true)
-    private void txoptimizations$reuseLerpedValue(EnvironmentAttribute<?> attribute, float partialTick, CallbackInfoReturnable<Object> cir) {
-        if (this.newValue == null || this.newValue != this.txoptimizations$cachedNewValue || this.lastValue != this.txoptimizations$cachedLastValue)
-            return;
-
-        if (partialTick != this.txoptimizations$cachedPartialTick)
-            return;
-
-        cir.setReturnValue(this.txoptimizations$cachedResult);
+    @Shadow
+    private Object getValueFromLevel(EnvironmentAttribute<Object> attribute) {
+        throw new AssertionError();
     }
 
-    @Inject(method = "get", at = @At("RETURN"))
-    private void txoptimizations$storeLerpedValue(EnvironmentAttribute<?> attribute, float partialTick, CallbackInfoReturnable<Object> cir) {
+    @Overwrite
+    public Object get(EnvironmentAttribute<Object> attribute, float partialTicks) {
+        if (this.newValue == null)
+            this.newValue = this.getValueFromLevel(attribute);
+        else if (this.newValue == this.txoptimizations$cachedNewValue && this.lastValue == this.txoptimizations$cachedLastValue && partialTicks == this.txoptimizations$cachedPartialTick)
+            return this.txoptimizations$cachedResult;
+
         this.txoptimizations$cachedLastValue   = this.lastValue;
         this.txoptimizations$cachedNewValue    = this.newValue;
-        this.txoptimizations$cachedPartialTick = partialTick;
-        this.txoptimizations$cachedResult      = cir.getReturnValue();
+        this.txoptimizations$cachedPartialTick = partialTicks;
+        this.txoptimizations$cachedResult      = attribute.type().partialTickLerp().apply(partialTicks, this.lastValue, this.newValue);
+
+        return this.txoptimizations$cachedResult;
     }
 }

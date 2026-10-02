@@ -1,16 +1,25 @@
 package com.teslicek.txoptimizations.mixin;
 
 import com.teslicek.txoptimizations.ClientClock;
+import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.client.particle.Particle;
+import net.minecraft.core.BlockPos;
+import net.minecraft.util.LightCoordsUtil;
+import org.spongepowered.asm.mixin.Final;
 import org.spongepowered.asm.mixin.Mixin;
+import org.spongepowered.asm.mixin.Overwrite;
 import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.Unique;
-import org.spongepowered.asm.mixin.injection.At;
-import org.spongepowered.asm.mixin.injection.Inject;
-import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 @Mixin(Particle.class)
 public abstract class ParticleLightCacheMixin {
+
+    @Unique
+    private static final int UNLOADED_LIGHT = 15728640;
+
+    @Shadow
+    @Final
+    protected ClientLevel level;
 
     @Shadow
     protected double x;
@@ -36,23 +45,21 @@ public abstract class ParticleLightCacheMixin {
     @Unique
     private int txoptimizations$light;
 
-    @Inject(method = "getLightCoords", at = @At("HEAD"), cancellable = true)
-    private void txoptimizations$reuseTickLight(float partialTick, CallbackInfoReturnable<Integer> cir) {
-        if (this.txoptimizations$lightTick != ClientClock.tick())
-            return;
+    @Overwrite
+    protected int getLightCoords(float partialTick) {
+        long tick = ClientClock.tick();
 
-        if (this.txoptimizations$lightX != this.x || this.txoptimizations$lightY != this.y || this.txoptimizations$lightZ != this.z)
-            return;
+        if (this.txoptimizations$lightTick == tick && this.txoptimizations$lightX == this.x && this.txoptimizations$lightY == this.y && this.txoptimizations$lightZ == this.z)
+            return this.txoptimizations$light;
 
-        cir.setReturnValue(this.txoptimizations$light);
-    }
+        BlockPos pos = BlockPos.containing(this.x, this.y, this.z);
 
-    @Inject(method = "getLightCoords", at = @At("RETURN"))
-    private void txoptimizations$storeTickLight(float partialTick, CallbackInfoReturnable<Integer> cir) {
-        this.txoptimizations$lightTick = ClientClock.tick();
+        this.txoptimizations$lightTick = tick;
         this.txoptimizations$lightX    = this.x;
         this.txoptimizations$lightY    = this.y;
         this.txoptimizations$lightZ    = this.z;
-        this.txoptimizations$light     = cir.getReturnValueI();
+        this.txoptimizations$light     = this.level.hasChunkAt(pos) ? LightCoordsUtil.getLightCoords(this.level, pos) : UNLOADED_LIGHT;
+
+        return this.txoptimizations$light;
     }
 }

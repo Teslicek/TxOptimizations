@@ -8,14 +8,11 @@ import it.unimi.dsi.fastutil.ints.Int2IntOpenHashMap;
 import java.util.ArrayList;
 import java.util.List;
 import net.minecraft.client.resources.MapTextureManager;
-import net.minecraft.world.level.saveddata.maps.MapId;
-import net.minecraft.world.level.saveddata.maps.MapItemSavedData;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
-import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 @Mixin(MapTextureManager.class)
 public abstract class MapTextureManagerAtlasMixin implements MapAtlasSource {
@@ -33,14 +30,6 @@ public abstract class MapTextureManagerAtlasMixin implements MapAtlasSource {
         this.txoptimizations$locations.clear();
     }
 
-    @Inject(method = "getOrCreateMapInstance", at = @At("HEAD"))
-    private void txoptimizations$assignLocation(MapId id, MapItemSavedData data, CallbackInfoReturnable<?> cir) {
-        if (!AtlasFeatures.isMapAtlasGeneration() || this.txoptimizations$locations.containsKey(id.id()))
-            return;
-
-        this.txoptimizations$locations.put(id.id(), this.txoptimizations$atlasWithSpace().allocate());
-    }
-
     @Override
     public MapAtlas txoptimizations$getMapAtlas(int location) {
         return this.txoptimizations$atlases.get(MapAtlas.atlasId(location));
@@ -49,6 +38,14 @@ public abstract class MapTextureManagerAtlasMixin implements MapAtlasSource {
     @Override
     public int txoptimizations$getMapAtlasLocation(int mapId) {
         return this.txoptimizations$locations.getOrDefault(mapId, NO_LOCATION);
+    }
+
+    @Override
+    public int txoptimizations$allocateMapAtlasLocation(int mapId) {
+        if (!AtlasFeatures.isMapAtlasGeneration())
+            return NO_LOCATION;
+
+        return this.txoptimizations$locations.computeIfAbsent(mapId, key -> this.txoptimizations$atlasWithSpace().allocate());
     }
 
     @Unique

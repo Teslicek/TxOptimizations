@@ -7,4 +7,6 @@ public interface MapAtlasSource {
     MapAtlas txoptimizations$getMapAtlas(int location);
 
     int txoptimizations$getMapAtlasLocation(int mapId);
+
+    int txoptimizations$allocateMapAtlasLocation(int mapId);
 }

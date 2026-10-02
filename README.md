@@ -196,7 +196,7 @@ Entities and block entities hidden behind solid blocks are not extracted or draw
 
 Entities farther than 128 blocks, glowing entities, the player, entities whose renderer ignores culling and boxes larger than 50 blocks are never culled, and anything found visible stays visible for at least one second. Culled entities that show their name still draw the name tag and the below-name score through walls, at the same distances vanilla uses. Block entities outside the camera's view are skipped as well, without allocating a box.
 
-Entities that are culled or were not extracted in the last frame only run a basic tick on the client: old position and rotation, tick count, `aiStep`, hurt time, position interpolation and the warden heartbeat. The camera entity, vehicles, boats, minecarts, display entities and firework rockets always tick fully.
+Entities that are culled, or were not extracted in any frame since the previous tick, only run a basic tick on the client: vanilla's common tick (old position and rotation, invulnerability timer, position interpolation, tick count), `aiStep`, hurt time and the warden heartbeat. A tick with no frame since the previous one, below 20 FPS, never counts entities as out of camera. The camera entity, vehicles, boats, minecarts, display entities and firework rockets always tick fully.
 
 ### Memory
 

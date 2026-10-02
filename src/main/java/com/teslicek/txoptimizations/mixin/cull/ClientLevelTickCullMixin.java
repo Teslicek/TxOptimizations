@@ -24,8 +24,7 @@ public abstract class ClientLevelTickCullMixin {
             return;
 
         ci.cancel();
-        entity.setOldPosAndRot();
-        entity.tickCount ++;
+        entity.commonTick();
 
         if (entity instanceof LivingEntity living) {
             living.aiStep();
@@ -33,8 +32,6 @@ public abstract class ClientLevelTickCullMixin {
             if (living.hurtTime > 0)
                 living.hurtTime --;
         }
-
-        entity.getInterpolation().interpolate();
 
         if (entity instanceof Warden warden && !warden.isSilent() && warden.tickCount % ((WardenHeartbeatAccessor) warden).txoptimizations$getHeartBeatDelay() == 0)
             warden.level().playLocalSound(warden.getX(), warden.getY(), warden.getZ(), SoundEvents.WARDEN_HEARTBEAT, warden.getSoundSource(), HEARTBEAT_VOLUME, warden.getVoicePitch(), false);

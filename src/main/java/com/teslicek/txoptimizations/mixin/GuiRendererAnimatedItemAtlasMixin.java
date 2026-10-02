@@ -4,10 +4,12 @@ import com.llamalad7.mixinextras.injector.ModifyReceiver;
 import com.teslicek.txoptimizations.AnimatedItemAtlas;
 import it.unimi.dsi.fastutil.objects.ObjectOpenHashSet;
 import java.util.Set;
+import java.util.function.Consumer;
 import net.minecraft.client.gui.render.GuiItemAtlas;
 import net.minecraft.client.gui.render.GuiRenderer;
 import net.minecraft.client.renderer.feature.FeatureRenderDispatcher;
 import net.minecraft.client.renderer.item.TrackingItemStackRenderState;
+import net.minecraft.client.renderer.state.gui.GuiItemRenderState;
 import net.minecraft.client.renderer.state.gui.GuiRenderState;
 import org.spongepowered.asm.mixin.Final;
 import org.spongepowered.asm.mixin.Mixin;
@@ -40,18 +42,22 @@ public abstract class GuiRendererAnimatedItemAtlasMixin {
     @Unique
     private boolean txoptimizations$animatedAtlasActive;
 
+    @Unique
+    private final Set<Object> txoptimizations$animatedItems = new ObjectOpenHashSet<>();
+
+    @Unique
+    private final Consumer<GuiItemRenderState> txoptimizations$collectAnimatedItem = itemRenderState -> {
+        TrackingItemStackRenderState item = itemRenderState.itemStackRenderState();
+
+        if (itemRenderState.oversizedItemBounds() == null && item.isAnimated())
+            this.txoptimizations$animatedItems.add(item.getModelIdentity());
+    };
+
     @Inject(method = "prepareItemElements", at = @At(value = "INVOKE", target = "Lnet/minecraft/client/gui/render/GuiRenderer;prepareItemAtlas(Ljava/util/Set;I)Lnet/minecraft/client/gui/render/GuiItemAtlas;"))
     private void txoptimizations$prepareAnimatedAtlas(CallbackInfo ci) {
-        Set<Object> animatedItems = new ObjectOpenHashSet<>();
-
-        this.renderState.forEachItem(itemRenderState -> {
-            TrackingItemStackRenderState item = itemRenderState.itemStackRenderState();
-
-            if (itemRenderState.oversizedItemBounds() == null && item.isAnimated())
-                animatedItems.add(item.getModelIdentity());
-        });
-
-        this.txoptimizations$animatedAtlasActive = this.txoptimizations$fitAnimatedAtlas(animatedItems, GuiRenderer.DEFAULT_ITEM_SIZE * this.cachedGuiScale);
+        this.txoptimizations$animatedItems.clear();
+        this.renderState.forEachItem(this.txoptimizations$collectAnimatedItem);
+        this.txoptimizations$animatedAtlasActive = this.txoptimizations$fitAnimatedAtlas(this.txoptimizations$animatedItems, GuiRenderer.DEFAULT_ITEM_SIZE * this.cachedGuiScale);
     }
 
     @ModifyReceiver(method = "lambda$prepareItemElements$0", at = @At(value = "INVOKE", target = "Lnet/minecraft/client/gui/render/GuiItemAtlas;getOrUpdate(Lnet/minecraft/client/renderer/item/TrackingItemStackRenderState;)Lnet/minecraft/client/gui/render/GuiItemAtlas$SlotView;"))

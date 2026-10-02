@@ -1,6 +1,7 @@
 package com.teslicek.txoptimizations.cull;
 
 import com.mojang.logging.LogUtils;
+import com.teslicek.txoptimizations.ClientClock;
 import com.teslicek.txoptimizations.mixin.FrustumAccessor;
 import com.teslicek.txoptimizations.mixin.cull.EntityRendererCullAccessor;
 import java.util.ArrayList;
@@ -55,7 +56,9 @@ public final class EntityCulling {
     private static volatile Snapshot snapshot;
     private static volatile Vec3     camera;
 
-    private static int captureTick;
+    private static int     captureTick;
+    private static long    tickFrame = -1L;
+    private static boolean renderedSinceTick;
 
     private EntityCulling() {
     }
@@ -67,6 +70,10 @@ public final class EntityCulling {
     public static void tick(Minecraft minecraft) {
         ClientLevel level  = minecraft.level;
         LocalPlayer player = minecraft.player;
+        long        frame  = ClientClock.frame();
+
+        renderedSinceTick = frame != tickFrame;
+        tickFrame         = frame;
 
         if (level == null || player == null || player.tickCount <= WARMUP_TICKS) {
             captureTick = 0;
@@ -108,7 +115,7 @@ public final class EntityCulling {
     public static boolean skipsTick(Entity entity) {
         Cullable cullable = (Cullable) entity;
 
-        if (!cullable.txoptimizations$isCulled() && !cullable.txoptimizations$isOutOfCamera()) {
+        if (!cullable.txoptimizations$isCulled() && !(renderedSinceTick && cullable.txoptimizations$isOutOfCamera())) {
             cullable.txoptimizations$setOutOfCamera(true);
 
             return false;

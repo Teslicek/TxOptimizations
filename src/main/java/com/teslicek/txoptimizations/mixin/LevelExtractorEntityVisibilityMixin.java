@@ -3,17 +3,32 @@ package com.teslicek.txoptimizations.mixin;
 import com.teslicek.txoptimizations.ClientClock;
 import com.teslicek.txoptimizations.EntityVisibilityMemo;
 import com.teslicek.txoptimizations.bake.Baking;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.multiplayer.ClientLevel;
+import net.minecraft.client.renderer.LevelRenderer;
 import net.minecraft.client.renderer.culling.Frustum;
 import net.minecraft.client.renderer.extract.LevelExtractor;
+import net.minecraft.core.BlockPos;
 import net.minecraft.world.entity.Entity;
+import org.spongepowered.asm.mixin.Final;
 import org.spongepowered.asm.mixin.Mixin;
+import org.spongepowered.asm.mixin.Overwrite;
+import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.Unique;
-import org.spongepowered.asm.mixin.injection.At;
-import org.spongepowered.asm.mixin.injection.Inject;
-import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 @Mixin(LevelExtractor.class)
 public abstract class LevelExtractorEntityVisibilityMixin {
+
+    @Shadow
+    @Final
+    private Minecraft minecraft;
+
+    @Shadow
+    @Final
+    private LevelRenderer levelRenderer;
+
+    @Shadow
+    private ClientLevel level;
 
     @Unique
     private long txoptimizations$keyFrame = -1L;
@@ -33,27 +48,33 @@ public abstract class LevelExtractorEntityVisibilityMixin {
     @Unique
     private long txoptimizations$keyFadeIn;
 
-    @Inject(method = "isEntityVisible", at = @At("HEAD"), cancellable = true)
-    private void txoptimizations$reuseFrameVisibility(Entity entity, Frustum frustum, double x, double y, double z, float partialTick, long fadeIn, CallbackInfoReturnable<Boolean> cir) {
-        if (!this.txoptimizations$matchesFrameKey(frustum, x, y, z, fadeIn))
-            return;
+    @Overwrite
+    public boolean isEntityVisible(Entity entity, Frustum frustum, double camX, double camY, double camZ, float partialTicks, long chunkFadeDuration) {
+        boolean              keyed = this.txoptimizations$matchesFrameKey(frustum, camX, camY, camZ, chunkFadeDuration);
+        EntityVisibilityMemo memo  = (EntityVisibilityMemo) entity;
 
-        EntityVisibilityMemo memo = (EntityVisibilityMemo) entity;
+        if (keyed && memo.txoptimizations$hasVisibility(this.txoptimizations$keyFrame, partialTicks))
+            return memo.txoptimizations$isVisible();
 
-        if (!memo.txoptimizations$hasVisibility(this.txoptimizations$keyFrame, partialTick))
-            return;
+        boolean visible = this.txoptimizations$computeVisibility(entity, frustum, camX, camY, camZ, partialTicks, chunkFadeDuration) && !Baking.isEntityMeshed(entity);
 
-        cir.setReturnValue(memo.txoptimizations$isVisible());
+        if (keyed)
+            memo.txoptimizations$setVisibility(this.txoptimizations$keyFrame, partialTicks, visible);
+
+        return visible;
     }
 
-    @Inject(method = "isEntityVisible", at = @At("RETURN"), cancellable = true)
-    private void txoptimizations$storeFrameVisibility(Entity entity, Frustum frustum, double x, double y, double z, float partialTick, long fadeIn, CallbackInfoReturnable<Boolean> cir) {
-        boolean visible = cir.getReturnValueZ() && !Baking.isEntityMeshed(entity);
+    @Unique
+    private boolean txoptimizations$computeVisibility(Entity entity, Frustum frustum, double camX, double camY, double camZ, float partialTicks, long chunkFadeDuration) {
+        if (this.level == null)
+            return false;
 
-        if (this.txoptimizations$matchesFrameKey(frustum, x, y, z, fadeIn))
-            ((EntityVisibilityMemo) entity).txoptimizations$setVisibility(this.txoptimizations$keyFrame, partialTick, visible);
+        if (!this.levelRenderer.entityRenderDispatcher().shouldRender(entity, frustum, camX, camY, camZ, partialTicks) && (this.minecraft.player == null || !entity.hasIndirectPassenger(this.minecraft.player)))
+            return false;
 
-        cir.setReturnValue(visible);
+        BlockPos blockPos = entity.blockPosition();
+
+        return this.level.isOutsideBuildHeight(blockPos.getY()) || this.levelRenderer.isSectionCompiledAndVisible(blockPos, chunkFadeDuration);
     }
 
     @Unique
