@@ -5,6 +5,7 @@
   "client": [
     "AtmosphericFogTickCacheMixin",
     "AvatarSkinCacheMixin",
+    "BakedModelEncoderNormalMixin",
     "BlockEntityRenderDispatcherCacheMixin",
     "BlockEntityRendererCacheMixin",
     "BlockStateCacheDedupMixin",
@@ -40,6 +41,7 @@
     "ParticleLightCacheMixin",
     "ParticleRotationMixin",
     "PatchedDataComponentMapEmptyPatchMixin",
+    "PoseAccessor",
     "QuadParticleCornerCacheMixin",
     "QuadParticleLayerCacheMixin",
     "ScissorStateEqualityMixin",
@@ -50,6 +52,7 @@
     "StateHolderNeighborTableMixin",
     "TranslatableTemplateCacheMixin",
     "VertexFormatElementCacheMixin",
+    "VisibleChunkCollectorRegionCacheMixin",
     "VulkanBackendCheckpointMixin",
     "VulkanCommandEncoderPollMixin",
     "VulkanCommandEncoderUploadBarrierMixin",
