@@ -20,7 +20,7 @@ public final class GpuPassProfiler {
 
     private static final int               SLOTS      = 3;
     private static final int               CAPACITY   = 4096;
-    private static final int               FRAMES     = 1000;
+    private static final long              DURATION   = 10_000_000_000L;
     private static final int               CHAT_LINES = 8;
     private static final String            FRAME_END  = "frame end";
     private static final DateTimeFormatter FILE_TIME  = DateTimeFormatter.ofPattern("yyyy-MM-dd_HH.mm.ss");
@@ -29,13 +29,13 @@ public final class GpuPassProfiler {
     private static final int[]             COUNTS     = new int[SLOTS];
     private static final Map<String, Pass> PASSES     = new HashMap<>();
 
-    private static int    slot;
-    private static int    framesToRecord;
-    private static int    framesPending;
-    private static int    framesRead;
-    private static long   gpuNanos;
-    private static long   startNanos;
-    private static double nanosPerTick;
+    private static int     slot;
+    private static boolean recording;
+    private static int     framesPending;
+    private static int     framesRead;
+    private static long    gpuNanos;
+    private static long    startNanos;
+    private static double  nanosPerTick;
 
     private GpuPassProfiler() {
     }
@@ -45,18 +45,18 @@ public final class GpuPassProfiler {
             throw new IllegalStateException("GPU profile is already running");
 
         PASSES.clear();
-        framesToRecord = FRAMES;
-        framesRead     = 0;
-        gpuNanos       = 0L;
-        startNanos     = System.nanoTime();
+        recording  = true;
+        framesRead = 0;
+        gpuNanos   = 0L;
+        startNanos = System.nanoTime();
     }
 
     public static boolean isRunning() {
-        return framesToRecord > 0 || framesPending > 0;
+        return recording || framesPending > 0;
     }
 
     public static void mark(VulkanDevice device, CommandEncoderBackend encoder, String label) {
-        if (framesToRecord == 0)
+        if (!recording)
             return;
 
         if (POOLS[0] == null)
@@ -76,10 +76,10 @@ public final class GpuPassProfiler {
         if (!isRunning())
             return;
 
-        if (framesToRecord > 0) {
+        if (recording) {
             mark(device, encoder, FRAME_END);
-            framesToRecord --;
             framesPending ++;
+            recording = System.nanoTime() - startNanos < DURATION;
         }
 
         slot = (slot + 1) % SLOTS;
