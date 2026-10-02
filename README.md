@@ -122,6 +122,10 @@ The Vulkan backend follows every buffer upload with a barrier that makes the who
 
 Name tags, holograms and other text in the world were laid out again every frame: each character looked up its glyph, built a positioned glyph instance and updated the text bounds. Components cache their visual-order sequence, so text the server has not changed arrives as the same sequence object every frame. The laid-out text is now kept per sequence object, position, colors, shadow and outline, and drawn again from the cache. Text with obfuscated characters or with player head and atlas sprite glyphs is never cached, unused layouts are dropped after 200 frames, and everything is dropped when fonts reload or font options change. Drawing a laid-out text only reads it, so the cached copy draws exactly like a fresh one.
 
+### Direct vertex writes
+
+Sodium writes every glyph, particle, entity cuboid and item quad into a small stack buffer and then copies it into the frame's vertex buffer, one native memory copy per glyph or cuboid. At a busy server spawn these copies took about 10% of the render thread. When the vertex buffer uses exactly the format being written, TxOptimizations reserves the space in the buffer first and writes the same bytes straight into it, updating the vertex count and last vertex pointer the same way Sodium's push does. Buffers with another format keep Sodium's converting push.
+
 ### Feature renderer list
 
 Preparing each frame walked the list of feature renderers through a freshly built Guava filter that skips empty slots, three times per frame preparation. The filtered list only changes when a renderer is registered, so it is built once at registration and reused.

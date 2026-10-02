@@ -1,5 +1,6 @@
 package com.teslicek.txoptimizations.mixin;
 
+import com.teslicek.txoptimizations.DirectVertexBuffer;
 import net.caffeinemc.mods.sodium.api.vertex.buffer.VertexBufferWriter;
 import net.caffeinemc.mods.sodium.api.vertex.format.common.ParticleVertex;
 import net.minecraft.client.renderer.state.level.QuadParticleRenderState;
@@ -47,15 +48,25 @@ public abstract class QuadParticleCornerCacheMixin {
     private void sodium$emitVertices(VertexBufferWriter writer, float x, float y, float z, float size, float u0, float u1, float v0, float v1, int color, int light, Quaternionf quaternion) {
         txoptimizations$rotateCorners(quaternion);
 
+        if (writer instanceof DirectVertexBuffer direct && direct.txoptimizations$writesFormat(ParticleVertex.FORMAT)) {
+            txoptimizations$putQuad(direct.txoptimizations$reserveVertices(VERTICES), x, y, z, size, u0, u1, v0, v1, color, light);
+            return;
+        }
+
         try (MemoryStack stack = MemoryStack.stackPush()) {
             long buffer = stack.nmalloc(VERTICES * ParticleVertex.STRIDE);
 
-            txoptimizations$putVertex(buffer, 0, x, y, z, size, u1, v1, color, light);
-            txoptimizations$putVertex(buffer + ParticleVertex.STRIDE, 1, x, y, z, size, u1, v0, color, light);
-            txoptimizations$putVertex(buffer + 2L * ParticleVertex.STRIDE, 2, x, y, z, size, u0, v0, color, light);
-            txoptimizations$putVertex(buffer + 3L * ParticleVertex.STRIDE, 3, x, y, z, size, u0, v1, color, light);
+            txoptimizations$putQuad(buffer, x, y, z, size, u0, u1, v0, v1, color, light);
             writer.push(stack, buffer, VERTICES, ParticleVertex.FORMAT);
         }
+    }
+
+    @Unique
+    private static void txoptimizations$putQuad(long buffer, float x, float y, float z, float size, float u0, float u1, float v0, float v1, int color, int light) {
+        txoptimizations$putVertex(buffer, 0, x, y, z, size, u1, v1, color, light);
+        txoptimizations$putVertex(buffer + ParticleVertex.STRIDE, 1, x, y, z, size, u1, v0, color, light);
+        txoptimizations$putVertex(buffer + 2L * ParticleVertex.STRIDE, 2, x, y, z, size, u0, v0, color, light);
+        txoptimizations$putVertex(buffer + 3L * ParticleVertex.STRIDE, 3, x, y, z, size, u0, v1, color, light);
     }
 
     @Unique
