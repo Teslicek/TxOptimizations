@@ -130,6 +130,14 @@ Sodium writes every glyph, particle, entity cuboid and item quad into a small st
 
 Every attribute read, such as an entity's scale or name tag distance each frame, looked the attribute up with `computeIfAbsent` and a freshly allocated lookup function. Attribute instances are never removed from an entity's attribute map, so the lookup now reads the map first and only falls back to vanilla's `computeIfAbsent` with the same creation function when the attribute is not there yet.
 
+### Descriptor pushes
+
+Every draw with a changed uniform pushed the pass's whole descriptor set to the driver, and uniforms are set again for most draws even when they hold the same buffers and textures as before. Each render pass now remembers the values and pipeline layout of its last push and skips a push whose values and layout are identical. Vulkan keeps pushed descriptors for the same pipeline layout, so every draw reads the same descriptors as before. A new render pass always pushes.
+
+### Entity shadow blocks
+
+Every entity with a shadow checked the blocks under it every frame: the block below, the light level, whether the block below has a full collision shape and its shape. These answers are now kept per block position for the current client tick and shared by all entities, then dropped at the next tick or level change. The shadow's strength and position are still computed every frame from the entity and the camera; a block or light change under a shadow shows up to one tick (50 ms) later.
+
 ### Map colors
 
 When a map's contents change, every one of its 16384 pixels was converted from its packed color byte to a color by looking up the map color and scaling it by the brightness. Map colors and brightness levels are fixed, so the 256 possible results are computed once with the same vanilla function and looked up per pixel. Servers that update maps in item frames often, like leaderboards, pay this on every update.
