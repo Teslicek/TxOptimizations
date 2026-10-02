@@ -2,15 +2,20 @@ package com.teslicek.txoptimizations.mixin;
 
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.blaze3d.vertex.VertexConsumer;
+import com.mojang.renderpearl.api.vertex.VertexFormat;
+import com.teslicek.txoptimizations.DirectVertexBuffer;
+import java.nio.ByteOrder;
 import java.util.List;
 import net.minecraft.client.renderer.feature.GizmoFeatureRenderer;
 import net.minecraft.client.renderer.feature.RenderTypeFeatureRenderer;
 import net.minecraft.client.renderer.gizmos.DrawableGizmoPrimitives.Line;
 import net.minecraft.client.renderer.rendertype.RenderTypes;
 import net.minecraft.client.renderer.state.level.CameraRenderState;
+import net.minecraft.util.ARGB;
 import net.minecraft.util.Mth;
 import org.joml.Math;
 import org.joml.Matrix4fc;
+import org.lwjgl.system.MemoryUtil;
 import org.spongepowered.asm.mixin.Final;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Overwrite;
@@ -25,6 +30,24 @@ public abstract class GizmoLineIdentityPoseMixin extends RenderTypeFeatureRender
 
     @Unique
     private static final float MIN_DENOMINATOR = 1.0E-9F;
+
+    @Unique
+    private static final int LINE_VERTICES = 3;
+
+    @Unique
+    private static final String POSITION = "Position";
+
+    @Unique
+    private static final String COLOR = "Color";
+
+    @Unique
+    private static final String NORMAL = "Normal";
+
+    @Unique
+    private static final String LINE_WIDTH = "LineWidth";
+
+    @Unique
+    private static final boolean LITTLE_ENDIAN = ByteOrder.nativeOrder() == ByteOrder.LITTLE_ENDIAN;
 
     @Shadow
     @Final
@@ -46,6 +69,13 @@ public abstract class GizmoLineIdentityPoseMixin extends RenderTypeFeatureRender
         float          viewY   = modelViewMatrix.m12();
         float          viewZ   = modelViewMatrix.m22();
         float          viewW   = modelViewMatrix.m32();
+        VertexFormat   format  = builder instanceof DirectVertexBuffer buffer && buffer.txoptimizations$duplicatesVertices() ? buffer.txoptimizations$format() : null;
+        boolean        direct  = format != null && format.contains(POSITION) && format.contains(COLOR) && format.contains(NORMAL) && format.contains(LINE_WIDTH);
+        int            stride  = direct ? format.getVertexSize() : 0;
+        int            color   = direct ? format.getElement(COLOR).offset() : 0;
+        int            normal  = direct ? format.getElement(NORMAL).offset() : 0;
+        int            width   = direct ? format.getElement(LINE_WIDTH).offset() : 0;
+        int            origin  = direct ? format.getElement(POSITION).offset() : 0;
 
         for (Line line : lines) {
             float startX     = (float) (line.start().x() - camX);
@@ -89,8 +119,35 @@ public abstract class GizmoLineIdentityPoseMixin extends RenderTypeFeatureRender
             float normalY = endY - startY;
             float normalZ = endZ - startZ;
 
-            builder.addVertex(startX, startY, startZ).setNormal(normalX, normalY, normalZ).setColor(line.color()).setLineWidth(line.width());
-            builder.addVertex(endX, endY, endZ).setNormal(normalX, normalY, normalZ).setColor(line.color()).setLineWidth(line.width());
+            if (!direct) {
+                builder.addVertex(startX, startY, startZ).setNormal(normalX, normalY, normalZ).setColor(line.color()).setLineWidth(line.width());
+                builder.addVertex(endX, endY, endZ).setNormal(normalX, normalY, normalZ).setColor(line.color()).setLineWidth(line.width());
+                continue;
+            }
+
+            long pointer = ((DirectVertexBuffer) builder).txoptimizations$reserveAfterLastVertex(LINE_VERTICES);
+            int  abgr    = ARGB.toABGR(line.color());
+
+            txoptimizations$putVertex(pointer, origin, color, normal, width, startX, startY, startZ, abgr, normalX, normalY, normalZ, line.width());
+            MemoryUtil.memCopy(pointer, pointer + stride, stride);
+            txoptimizations$putVertex(pointer + 2L * stride, origin, color, normal, width, endX, endY, endZ, abgr, normalX, normalY, normalZ, line.width());
         }
+    }
+
+    @Unique
+    private static void txoptimizations$putVertex(long pointer, int origin, int color, int normal, int width, float x, float y, float z, int abgr, float normalX, float normalY, float normalZ, float lineWidth) {
+        MemoryUtil.memPutFloat(pointer + origin, x);
+        MemoryUtil.memPutFloat(pointer + origin + 4L, y);
+        MemoryUtil.memPutFloat(pointer + origin + 8L, z);
+        MemoryUtil.memPutInt(pointer + color, LITTLE_ENDIAN ? abgr : Integer.reverseBytes(abgr));
+        MemoryUtil.memPutByte(pointer + normal, txoptimizations$normalByte(normalX));
+        MemoryUtil.memPutByte(pointer + normal + 1L, txoptimizations$normalByte(normalY));
+        MemoryUtil.memPutByte(pointer + normal + 2L, txoptimizations$normalByte(normalZ));
+        MemoryUtil.memPutFloat(pointer + width, lineWidth);
+    }
+
+    @Unique
+    private static byte txoptimizations$normalByte(float value) {
+        return (byte) ((int) (Mth.clamp(value, -1.0F, 1.0F) * 127.0F) & 0xFF);
     }
 }
