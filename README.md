@@ -126,6 +126,10 @@ Name tags, holograms and other text in the world were laid out again every frame
 
 Sodium writes every glyph, particle, entity cuboid and item quad into a small stack buffer and then copies it into the frame's vertex buffer, one native memory copy per glyph or cuboid. At a busy server spawn these copies took about 10% of the render thread. When the vertex buffer uses exactly the format being written, TxOptimizations reserves the space in the buffer first and writes the same bytes straight into it, updating the vertex count and last vertex pointer the same way Sodium's push does. Buffers with another format keep Sodium's converting push.
 
+### Attribute lookups
+
+Every attribute read, such as an entity's scale or name tag distance each frame, looked the attribute up with `computeIfAbsent` and a freshly allocated lookup function. Attribute instances are never removed from an entity's attribute map, so the lookup now reads the map first and only falls back to vanilla's `computeIfAbsent` with the same creation function when the attribute is not there yet.
+
 ### Map colors
 
 When a map's contents change, every one of its 16384 pixels was converted from its packed color byte to a color by looking up the map color and scaling it by the brightness. Map colors and brightness levels are fixed, so the 256 possible results are computed once with the same vanilla function and looked up per pixel. Servers that update maps in item frames often, like leaderboards, pay this on every update.
