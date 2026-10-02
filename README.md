@@ -80,7 +80,7 @@ When the GPU supports `VK_AMD_buffer_marker` or `VK_NV_device_diagnostic_checkpo
 
 ### Particle rotation
 
-Every camera-facing particle allocated a new rotation quaternion and rotated it around Z by its roll angle, which costs a sine and a square root even when the roll is 0. The quaternion is now reused (reset to identity first, as the new one was), and a roll of exactly 0 skips the rotation. Most particles never roll.
+Every camera-facing particle allocated a new rotation quaternion each frame. The quaternion is now reused, reset to identity first as the new one was.
 
 ### Feature renderer list
 

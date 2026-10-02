@@ -18,12 +18,4 @@ public abstract class ParticleRotationMixin {
     private Quaternionf txoptimizations$reuseRotation(Operation<Quaternionf> original) {
         return ROTATION.identity();
     }
-
-    @WrapOperation(method = "extract", at = @At(value = "INVOKE", target = "Lorg/joml/Quaternionf;rotateZ(F)Lorg/joml/Quaternionf;"))
-    private Quaternionf txoptimizations$skipZeroRoll(Quaternionf rotation, float angle, Operation<Quaternionf> original) {
-        if (angle == 0.0F)
-            return rotation;
-
-        return original.call(rotation, angle);
-    }
 }
