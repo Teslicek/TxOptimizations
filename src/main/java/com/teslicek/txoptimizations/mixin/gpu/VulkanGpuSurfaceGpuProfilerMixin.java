@@ -1,5 +1,6 @@
 package com.teslicek.txoptimizations.mixin.gpu;
 
+import com.mojang.renderpearl.api.textures.GpuTextureView;
 import com.mojang.renderpearl.backend.api.CommandEncoderBackend;
 import com.mojang.renderpearl.backend.vulkan.VulkanDevice;
 import com.mojang.renderpearl.backend.vulkan.VulkanGpuSurface;
@@ -19,7 +20,7 @@ public abstract class VulkanGpuSurfaceGpuProfilerMixin {
     private VulkanDevice device;
 
     @Inject(method = "blitFromTexture", at = @At("HEAD"))
-    private void txoptimizations$profileScreenCopy(CommandEncoderBackend encoder, CallbackInfo ci) {
+    private void txoptimizations$profileScreenCopy(CommandEncoderBackend encoder, GpuTextureView textureView, CallbackInfo ci) {
         if (GpuPassProfiler.isRunning())
             GpuPassProfiler.mark(this.device, encoder, "screen copy and wait for screen image");
     }
