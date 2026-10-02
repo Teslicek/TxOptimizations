@@ -86,6 +86,10 @@ Every camera-facing particle allocated a new rotation quaternion each frame. The
 
 Every frame cleared the main color and depth target before rendering, and the world render cleared the same target again with the fog color before drawing anything. When a world is rendered, the first clear is skipped. Screens without a world still clear as before.
 
+### Redundant pipeline and uniform state
+
+The Vulkan render pass bound the pipeline again even when the same one was already bound, threw away its uniforms, and on the next draw rebuilt and pushed every descriptor, creating a new buffer view for each texel buffer. Binding the bound pipeline is skipped, and a uniform set to the value it already has does not mark the descriptors dirty. Pushed descriptors and the bound pipeline stay in the command buffer, so the GPU state is the same.
+
 ### Feature renderer list
 
 Preparing each frame walked the list of feature renderers through a freshly built Guava filter that skips empty slots, three times per frame preparation. The filtered list only changes when a renderer is registered, so it is built once at registration and reused.
