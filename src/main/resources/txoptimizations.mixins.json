@@ -73,6 +73,7 @@
     "bake.SignTextMessageCacheMixin",
     "bake.SkullBlockEntityBakeMixin",
     "bake.SodiumWorldRendererBakeMixin",
+    "cull.ChunkRenderListAccessor",
     "cull.DefaultChunkRendererCullMixin",
     "cull.LevelRendererOcclusionMixin",
     "cull.MinecraftOcclusionResetMixin",

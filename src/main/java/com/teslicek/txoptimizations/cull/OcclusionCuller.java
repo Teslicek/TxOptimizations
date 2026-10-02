@@ -1,6 +1,6 @@
 package com.teslicek.txoptimizations.cull;
 
-import it.unimi.dsi.fastutil.longs.LongArrayList;
+import com.teslicek.txoptimizations.mixin.cull.ChunkRenderListAccessor;
 import it.unimi.dsi.fastutil.objects.ReferenceOpenHashSet;
 import java.util.Arrays;
 import java.util.Iterator;
@@ -28,17 +28,17 @@ public final class OcclusionCuller {
     private static final float[]                            MATRIX          = new float[16];
     private static final float[]                            TESTED_DEPTH    = new float[WIDTH * HEIGHT];
     private static final float[]                            TESTED_MATRIX   = new float[16];
-    private static final float[]                            CORNER          = new float[4];
+    private static final float[]                            CORNER_OFFSETS  = new float[32];
     private static final long[]                             HIDDEN          = new long[MASK_WORDS];
     private static final Matrix4f                           VIEW_PROJECTION = new Matrix4f();
-    private static final LongArrayList                      SECTIONS        = new LongArrayList();
-    private static final LongArrayList                      TESTED_SECTIONS = new LongArrayList();
     private static final ReferenceOpenHashSet<RenderRegion> REGIONS         = new ReferenceOpenHashSet<>();
     private static final ReferenceOpenHashSet<RenderRegion> CULLED_REGIONS  = new ReferenceOpenHashSet<>();
     private static final FilteredSectionIterator            FILTERED        = new FilteredSectionIterator();
 
     private static boolean culling;
     private static boolean sectionsChanged;
+    private static int     testGeneration;
+    private static int     testedRegionCount;
     private static double  testedX;
     private static double  testedY;
     private static double  testedZ;
@@ -106,31 +106,20 @@ public final class OcclusionCuller {
     }
 
     private static void collectSections(ChunkRenderListIterable lists) {
-        SECTIONS.clear();
         REGIONS.clear();
         sectionsChanged = false;
 
         for (ChunkRenderList list : iterable(lists)) {
-            RenderRegion region   = list.getRegion();
-            ByteIterator sections = list.sectionsWithGeometryIterator(false);
+            RenderRegion    region    = list.getRegion();
+            RegionOcclusion occlusion = (RegionOcclusion) region;
 
             REGIONS.add(region);
 
-            if (sections == null)
-                continue;
-
-            while (sections.hasNext()) {
-                int  section = sections.nextByteAsInt();
-                long key     = SectionPos.asLong(region.getChunkX() + LocalSectionIndex.unpackX(section), region.getChunkY() + LocalSectionIndex.unpackY(section), region.getChunkZ() + LocalSectionIndex.unpackZ(section));
-
-                if (!sectionsChanged && (SECTIONS.size() >= TESTED_SECTIONS.size() || TESTED_SECTIONS.getLong(SECTIONS.size()) != key))
-                    sectionsChanged = true;
-
-                SECTIONS.add(key);
-            }
+            if (!sectionsChanged && (occlusion.txoptimizations$getTestedGeneration() != testGeneration || !Arrays.equals(((ChunkRenderListAccessor) list).txoptimizations$sectionsWithGeometryMap(), occlusion.txoptimizations$getTestedSections())))
+                sectionsChanged = true;
         }
 
-        if (SECTIONS.size() != TESTED_SECTIONS.size())
+        if (REGIONS.size() != testedRegionCount)
             sectionsChanged = true;
     }
 
@@ -164,15 +153,27 @@ public final class OcclusionCuller {
 
         System.arraycopy(DepthReadback.latestMatrix(), 0, TESTED_MATRIX, 0, TESTED_MATRIX.length);
         System.arraycopy(DepthReadback.latestDepth(), 0, TESTED_DEPTH, 0, TESTED_DEPTH.length);
-        TESTED_SECTIONS.clear();
-        TESTED_SECTIONS.addAll(SECTIONS);
+        testGeneration ++;
+        testedRegionCount = REGIONS.size();
+
+        for (int corner = 0; corner < 8; corner ++) {
+            float offsetX = (corner & 1) == 0 ? 0.0F : SECTION_SIZE;
+            float offsetY = (corner & 2) == 0 ? 0.0F : SECTION_SIZE;
+            float offsetZ = (corner & 4) == 0 ? 0.0F : SECTION_SIZE;
+
+            for (int row = 0; row < 4; row ++)
+                CORNER_OFFSETS[corner * 4 + row] = TESTED_MATRIX[row] * offsetX + TESTED_MATRIX[4 + row] * offsetY + TESTED_MATRIX[8 + row] * offsetZ;
+        }
     }
 
     private static void testSections(ChunkRenderListIterable lists) {
         for (ChunkRenderList list : iterable(lists)) {
-            RenderRegion region   = list.getRegion();
-            ByteIterator sections = list.sectionsWithGeometryIterator(false);
+            RenderRegion    region    = list.getRegion();
+            RegionOcclusion occlusion = (RegionOcclusion) region;
+            ByteIterator    sections  = list.sectionsWithGeometryIterator(false);
 
+            System.arraycopy(((ChunkRenderListAccessor) list).txoptimizations$sectionsWithGeometryMap(), 0, occlusion.txoptimizations$getTestedSections(), 0, MASK_WORDS);
+            occlusion.txoptimizations$setTestedGeneration(testGeneration);
             Arrays.fill(HIDDEN, 0L);
 
             if (sections != null) {
@@ -184,7 +185,7 @@ public final class OcclusionCuller {
                 }
             }
 
-            long[] current = ((RegionOcclusion) region).txoptimizations$getHiddenSections();
+            long[] current = occlusion.txoptimizations$getHiddenSections();
 
             if (Arrays.equals(current, HIDDEN))
                 continue;
@@ -214,16 +215,17 @@ public final class OcclusionCuller {
         float   right   = Float.NEGATIVE_INFINITY;
         float   top     = Float.NEGATIVE_INFINITY;
 
-        for (int corner = 0; corner < 8; corner ++) {
-            corner(matrix, baseX, baseY, baseZ, baseW, corner);
+        for (int offset = 0; offset < CORNER_OFFSETS.length; offset += 4) {
+            float w = baseW + CORNER_OFFSETS[offset + 3];
 
-            if (CORNER[3] <= NEAR)
+            if (w <= NEAR)
                 return false;
 
-            float screenX = (CORNER[0] / CORNER[3] * 0.5F + 0.5F) * WIDTH;
-            float screenY = (CORNER[1] / CORNER[3] * 0.5F + 0.5F) * HEIGHT;
+            float inverseW = 1.0F / w;
+            float screenX  = ((baseX + CORNER_OFFSETS[offset]) * inverseW * 0.5F + 0.5F) * WIDTH;
+            float screenY  = ((baseY + CORNER_OFFSETS[offset + 1]) * inverseW * 0.5F + 0.5F) * HEIGHT;
 
-            nearest = Math.max(nearest, CORNER[2] / CORNER[3]);
+            nearest = Math.max(nearest, (baseZ + CORNER_OFFSETS[offset + 2]) * inverseW);
             left    = Math.min(left, screenX);
             bottom  = Math.min(bottom, screenY);
             right   = Math.max(right, screenX);
@@ -253,17 +255,6 @@ public final class OcclusionCuller {
         }
 
         return farthest > nearest * (1.0F + DEPTH_RELATIVE);
-    }
-
-    private static void corner(float[] matrix, float baseX, float baseY, float baseZ, float baseW, int corner) {
-        float offsetX = (corner & 1) == 0 ? 0.0F : SECTION_SIZE;
-        float offsetY = (corner & 2) == 0 ? 0.0F : SECTION_SIZE;
-        float offsetZ = (corner & 4) == 0 ? 0.0F : SECTION_SIZE;
-
-        CORNER[0] = baseX + matrix[0] * offsetX + matrix[4] * offsetY + matrix[8] * offsetZ;
-        CORNER[1] = baseY + matrix[1] * offsetX + matrix[5] * offsetY + matrix[9] * offsetZ;
-        CORNER[2] = baseZ + matrix[2] * offsetX + matrix[6] * offsetY + matrix[10] * offsetZ;
-        CORNER[3] = baseW + matrix[3] * offsetX + matrix[7] * offsetY + matrix[11] * offsetZ;
     }
 
     private static void buildPyramid() {
