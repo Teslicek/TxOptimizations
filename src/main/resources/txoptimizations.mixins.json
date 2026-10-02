@@ -58,7 +58,6 @@
     "VertexFormatElementCacheMixin",
     "VulkanBackendCheckpointMixin",
     "VulkanCommandEncoderDeferredClearMixin",
-    "VulkanCommandEncoderPassBarrierMixin",
     "VulkanCommandEncoderPollMixin",
     "VulkanCommandEncoderUploadBarrierMixin",
     "WeatherColumnCullMixin",
