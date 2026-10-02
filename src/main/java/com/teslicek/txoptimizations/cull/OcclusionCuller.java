@@ -37,6 +37,7 @@ public final class OcclusionCuller {
     private static final FilteredSectionIterator            FILTERED        = new FilteredSectionIterator();
 
     private static boolean culling;
+    private static boolean sectionsChanged;
     private static double  testedX;
     private static double  testedY;
     private static double  testedZ;
@@ -106,6 +107,7 @@ public final class OcclusionCuller {
     private static void collectSections(ChunkRenderListIterable lists) {
         SECTIONS.clear();
         REGIONS.clear();
+        sectionsChanged = false;
 
         for (ChunkRenderList list : iterable(lists)) {
             RenderRegion region   = list.getRegion();
@@ -117,11 +119,18 @@ public final class OcclusionCuller {
                 continue;
 
             while (sections.hasNext()) {
-                int section = sections.nextByteAsInt();
+                int  section = sections.nextByteAsInt();
+                long key     = SectionPos.asLong(region.getChunkX() + LocalSectionIndex.unpackX(section), region.getChunkY() + LocalSectionIndex.unpackY(section), region.getChunkZ() + LocalSectionIndex.unpackZ(section));
 
-                SECTIONS.add(SectionPos.asLong(region.getChunkX() + LocalSectionIndex.unpackX(section), region.getChunkY() + LocalSectionIndex.unpackY(section), region.getChunkZ() + LocalSectionIndex.unpackZ(section)));
+                if (!sectionsChanged && (SECTIONS.size() >= TESTED_SECTIONS.size() || TESTED_SECTIONS.getLong(SECTIONS.size()) != key))
+                    sectionsChanged = true;
+
+                SECTIONS.add(key);
             }
         }
+
+        if (SECTIONS.size() != TESTED_SECTIONS.size())
+            sectionsChanged = true;
     }
 
     private static void releaseAbsentRegions() {
@@ -144,7 +153,7 @@ public final class OcclusionCuller {
     }
 
     private static boolean isUnchanged() {
-        return culling && DepthReadback.latestX() == testedX && DepthReadback.latestY() == testedY && DepthReadback.latestZ() == testedZ && Arrays.equals(DepthReadback.latestMatrix(), TESTED_MATRIX) && Arrays.equals(DepthReadback.latestDepth(), TESTED_DEPTH) && SECTIONS.equals(TESTED_SECTIONS);
+        return culling && DepthReadback.latestX() == testedX && DepthReadback.latestY() == testedY && DepthReadback.latestZ() == testedZ && Arrays.equals(DepthReadback.latestMatrix(), TESTED_MATRIX) && !sectionsChanged && Arrays.equals(DepthReadback.latestDepth(), TESTED_DEPTH);
     }
 
     private static void remember() {

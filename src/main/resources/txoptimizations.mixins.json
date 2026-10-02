@@ -10,6 +10,7 @@
     "BlockStateCacheDedupMixin",
     "BufferBuilderElementCacheMixin",
     "CameraFluidCacheMixin",
+    "ClientChunkCachePrecipitationMixin",
     "DebugScreenEntryListLookupMixin",
     "EntityRenderDispatcherCacheMixin",
     "EntityRenderDispatcherSkinCacheMixin",
