@@ -22,6 +22,7 @@ public final class OcclusionCuller {
     private static final float                              NEAR            = 0.1F;
     private static final float                              SCREEN_MARGIN   = 0.01F;
     private static final float                              DEPTH_RELATIVE  = 1.0e-3F;
+    private static final int                                LEVEL_SPAN      = 4;
     private static final float[][]                          PYRAMID         = createPyramid();
     private static final int[]                              LEVEL_WIDTHS    = levelWidths();
     private static final float[]                            MATRIX          = new float[16];
@@ -229,17 +230,17 @@ public final class OcclusionCuller {
             top     = Math.max(top, screenY);
         }
 
-        int pixelMinX = (int) Math.floor(left - SCREEN_MARGIN);
-        int pixelMinY = (int) Math.floor(bottom - SCREEN_MARGIN);
-        int pixelMaxX = (int) Math.floor(right + SCREEN_MARGIN);
-        int pixelMaxY = (int) Math.floor(top + SCREEN_MARGIN);
+        int pixelMinX = Math.max((int) Math.floor(left - SCREEN_MARGIN), 0);
+        int pixelMinY = Math.max((int) Math.floor(bottom - SCREEN_MARGIN), 0);
+        int pixelMaxX = Math.min((int) Math.floor(right + SCREEN_MARGIN), WIDTH - 1);
+        int pixelMaxY = Math.min((int) Math.floor(top + SCREEN_MARGIN), HEIGHT - 1);
 
-        if (pixelMinX < 0 || pixelMinY < 0 || pixelMaxX >= WIDTH || pixelMaxY >= HEIGHT)
+        if (pixelMinX > pixelMaxX || pixelMinY > pixelMaxY)
             return false;
 
         int level = 0;
 
-        while ((pixelMaxX >> level) - (pixelMinX >> level) > 1 || (pixelMaxY >> level) - (pixelMinY >> level) > 1)
+        while ((pixelMaxX >> level) - (pixelMinX >> level) >= LEVEL_SPAN || (pixelMaxY >> level) - (pixelMinY >> level) >= LEVEL_SPAN)
             level ++;
 
         float[] depths     = PYRAMID[level];
