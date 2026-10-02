@@ -106,9 +106,9 @@ On GPUs with the multi-draw extension Sodium hands every section's draw commands
 
 Each region kept its per-pass section data and cached draw batches in hash maps keyed by render pass, looked up for every region and pass each frame. With only three passes they are now also held in arrays indexed by pass, and the lookups read the arrays.
 
-### Repeated pipeline binds
+### Repeated binds
 
-Binding a pipeline on a render pass validated its attachments, recorded a pipeline bind, forgot every uniform and then set all of them again, even when that same pipeline was already bound on the pass. Binding the pipeline that is already bound is now skipped. Vulkan keeps the bound pipeline, its pushed descriptors and push constants, and every uniform set after it still goes through the normal path, so every draw sees the same state as before.
+Binding a pipeline on a render pass validated its attachments, recorded a pipeline bind, forgot every uniform and then set all of them again, even when that same pipeline was already bound on the pass. Vertex and index buffers were also bound again through a native call before every draw that used the buffer already bound. Binding the pipeline, vertex buffer slice or index buffer and type that is already bound on the pass is now skipped, unless the buffer has been closed so vanilla's error still fires. Vulkan keeps the bound pipeline, its pushed descriptors, push constants and buffer bindings, and every uniform set afterwards still goes through the normal path, so every draw sees the same state as before.
 
 ### Clears on load
 
