@@ -2,6 +2,7 @@ package com.teslicek.txoptimizations;
 
 import com.teslicek.txoptimizations.bake.Cushions;
 import com.teslicek.txoptimizations.gpu.GpuPassProfiler;
+import com.teslicek.txoptimizations.gpu.OcclusionProbe;
 import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.fabric.api.client.command.v2.ClientCommandRegistrationCallback;
 import net.fabricmc.fabric.api.client.command.v2.ClientCommands;
@@ -14,17 +15,31 @@ public final class TxOptimizationsClient implements ClientModInitializer {
     public void onInitializeClient() {
         ClientEntityEvents.ENTITY_LOAD.register((entity, level) -> Cushions.track(entity));
         ClientEntityEvents.ENTITY_UNLOAD.register((entity, level) -> Cushions.untrack(entity));
-        ClientCommandRegistrationCallback.EVENT.register((dispatcher, context) -> dispatcher.register(ClientCommands.literal("txgpu").executes(command -> {
-            if (GpuPassProfiler.isRunning()) {
-                command.getSource().sendError(Component.literal("GPU profile is already running"));
+        ClientCommandRegistrationCallback.EVENT.register((dispatcher, context) -> {
+            dispatcher.register(ClientCommands.literal("txgpu").executes(command -> {
+                if (GpuPassProfiler.isRunning()) {
+                    command.getSource().sendError(Component.literal("GPU profile is already running"));
 
-                return 0;
-            }
+                    return 0;
+                }
 
-            GpuPassProfiler.start();
-            command.getSource().sendFeedback(Component.literal("Recording GPU time for 10 seconds"));
+                GpuPassProfiler.start();
+                command.getSource().sendFeedback(Component.literal("Recording GPU time for 10 seconds"));
 
-            return 1;
-        })));
+                return 1;
+            }));
+            dispatcher.register(ClientCommands.literal("txocclusion").executes(command -> {
+                if (OcclusionProbe.isActive()) {
+                    command.getSource().sendError(Component.literal("Occlusion probe is already running"));
+
+                    return 0;
+                }
+
+                OcclusionProbe.arm();
+                command.getSource().sendFeedback(Component.literal("Measuring hidden terrain in the next frame"));
+
+                return 1;
+            }));
+        });
     }
 }
