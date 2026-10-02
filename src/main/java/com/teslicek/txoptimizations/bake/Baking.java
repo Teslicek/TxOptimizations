@@ -44,9 +44,8 @@ public final class Baking {
     }
 
     public static boolean isEntityMeshed(Entity entity) {
-        Bakeable bakeable = (Bakeable) entity;
-
-        return bakeable.txoptimizations$isBakeSupported() && bakeable.txoptimizations$getRenderMode() == RenderMode.TERRAIN && !entity.shouldShowName();
+        return entity instanceof Bakeable bakeable
+            && bakeable.txoptimizations$isBakeSupported() && bakeable.txoptimizations$getRenderMode() == RenderMode.TERRAIN && !entity.shouldShowName();
     }
 
     public static void requestMode(BlockEntity blockEntity, RenderMode mode) {
@@ -87,17 +86,14 @@ public final class Baking {
         minecraft.levelExtractor.blockChanged(pos, REBUILD_FLAGS);
     }
 
-    public static RenderShape meshedRenderShape(BlockState state, BlockEntity blockEntity, SectionPos section, RenderShape vanilla) {
-        if (blockEntity == null || !state.hasBlockEntity())
+    public static RenderShape meshedRenderShape(BlockEntity blockEntity, SectionPos section, RenderShape vanilla) {
+        if (blockEntity == null)
             return vanilla;
 
         BakeableBlockEntity bakeable = (BakeableBlockEntity) blockEntity;
 
         if (!bakeable.txoptimizations$isBakeSupported())
             return vanilla;
-
-        if (bakeable.txoptimizations$isTimerFinished())
-            ChunkTasks.add(section, () -> bakeable.txoptimizations$setRenderMode(RenderMode.TERRAIN));
 
         if (bakeable.txoptimizations$getRenderMode() != bakeable.txoptimizations$getPendingMode())
             ChunkTasks.add(section, () -> bakeable.txoptimizations$setRenderMode(bakeable.txoptimizations$getPendingMode()));
@@ -108,8 +104,8 @@ public final class Baking {
         return vanilla;
     }
 
-    public static BlockStateModel meshedModel(BlockState state, BlockEntity blockEntity, BlockStateModel model) {
-        if (blockEntity == null || !state.hasBlockEntity())
+    public static BlockStateModel meshedModel(BlockEntity blockEntity, BlockStateModel model) {
+        if (blockEntity == null)
             return model;
 
         BakeableBlockEntity bakeable = (BakeableBlockEntity) blockEntity;

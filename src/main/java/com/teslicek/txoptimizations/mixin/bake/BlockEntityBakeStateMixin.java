@@ -39,12 +39,6 @@ public abstract class BlockEntityBakeStateMixin implements BakeableBlockEntity {
     @Unique
     private boolean txoptimizations$forcedEntity;
 
-    @Unique
-    private long txoptimizations$timerStart;
-
-    @Unique
-    private int txoptimizations$timerDuration;
-
     @Shadow
     public abstract BlockEntityType<?> getType();
 
@@ -56,8 +50,11 @@ public abstract class BlockEntityBakeStateMixin implements BakeableBlockEntity {
         if (BakedKind.of(type) == null)
             return;
 
-        this.txoptimizations$setBakeSupported(true);
-        this.txoptimizations$renderBoth = type == BlockEntityTypes.BANNER;
+        this.txoptimizations$bakeSupported = true;
+        this.txoptimizations$renderBoth    = type == BlockEntityTypes.BANNER;
+
+        if (!Baking.canBeTerrain((BlockEntity) (Object) this))
+            this.txoptimizations$pendingMode = RenderMode.ENTITY;
     }
 
     @Inject(method = "setBlockState", at = @At("TAIL"))
@@ -71,14 +68,6 @@ public abstract class BlockEntityBakeStateMixin implements BakeableBlockEntity {
     @Override
     public boolean txoptimizations$isBakeSupported() {
         return this.txoptimizations$bakeSupported;
-    }
-
-    @Override
-    public void txoptimizations$setBakeSupported(boolean supported) {
-        if (supported && !this.txoptimizations$bakeSupported && this.txoptimizations$pendingMode == RenderMode.TERRAIN && !Baking.canBeTerrain((BlockEntity) (Object) this))
-            this.txoptimizations$pendingMode = RenderMode.ENTITY;
-
-        this.txoptimizations$bakeSupported = supported;
     }
 
     @Override
@@ -108,18 +97,8 @@ public abstract class BlockEntityBakeStateMixin implements BakeableBlockEntity {
     }
 
     @Override
-    public void txoptimizations$setRenderBoth(boolean renderBoth) {
-        this.txoptimizations$renderBoth = renderBoth;
-    }
-
-    @Override
     public boolean txoptimizations$isHidden() {
         return this.txoptimizations$hidden;
-    }
-
-    @Override
-    public void txoptimizations$setHidden(boolean hidden) {
-        this.txoptimizations$hidden = hidden;
     }
 
     @Override
@@ -130,20 +109,6 @@ public abstract class BlockEntityBakeStateMixin implements BakeableBlockEntity {
     @Override
     public void txoptimizations$setForcedEntity(boolean forcedEntity) {
         this.txoptimizations$forcedEntity = forcedEntity;
-    }
-
-    @Override
-    public boolean txoptimizations$isTimerFinished() {
-        if (this.txoptimizations$timerStart == 0L)
-            return false;
-
-        return Minecraft.getInstance().level.getGameTime() - this.txoptimizations$timerStart > this.txoptimizations$timerDuration;
-    }
-
-    @Override
-    public void txoptimizations$setTimer(long start, int duration) {
-        this.txoptimizations$timerStart    = start;
-        this.txoptimizations$timerDuration = duration;
     }
 
     @Unique

@@ -81,7 +81,6 @@
     "bake.CushionRendererBakeMixin",
     "bake.DecoratedPotBlockEntityBakeMixin",
     "bake.EnderChestBlockEntityBakeMixin",
-    "bake.EntityBakeStateMixin",
     "bake.MeshedRenderStateMixin",
     "bake.ModelManagerBakeMixin",
     "bake.RenderSectionManagerBakeMixin",

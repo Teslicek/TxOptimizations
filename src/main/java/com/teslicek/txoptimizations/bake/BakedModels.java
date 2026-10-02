@@ -27,7 +27,15 @@ public final class BakedModels {
 
         BakedKind kind = BakedKind.of(state);
 
-        if (kind == null || !kind.canBake(state))
+        if (kind == null)
+            return vanilla;
+
+        BlockStateModel cached = MODELS.get(state);
+
+        if (cached != null)
+            return cached;
+
+        if (!kind.canBake(state))
             return vanilla;
 
         return MODELS.computeIfAbsent(state, _ -> bake(state, kind, vanilla));

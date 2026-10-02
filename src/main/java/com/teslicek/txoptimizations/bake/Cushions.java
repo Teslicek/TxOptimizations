@@ -47,10 +47,17 @@ public final class Cushions {
         if (!isTracked(entity))
             return;
 
-        BlockPos pos = entity.blockPosition();
+        BlockPos               pos      = entity.blockPosition();
+        SectionPos             section  = SectionPos.of(pos);
+        Map<Integer, Snapshot> cushions = SECTIONS.get(section);
 
-        section(pos).remove(entity.getId());
-        ChunkTasks.add(SectionPos.of(pos), () -> ((Bakeable) entity).txoptimizations$setRenderMode(RenderMode.ENTITY));
+        if (cushions == null || cushions.remove(entity.getId()) == null)
+            return;
+
+        if (cushions.isEmpty())
+            SECTIONS.remove(section, cushions);
+
+        ChunkTasks.add(section, () -> ((Bakeable) entity).txoptimizations$setRenderMode(RenderMode.ENTITY));
         Baking.rebuild(pos);
     }
 
@@ -80,12 +87,18 @@ public final class Cushions {
         }
     }
 
+    public static boolean hasCushions(SectionPos section) {
+        Map<Integer, Snapshot> cushions = SECTIONS.get(section);
+
+        return cushions != null && !cushions.isEmpty();
+    }
+
     public static void clearModels() {
         MODELS.clear();
     }
 
     private static boolean isTracked(Entity entity) {
-        return entity.level().isClientSide() && ((Bakeable) entity).txoptimizations$isBakeSupported();
+        return entity instanceof Bakeable bakeable && bakeable.txoptimizations$isBakeSupported() && entity.level().isClientSide();
     }
 
     private static Map<Integer, Snapshot> section(BlockPos pos) {

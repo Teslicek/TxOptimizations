@@ -5,7 +5,6 @@ import com.teslicek.txoptimizations.bake.RenderMode;
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.ChestBlock;
-import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.entity.ChestBlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.properties.ChestType;
@@ -23,18 +22,29 @@ public abstract class ChestBlockEntityBakeMixin {
 
     @Inject(method = "lidAnimateTick", at = @At("RETURN"))
     private static void txoptimizations$followLid(Level level, BlockPos pos, BlockState state, ChestBlockEntity chest, CallbackInfo ci) {
-        float      openness = state.getBlock() instanceof ChestBlock chestBlock && chest.hasLevel() ? chestBlock.combine(state, level, pos, true).apply(ChestBlock.opennessCombiner(chest)).get(PARTIAL_TICK) : chest.getOpenNess(PARTIAL_TICK);
-        RenderMode mode     = openness > 0.0F ? RenderMode.ENTITY : RenderMode.TERRAIN;
+        ChestBlockEntity otherHalf = txoptimizations$otherHalf(level, pos, state);
+        float            openness  = otherHalf == null ? chest.getOpenNess(PARTIAL_TICK) : Math.max(chest.getOpenNess(PARTIAL_TICK), otherHalf.getOpenNess(PARTIAL_TICK));
+        RenderMode       mode      = openness > 0.0F ? RenderMode.ENTITY : RenderMode.TERRAIN;
 
         Baking.requestMode(chest, mode);
 
-        if (state.getValueOrElse(ChestBlock.TYPE, ChestType.SINGLE) == ChestType.SINGLE)
-            return;
-
-        BlockPos    otherPos  = ChestBlock.getConnectedBlockPos(pos, state);
-        BlockEntity otherHalf = level.getBlockEntity(otherPos);
-
-        if (otherHalf instanceof ChestBlockEntity && level.getBlockState(otherPos).is(state.getBlock()))
+        if (otherHalf != null)
             Baking.requestMode(otherHalf, mode);
+    }
+
+    @Unique
+    private static ChestBlockEntity txoptimizations$otherHalf(Level level, BlockPos pos, BlockState state) {
+        ChestType type = state.getValue(ChestBlock.TYPE);
+
+        if (type == ChestType.SINGLE)
+            return null;
+
+        BlockPos   otherPos   = ChestBlock.getConnectedBlockPos(pos, state);
+        BlockState otherState = level.getBlockState(otherPos);
+
+        if (!otherState.is(state.getBlock()) || otherState.getValue(ChestBlock.TYPE) != type.getOpposite() || otherState.getValue(ChestBlock.FACING) != state.getValue(ChestBlock.FACING))
+            return null;
+
+        return level.getBlockEntity(otherPos) instanceof ChestBlockEntity otherChest ? otherChest : null;
     }
 }

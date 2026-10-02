@@ -6,15 +6,16 @@ import com.mojang.renderpearl.frontend.FrontendRenderPipeline;
 import com.teslicek.txoptimizations.gpu.GpuPassProfiler;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
-import org.spongepowered.asm.mixin.injection.Inject;
-import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
+import org.spongepowered.asm.mixin.injection.ModifyVariable;
 
 @Mixin(FrontendRenderPass.class)
 public abstract class FrontendRenderPassGpuProfilerMixin {
 
-    @Inject(method = "setPipeline", at = @At("HEAD"))
-    private void txoptimizations$profilePipeline(CompiledRenderPipeline pipeline, CallbackInfo ci) {
+    @ModifyVariable(method = "setPipeline", at = @At("HEAD"), argsOnly = true)
+    private CompiledRenderPipeline txoptimizations$profilePipeline(CompiledRenderPipeline pipeline) {
         if (GpuPassProfiler.isRunning())
             GpuPassProfiler.markPipeline(((FrontendRenderPipeline) pipeline).name());
+
+        return pipeline;
     }
 }

@@ -12,6 +12,7 @@ import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
+import org.spongepowered.asm.mixin.injection.ModifyVariable;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 @Mixin(GuiRenderState.class)
@@ -48,10 +49,12 @@ public abstract class GuiRenderStateHudCacheMixin {
         ci.cancel();
     }
 
-    @Inject(method = "addBlitToCurrentLayer", at = @At("HEAD"))
-    private void txoptimizations$includeBlit(BlitRenderState blit, CallbackInfo ci) {
+    @ModifyVariable(method = "addBlitToCurrentLayer", at = @At("HEAD"), argsOnly = true)
+    private BlitRenderState txoptimizations$includeBlit(BlitRenderState blit) {
         if (HudCache.isRendering())
             HudCache.include(blit.bounds());
+
+        return blit;
     }
 
     @Unique

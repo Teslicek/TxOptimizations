@@ -87,7 +87,7 @@ public final class HudCache {
     }
 
     public static boolean isCurrentUncached() {
-        return current == null ? !UNKNOWN.isCached() : !current.isCached();
+        return current == null || !current.isCached();
     }
 
     public static void defer(ScreenArea submission) {
@@ -143,7 +143,7 @@ public final class HudCache {
         List<ScreenRectangle> areas = buffers.frontAreas();
 
         if (!areas.isEmpty())
-            graphics.guiRenderState.addGuiElement(new HudBlit(buffers.front(), areas, union(areas)));
+            graphics.guiRenderState.addGuiElement(new HudBlit(buffers.front(), areas, buffers.frontBounds()));
     }
 
     public static void include(ScreenRectangle bounds) {
@@ -253,22 +253,6 @@ public final class HudCache {
         }
 
         DEFERRED.clear();
-    }
-
-    private static ScreenRectangle union(List<ScreenRectangle> areas) {
-        int left   = Integer.MAX_VALUE;
-        int top    = Integer.MAX_VALUE;
-        int right  = Integer.MIN_VALUE;
-        int bottom = Integer.MIN_VALUE;
-
-        for (ScreenRectangle area : areas) {
-            left   = Math.min(left, area.left());
-            top    = Math.min(top, area.top());
-            right  = Math.max(right, area.right());
-            bottom = Math.max(bottom, area.bottom());
-        }
-
-        return new ScreenRectangle(left, top, right - left, bottom - top);
     }
 
     private static List<ColorTargetState> withPremultipliedAlpha(List<ColorTargetState> targets, BlendFunction blend) {

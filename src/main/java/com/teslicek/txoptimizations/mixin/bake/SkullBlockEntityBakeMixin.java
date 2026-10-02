@@ -22,9 +22,17 @@ public abstract class SkullBlockEntityBakeMixin {
 
     @Inject(method = {"loadAdditional", "applyImplicitComponents"}, at = @At("RETURN"))
     private void txoptimizations$keepProfileSkullsAsEntities(CallbackInfo ci) {
-        if (((SkullBlockEntity) (Object) this).getOwnerProfile() == null)
+        SkullBlockEntity skull = (SkullBlockEntity) (Object) this;
+        Bakeable         state = (Bakeable) this;
+
+        if (skull.getOwnerProfile() == null)
             return;
 
-        ((Bakeable) this).txoptimizations$setRenderMode(RenderMode.ENTITY);
+        boolean wasTerrain = state.txoptimizations$getRenderMode() == RenderMode.TERRAIN;
+
+        state.txoptimizations$setRenderMode(RenderMode.ENTITY);
+
+        if (wasTerrain && skull.hasLevel())
+            Baking.rebuild(skull.getBlockPos());
     }
 }

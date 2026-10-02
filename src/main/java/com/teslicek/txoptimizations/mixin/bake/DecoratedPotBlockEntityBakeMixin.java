@@ -1,5 +1,6 @@
 package com.teslicek.txoptimizations.mixin.bake;
 
+import com.llamalad7.mixinextras.injector.ModifyReturnValue;
 import com.teslicek.txoptimizations.bake.BakeableBlockEntity;
 import com.teslicek.txoptimizations.bake.Baking;
 import com.teslicek.txoptimizations.bake.RenderMode;
@@ -14,7 +15,6 @@ import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
-import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 @Mixin(DecoratedPotBlockEntity.class)
 public abstract class DecoratedPotBlockEntityBakeMixin {
@@ -25,27 +25,29 @@ public abstract class DecoratedPotBlockEntityBakeMixin {
     @Shadow
     private PotDecorations decorations;
 
-    @Inject(method = {"<init>", "loadAdditional", "applyImplicitComponents"}, at = @At("RETURN"))
+    @Inject(method = {"loadAdditional", "applyImplicitComponents"}, at = @At("RETURN"))
     private void txoptimizations$forceEntityForSherds(CallbackInfo ci) {
         ((BakeableBlockEntity) this).txoptimizations$setForcedEntity(!this.decorations.equals(PotDecorations.EMPTY) && !this.decorations.equals(BRICK_DECORATIONS));
     }
 
-    @Inject(method = "triggerEvent", at = @At("RETURN"))
-    private void txoptimizations$wobbleAsEntity(int event, int data, CallbackInfoReturnable<Boolean> cir) {
+    @ModifyReturnValue(method = "triggerEvent", at = @At("RETURN"))
+    private boolean txoptimizations$wobbleAsEntity(boolean wobbled) {
         DecoratedPotBlockEntity pot = (DecoratedPotBlockEntity) (Object) this;
 
-        Baking.requestMode(pot, RenderMode.ENTITY);
-        ((BakeableBlockEntity) pot).txoptimizations$setTimer(pot.wobbleStartedAtTick, pot.lastWobbleStyle.duration);
+        if (wobbled && pot.getLevel().isClientSide())
+            Baking.requestMode(pot, RenderMode.ENTITY);
+
+        return wobbled;
     }
 
-    @Inject(method = "getDecorations", at = @At("RETURN"))
-    private void txoptimizations$settleAfterWobble(CallbackInfoReturnable<PotDecorations> cir) {
+    @ModifyReturnValue(method = "getDecorations", at = @At("RETURN"))
+    private PotDecorations txoptimizations$settleAfterWobble(PotDecorations decorations) {
         DecoratedPotBlockEntity pot = (DecoratedPotBlockEntity) (Object) this;
 
-        if (!((BakeableBlockEntity) pot).txoptimizations$isTimerFinished())
-            return;
+        if (pot.lastWobbleStyle != null && pot.hasLevel() && pot.getLevel().isClientSide() && pot.getLevel().getGameTime() - pot.wobbleStartedAtTick > pot.lastWobbleStyle.duration)
+            Baking.requestMode(pot, RenderMode.TERRAIN);
 
-        Baking.requestMode(pot, RenderMode.TERRAIN);
+        return decorations;
     }
 
     @Unique

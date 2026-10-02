@@ -21,6 +21,7 @@ final class HudFramebuffers {
     private RenderTarget          back       = new TextureTarget("txoptimizations_hud_back", 1, 1, GpuFormat.RGBA8_UNORM, null);
     private RenderTarget          front      = new TextureTarget("txoptimizations_hud_front", 1, 1, GpuFormat.RGBA8_UNORM, null);
     private List<ScreenRectangle> frontAreas = List.of();
+    private ScreenRectangle       frontBounds = ScreenRectangle.empty();
     private RenderTarget          mainTarget;
     private boolean               dropFrame;
     private int                   serial;
@@ -42,7 +43,8 @@ final class HudFramebuffers {
         this.width      = window.getWidth();
         this.height     = window.getHeight();
         this.guiScale   = window.getGuiScale();
-        this.frontAreas = List.of();
+        this.frontAreas  = List.of();
+        this.frontBounds = ScreenRectangle.empty();
         this.backAreas.clear();
         this.back.resize(this.width, this.height);
         this.front.resize(this.width, this.height);
@@ -58,7 +60,8 @@ final class HudFramebuffers {
 
             this.front      = this.back;
             this.back       = previousFront;
-            this.frontAreas = this.backAreas.rectangles(window.getGuiScaledWidth(), window.getGuiScaledHeight());
+            this.frontAreas  = this.backAreas.rectangles(window.getGuiScaledWidth(), window.getGuiScaledHeight());
+            this.frontBounds = this.frontAreas.isEmpty() ? ScreenRectangle.empty() : union(this.frontAreas);
             this.serial ++;
         }
 
@@ -108,6 +111,10 @@ final class HudFramebuffers {
         return this.frontAreas;
     }
 
+    ScreenRectangle frontBounds() {
+        return this.frontBounds;
+    }
+
     void include(ScreenRectangle bounds) {
         if (bounds == null) {
             Window window = Minecraft.getInstance().getWindow();
@@ -118,5 +125,21 @@ final class HudFramebuffers {
         }
 
         this.backAreas.include(bounds.left(), bounds.top(), bounds.right(), bounds.bottom());
+    }
+
+    private static ScreenRectangle union(List<ScreenRectangle> areas) {
+        int left   = Integer.MAX_VALUE;
+        int top    = Integer.MAX_VALUE;
+        int right  = Integer.MIN_VALUE;
+        int bottom = Integer.MIN_VALUE;
+
+        for (ScreenRectangle area : areas) {
+            left   = Math.min(left, area.left());
+            top    = Math.min(top, area.top());
+            right  = Math.max(right, area.right());
+            bottom = Math.max(bottom, area.bottom());
+        }
+
+        return new ScreenRectangle(left, top, right - left, bottom - top);
     }
 }

@@ -16,6 +16,9 @@ public abstract class ShulkerBoxBlockEntityBakeMixin {
 
     @Inject(method = "updateAnimation", at = @At("RETURN"))
     private void txoptimizations$followLid(Level level, BlockPos pos, BlockState state, CallbackInfo ci) {
+        if (!level.isClientSide())
+            return;
+
         ShulkerBoxBlockEntity box = (ShulkerBoxBlockEntity) (Object) this;
 
         Baking.requestMode(box, box.getAnimationStatus() == ShulkerBoxBlockEntity.AnimationStatus.CLOSED ? RenderMode.TERRAIN : RenderMode.ENTITY);

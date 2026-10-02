@@ -37,19 +37,21 @@ public abstract class ChunkBuilderMeshingTaskBakeMixin {
 
     @WrapOperation(method = "execute", at = @At(value = "INVOKE", target = "Lnet/caffeinemc/mods/sodium/client/world/LevelSlice;getBlockState(III)Lnet/minecraft/world/level/block/state/BlockState;"))
     private BlockState txoptimizations$captureBlockEntity(LevelSlice slice, int x, int y, int z, Operation<BlockState> original, @Share("blockEntity") LocalRef<BlockEntity> blockEntity) {
-        blockEntity.set(slice.getBlockEntity(x, y, z));
+        BlockState state = original.call(slice, x, y, z);
 
-        return original.call(slice, x, y, z);
+        blockEntity.set(state.hasBlockEntity() ? slice.getBlockEntity(x, y, z) : null);
+
+        return state;
     }
 
     @WrapOperation(method = "execute", at = @At(value = "INVOKE", target = "Lnet/minecraft/world/level/block/state/BlockState;getRenderShape()Lnet/minecraft/world/level/block/RenderShape;"))
     private RenderShape txoptimizations$meshBakedBlockEntities(BlockState state, Operation<RenderShape> original, @Share("blockEntity") LocalRef<BlockEntity> blockEntity) {
-        return Baking.meshedRenderShape(state, blockEntity.get(), this.txoptimizations$section, original.call(state));
+        return Baking.meshedRenderShape(blockEntity.get(), this.txoptimizations$section, original.call(state));
     }
 
     @WrapOperation(method = "execute", at = @At(value = "INVOKE", target = "Lnet/caffeinemc/mods/sodium/client/render/chunk/compile/pipeline/BlockRenderer;renderModel(Lnet/minecraft/client/renderer/block/dispatch/BlockStateModel;Lnet/minecraft/world/level/block/state/BlockState;Lnet/minecraft/core/BlockPos;Lnet/minecraft/core/BlockPos;)V"))
     private void txoptimizations$chooseMeshedModel(BlockRenderer renderer, BlockStateModel model, BlockState state, BlockPos pos, BlockPos origin, Operation<Void> original, @Share("blockEntity") LocalRef<BlockEntity> blockEntity) {
-        original.call(renderer, Baking.meshedModel(state, blockEntity.get(), model), state, pos, origin);
+        original.call(renderer, Baking.meshedModel(blockEntity.get(), model), state, pos, origin);
     }
 
     @WrapOperation(method = "execute", at = @At(value = "INVOKE", target = "Lnet/caffeinemc/mods/sodium/client/render/chunk/ExtendedBlockEntityType;shouldRender(Lnet/minecraft/world/level/block/entity/BlockEntityType;Lnet/minecraft/world/level/BlockGetter;Lnet/minecraft/core/BlockPos;Lnet/minecraft/world/level/block/entity/BlockEntity;)Z"))
@@ -62,6 +64,9 @@ public abstract class ChunkBuilderMeshingTaskBakeMixin {
 
     @Inject(method = "execute", at = @At(value = "INVOKE", target = "Lnet/caffeinemc/mods/sodium/client/render/chunk/compile/pipeline/BlockRenderer;release()V"))
     private void txoptimizations$meshCushions(CallbackInfoReturnable<ChunkBuildOutput> cir, @Local BlockRenderer renderer) {
+        if (!Cushions.hasCushions(this.txoptimizations$section))
+            return;
+
         BlockState               air    = Blocks.AIR.defaultBlockState();
         BlockPos.MutableBlockPos offset = new BlockPos.MutableBlockPos();
 

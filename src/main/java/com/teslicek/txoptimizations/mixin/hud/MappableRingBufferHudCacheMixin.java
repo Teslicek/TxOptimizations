@@ -10,18 +10,10 @@ import org.spongepowered.asm.mixin.injection.At;
 public abstract class MappableRingBufferHudCacheMixin {
 
     @Unique
-    private static final int ALLOCATED_EXTRA = 6;
+    private static final int HUD_FLUSH_EXTRA = 3;
 
-    @Unique
-    private static final int ROTATED_EXTRA = 3;
-
-    @ModifyExpressionValue(method = {"<init>", "close"}, at = @At(value = "CONSTANT", args = "intValue=3"))
-    private int txoptimizations$allocateForHudFlush(int buffers) {
-        return buffers + ALLOCATED_EXTRA;
-    }
-
-    @ModifyExpressionValue(method = "rotate", at = @At(value = "CONSTANT", args = "intValue=3"))
-    private int txoptimizations$rotateForHudFlush(int buffers) {
-        return buffers + ROTATED_EXTRA;
+    @ModifyExpressionValue(method = {"<init>", "close", "rotate"}, at = @At(value = "CONSTANT", args = "intValue=3"))
+    private int txoptimizations$extendForHudFlush(int buffers) {
+        return buffers + HUD_FLUSH_EXTRA;
     }
 }

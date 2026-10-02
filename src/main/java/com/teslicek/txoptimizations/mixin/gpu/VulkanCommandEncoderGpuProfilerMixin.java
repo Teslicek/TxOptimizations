@@ -1,5 +1,6 @@
 package com.teslicek.txoptimizations.mixin.gpu;
 
+import com.mojang.renderpearl.api.buffers.GpuBufferSlice;
 import com.mojang.renderpearl.api.commands.RenderPassDescriptor;
 import com.mojang.renderpearl.backend.api.CommandEncoderBackend;
 import com.mojang.renderpearl.backend.vulkan.VulkanCommandEncoder;
@@ -12,6 +13,7 @@ import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
+import org.spongepowered.asm.mixin.injection.ModifyVariable;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
@@ -37,8 +39,16 @@ public abstract class VulkanCommandEncoderGpuProfilerMixin {
             this.txoptimizations$mark("clear");
     }
 
-    @Inject(method = {"writeToBuffer", "copyToBuffer", "writeToTexture", "copyBufferToTexture", "copyTextureToBuffer", "copyTextureToTexture"}, at = @At("HEAD"))
-    private void txoptimizations$profileCopy(CallbackInfo ci) {
+    @ModifyVariable(method = {"writeToBuffer", "copyToBuffer"}, at = @At("HEAD"), argsOnly = true, ordinal = 0)
+    private GpuBufferSlice txoptimizations$profileBufferCopy(GpuBufferSlice slice) {
+        if (GpuPassProfiler.isRunning())
+            this.txoptimizations$mark("copy");
+
+        return slice;
+    }
+
+    @Inject(method = {"writeToTexture", "copyBufferToTexture", "copyTextureToBuffer", "copyTextureToTexture"}, at = @At("HEAD"))
+    private void txoptimizations$profileTextureCopy(CallbackInfo ci) {
         if (GpuPassProfiler.isRunning())
             this.txoptimizations$mark("copy");
     }

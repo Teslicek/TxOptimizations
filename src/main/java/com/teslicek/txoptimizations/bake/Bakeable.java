@@ -4,8 +4,6 @@ public interface Bakeable {
 
     boolean txoptimizations$isBakeSupported();
 
-    void txoptimizations$setBakeSupported(boolean supported);
-
     RenderMode txoptimizations$getRenderMode();
 
     void txoptimizations$setRenderMode(RenderMode mode);
