@@ -22,8 +22,8 @@ import org.lwjgl.system.MemoryStack;
 
 public final class DepthReadback {
 
-    public static final int WIDTH  = 160;
-    public static final int HEIGHT = 90;
+    public static final int WIDTH  = 320;
+    public static final int HEIGHT = 180;
 
     private static final int             TEXELS          = WIDTH * HEIGHT;
     private static final int             SLOTS           = 3;

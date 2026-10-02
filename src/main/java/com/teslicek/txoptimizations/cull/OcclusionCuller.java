@@ -20,6 +20,7 @@ public final class OcclusionCuller {
     private static final int                                MASK_WORDS      = 4;
     private static final float                              SECTION_SIZE    = 16.0F;
     private static final float                              NEAR            = 0.1F;
+    private static final float                              SCREEN_MARGIN   = 0.01F;
     private static final float                              DEPTH_RELATIVE  = 1.0e-3F;
     private static final float[][]                          PYRAMID         = createPyramid();
     private static final int[]                              LEVEL_WIDTHS    = levelWidths();
@@ -219,10 +220,10 @@ public final class OcclusionCuller {
             top     = Math.max(top, screenY);
         }
 
-        int pixelMinX = (int) Math.floor(left) - 1;
-        int pixelMinY = (int) Math.floor(bottom) - 1;
-        int pixelMaxX = (int) Math.floor(right) + 1;
-        int pixelMaxY = (int) Math.floor(top) + 1;
+        int pixelMinX = (int) Math.floor(left - SCREEN_MARGIN);
+        int pixelMinY = (int) Math.floor(bottom - SCREEN_MARGIN);
+        int pixelMaxX = (int) Math.floor(right + SCREEN_MARGIN);
+        int pixelMaxY = (int) Math.floor(top + SCREEN_MARGIN);
 
         if (pixelMinX < 0 || pixelMinY < 0 || pixelMaxX >= WIDTH || pixelMaxY >= HEIGHT)
             return false;
