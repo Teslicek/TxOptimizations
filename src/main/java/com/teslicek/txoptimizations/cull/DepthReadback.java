@@ -16,6 +16,7 @@ import com.mojang.renderpearl.api.textures.GpuTexture;
 import com.mojang.renderpearl.api.textures.GpuTextureView;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
+import java.util.Arrays;
 import java.util.Optional;
 import net.minecraft.resources.Identifier;
 import org.lwjgl.system.MemoryStack;
@@ -27,6 +28,7 @@ public final class DepthReadback {
 
     private static final int             TEXELS          = WIDTH * HEIGHT;
     private static final int             SLOTS           = 3;
+    private static final int             STILL_INTERVAL  = 8;
     private static final int             PUSH_CONSTANTS  = 16;
     private static final int             TEXTURE_USAGE   = GpuTexture.USAGE_RENDER_ATTACHMENT | GpuTexture.USAGE_COPY_SRC;
     private static final int             BUFFER_USAGE    = GpuBuffer.USAGE_MAP_READ | GpuBuffer.USAGE_COPY_DST;
@@ -44,6 +46,7 @@ public final class DepthReadback {
         .build();
     private static final Slot[]          RING            = new Slot[SLOTS];
     private static final float[]         FRAME_MATRIX    = new float[16];
+    private static final float[]         CAPTURED_MATRIX = new float[16];
     private static final float[]         LATEST_DEPTH    = new float[TEXELS];
     private static final float[]         LATEST_MATRIX   = new float[16];
 
@@ -53,6 +56,10 @@ public final class DepthReadback {
     private static double         frameX;
     private static double         frameY;
     private static double         frameZ;
+    private static double         capturedX;
+    private static double         capturedY;
+    private static double         capturedZ;
+    private static int            framesSinceCapture = STILL_INTERVAL;
     private static long           generation;
     private static long           latestVersion;
     private static double         latestX;
@@ -68,10 +75,16 @@ public final class DepthReadback {
         frameY     = cameraY;
         frameZ     = cameraZ;
         frameKnown = true;
+        framesSinceCapture ++;
     }
 
     public static boolean canCapture() {
-        return frameKnown && freeSlot() != null;
+        if (!frameKnown || freeSlot() == null)
+            return false;
+
+        boolean moved = frameX != capturedX || frameY != capturedY || frameZ != capturedZ || !Arrays.equals(FRAME_MATRIX, CAPTURED_MATRIX);
+
+        return moved || framesSinceCapture >= STILL_INTERVAL;
     }
 
     public static void capture(RenderTarget mainTarget) {
@@ -102,15 +115,21 @@ public final class DepthReadback {
         slot.y       = frameY;
         slot.z       = frameZ;
         System.arraycopy(FRAME_MATRIX, 0, slot.matrix, 0, FRAME_MATRIX.length);
-        frameKnown = false;
+        System.arraycopy(FRAME_MATRIX, 0, CAPTURED_MATRIX, 0, FRAME_MATRIX.length);
+        capturedX          = frameX;
+        capturedY          = frameY;
+        capturedZ          = frameZ;
+        framesSinceCapture = 0;
+        frameKnown         = false;
 
         RenderSystem.getDevice().createCommandEncoder().copyTextureToBuffer(target, slot.buffer, 0L, () -> complete(slot, captureGeneration), 0);
     }
 
     public static void reset() {
         generation ++;
-        latestVersion = 0L;
-        frameKnown    = false;
+        latestVersion      = 0L;
+        frameKnown         = false;
+        framesSinceCapture = STILL_INTERVAL;
     }
 
     public static long latestVersion() {
