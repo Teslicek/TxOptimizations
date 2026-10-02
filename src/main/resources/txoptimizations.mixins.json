@@ -43,6 +43,7 @@
     "ScissorStateEqualityMixin",
     "ShapeOutlineEdgeCacheMixin",
     "SodiumExtraFrameCounterMixin",
+    "SodiumTerrainShaderMixin",
     "SoundEngineListenerMixin",
     "StateDefinitionNeighborTableMixin",
     "StateHolderNeighborTableMixin",
