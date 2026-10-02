@@ -69,6 +69,7 @@
     "bake.SignTextMessageCacheMixin",
     "bake.SkullBlockEntityBakeMixin",
     "bake.SodiumWorldRendererBakeMixin",
+    "gpu.FrontendRenderPassGpuProfilerMixin",
     "gpu.VulkanCommandEncoderGpuProfilerMixin",
     "gpu.VulkanGpuSurfaceGpuProfilerMixin",
     "hud.GameRendererHudCacheMixin",

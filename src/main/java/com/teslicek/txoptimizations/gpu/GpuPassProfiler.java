@@ -29,13 +29,15 @@ public final class GpuPassProfiler {
     private static final int[]             COUNTS     = new int[SLOTS];
     private static final Map<String, Pass> PASSES     = new HashMap<>();
 
-    private static int     slot;
-    private static boolean recording;
-    private static int     framesPending;
-    private static int     framesRead;
-    private static long    gpuNanos;
-    private static long    startNanos;
-    private static double  nanosPerTick;
+    private static VulkanDevice          device;
+    private static CommandEncoderBackend encoder;
+    private static int                   slot;
+    private static boolean               recording;
+    private static int                   framesPending;
+    private static int                   framesRead;
+    private static long                  gpuNanos;
+    private static long                  startNanos;
+    private static double                nanosPerTick;
 
     private GpuPassProfiler() {
     }
@@ -55,29 +57,45 @@ public final class GpuPassProfiler {
         return recording || framesPending > 0;
     }
 
-    public static void mark(VulkanDevice device, CommandEncoderBackend encoder, String label) {
+    public static void mark(VulkanDevice frameDevice, CommandEncoderBackend frameEncoder, String label) {
         if (!recording)
             return;
 
+        device  = frameDevice;
+        encoder = frameEncoder;
+
         if (POOLS[0] == null)
-            openPools(device);
+            openPools(frameDevice);
 
         int index = COUNTS[slot];
 
         if (index == CAPACITY)
             throw new IllegalStateException("GPU profile recorded more than " + CAPACITY + " passes in one frame");
 
-        encoder.writeTimestamp(POOLS[slot], index);
+        frameEncoder.writeTimestamp(POOLS[slot], index);
         LABELS[slot][index] = label;
         COUNTS[slot]        = index + 1;
     }
 
-    public static void endFrame(VulkanDevice device, CommandEncoderBackend encoder) {
+    public static void markPipeline(String pipeline) {
+        if (!recording || encoder == null)
+            return;
+
+        String label = "pipeline " + pipeline;
+        int    count = COUNTS[slot];
+
+        if (count > 0 && LABELS[slot][count - 1].equals(label))
+            return;
+
+        mark(device, encoder, label);
+    }
+
+    public static void endFrame(VulkanDevice frameDevice, CommandEncoderBackend frameEncoder) {
         if (!isRunning())
             return;
 
         if (recording) {
-            mark(device, encoder, FRAME_END);
+            mark(frameDevice, frameEncoder, FRAME_END);
             framesPending ++;
             recording = System.nanoTime() - startNanos < DURATION;
         }
@@ -93,11 +111,11 @@ public final class GpuPassProfiler {
             finish();
     }
 
-    private static void openPools(VulkanDevice device) {
-        nanosPerTick = device.getDeviceInfo().timestampPeriod();
+    private static void openPools(VulkanDevice poolDevice) {
+        nanosPerTick = poolDevice.getDeviceInfo().timestampPeriod();
 
         for (int index = 0; index < SLOTS; index ++)
-            POOLS[index] = device.createTimestampQueryPool(CAPACITY);
+            POOLS[index] = poolDevice.createTimestampQueryPool(CAPACITY);
     }
 
     private static void read(int frameSlot) {
@@ -153,7 +171,7 @@ public final class GpuPassProfiler {
         double        frameMs = gpuNanos / 1.0e6 / framesRead;
         StringBuilder report  = new StringBuilder();
 
-        report.append(String.format(Locale.ROOT, "%d frames in %.1f s (%.0f fps), GPU %.3f ms per frame%n", framesRead, seconds, framesRead / seconds, frameMs));
+        report.append(String.format(Locale.ROOT, "%d frames in %.1f s (%.0f fps), GPU %.3f ms per frame, GPU busy %.0f%% of the time%n", framesRead, seconds, framesRead / seconds, frameMs, gpuNanos / 1.0e7 / seconds));
 
         PASSES.entrySet().stream()
             .sorted((first, second) -> Long.compare(second.getValue().nanos, first.getValue().nanos))
