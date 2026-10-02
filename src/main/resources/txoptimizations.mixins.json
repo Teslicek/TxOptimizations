@@ -41,7 +41,6 @@
     "QuadParticleCornerCacheMixin",
     "QuadParticleLayerCacheMixin",
     "ScissorStateEqualityMixin",
-    "ShaderSourcePatchMixin",
     "ShapeOutlineEdgeCacheMixin",
     "SodiumExtraFrameCounterMixin",
     "SoundEngineListenerMixin",
