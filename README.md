@@ -126,6 +126,14 @@ Name tags, holograms and other text in the world were laid out again every frame
 
 Sodium writes every glyph, particle, entity cuboid and item quad into a small stack buffer and then copies it into the frame's vertex buffer, one native memory copy per glyph or cuboid. At a busy server spawn these copies took about 10% of the render thread. When the vertex buffer uses exactly the format being written, TxOptimizations reserves the space in the buffer first and writes the same bytes straight into it, updating the vertex count and last vertex pointer the same way Sodium's push does. Buffers with another format keep Sodium's converting push.
 
+### Map colors
+
+When a map's contents change, every one of its 16384 pixels was converted from its packed color byte to a color by looking up the map color and scaling it by the brightness. Map colors and brightness levels are fixed, so the 256 possible results are computed once with the same vanilla function and looked up per pixel. Servers that update maps in item frames often, like leaderboards, pay this on every update.
+
+### Hitbox cuboids
+
+Each hitbox or debug cuboid created 24 corner vectors every frame for its 12 edges and 24 more when filled, although a box has 8 corners. The edges and faces now share the 8 corner vectors, which are immutable, so the same lines and quads are emitted with fewer allocations.
+
 ### Feature renderer list
 
 Preparing each frame walked the list of feature renderers through a freshly built Guava filter that skips empty slots, three times per frame preparation. The filtered list only changes when a renderer is registered, so it is built once at registration and reused.
