@@ -23,6 +23,8 @@ public final class OcclusionCuller {
     private static final float                              SCREEN_MARGIN   = 0.01F;
     private static final float                              DEPTH_RELATIVE  = 1.0e-3F;
     private static final int                                LEVEL_SPAN      = 4;
+    private static final long                               MIN_INTERVAL    = 4_000_000L;
+    private static final double                             TEST_BUDGET     = 0.5;
     private static final float[][]                          PYRAMID         = createPyramid();
     private static final int[]                              LEVEL_WIDTHS    = levelWidths();
     private static final float[]                            MATRIX          = new float[16];
@@ -40,6 +42,7 @@ public final class OcclusionCuller {
     private static int     testGeneration;
     private static int     testedRegionCount;
     private static long    testedVersion;
+    private static long    testNanos;
     private static double  testedX;
     private static double  testedY;
     private static double  testedZ;
@@ -87,10 +90,17 @@ public final class OcclusionCuller {
         if (DepthReadback.latestVersion() == 0L || isUnchanged())
             return;
 
+        long start = System.nanoTime();
+
         remember();
         buildPyramid();
         testSections(lists);
-        culling = true;
+        culling   = true;
+        testNanos = System.nanoTime() - start;
+    }
+
+    static long captureInterval() {
+        return Math.max(MIN_INTERVAL, (long) (testNanos / (GpuWaitMeter.waitShare() * TEST_BUDGET)));
     }
 
     public static void reset() {

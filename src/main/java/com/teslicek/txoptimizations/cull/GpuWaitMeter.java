@@ -10,6 +10,7 @@ public final class GpuWaitMeter {
     private static long    waited;
     private static long    waitStart;
     private static boolean gpuBound;
+    private static double  share;
 
     private GpuWaitMeter() {
     }
@@ -26,7 +27,7 @@ public final class GpuWaitMeter {
         if (now - windowStart < WINDOW)
             return;
 
-        double share = (double) waited / (now - windowStart);
+        share = (double) waited / (now - windowStart);
 
         if (share > ENABLE_AT)
             gpuBound = true;
@@ -39,5 +40,9 @@ public final class GpuWaitMeter {
 
     public static boolean isGpuBound() {
         return gpuBound;
+    }
+
+    public static double waitShare() {
+        return share;
     }
 }
