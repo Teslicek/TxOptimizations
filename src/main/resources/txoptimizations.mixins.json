@@ -21,6 +21,7 @@
     "FontTextureSizeMixin",
     "FormattedBidiReorderFastPathMixin",
     "GameRendererLevelClearMixin",
+    "GizmoLineIdentityPoseMixin",
     "GlyphRendererVertexBuilderMixin",
     "GpuBufferPoolRecycleMixin",
     "GuiGraphicsExtractorMapAtlasMixin",

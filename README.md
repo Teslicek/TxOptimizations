@@ -101,6 +101,10 @@ Sodium draws every terrain section that its visibility graph and the view frustu
 
 `/txocclusion` reports the culled share and how many culled sections were visible.
 
+### Debug lines
+
+Hitboxes and other debug lines are built with a pose that is always the identity, yet vanilla transformed every vertex position and normal through it, allocating a vector each time. With hitboxes shown this cost several percent of the render thread. The values are now written directly, and an error is thrown if the pose is ever anything but the identity.
+
 ### Upload barriers
 
 The Vulkan backend follows every buffer upload with a barrier that makes the whole GPU finish all earlier work before anything else may start. Several uniform uploads happen back to back each frame (global settings, projection matrices, lighting), so the GPU drained once per upload. Consecutive uploads to separate buffer ranges now share a single barrier, which is recorded before the next command of any other kind, before an upload that overlaps one still waiting for its barrier, and before the command buffer ends. Timestamp queries do not trigger it.
