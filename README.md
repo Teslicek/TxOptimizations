@@ -98,6 +98,14 @@ Hitboxes and other debug lines are built with a pose that is always the identity
 
 Sodium writes item model quads by transforming and renormalizing the normal of every vertex, although the four vertices of a quad nearly always share one normal. The transformed normal is now reused while consecutive vertices carry the same normal, so most quads do this work once instead of four times.
 
+### Indirect terrain draws
+
+On GPUs with the multi-draw extension Sodium hands every section's draw commands to the driver through `vkCmdDrawMultiIndexedEXT`, and the driver walks all of them on the render thread each frame. Sodium's indirect path writes the same commands into a GPU-visible buffer and issues one indirect draw per region, so the GPU reads the list instead. It is now used whenever the device supports indirect multi-draw.
+
+### Region pass lookups
+
+Each region kept its per-pass section data and cached draw batches in hash maps keyed by render pass, looked up for every region and pass each frame. With only three passes they are now also held in arrays indexed by pass, and the lookups read the arrays.
+
 ### Upload barriers
 
 The Vulkan backend follows every buffer upload with a barrier that makes the whole GPU finish all earlier work before anything else may start. Several uniform uploads happen back to back each frame (global settings, projection matrices, lighting), so the GPU drained once per upload. Consecutive uploads to separate buffer ranges now share a single barrier, which is recorded before the next command of any other kind, before an upload that overlaps one still waiting for its barrier, and before the command buffer ends. Timestamp queries do not trigger it.
