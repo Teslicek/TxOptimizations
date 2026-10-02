@@ -50,6 +50,7 @@
     "PoseAccessor",
     "QuadParticleCornerCacheMixin",
     "QuadParticleLayerCacheMixin",
+    "RadixSortPackedSmallSortMixin",
     "RenderRegionPassArrayMixin",
     "ScissorStateEqualityMixin",
     "ShapeOutlineEdgeCacheMixin",
