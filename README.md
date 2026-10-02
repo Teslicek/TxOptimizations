@@ -106,6 +106,10 @@ On GPUs with the multi-draw extension Sodium hands every section's draw commands
 
 Each region kept its per-pass section data and cached draw batches in hash maps keyed by render pass, looked up for every region and pass each frame. With only three passes they are now also held in arrays indexed by pass, and the lookups read the arrays.
 
+### Repeated pipeline binds
+
+Binding a pipeline on a render pass validated its attachments, recorded a pipeline bind, forgot every uniform and then set all of them again, even when that same pipeline was already bound on the pass. Binding the pipeline that is already bound is now skipped. Vulkan keeps the bound pipeline, its pushed descriptors and push constants, and every uniform set after it still goes through the normal path, so every draw sees the same state as before.
+
 ### Clears on load
 
 Every frame cleared the world target, the depth before the held item and the depth before the GUI with separate clear commands, each followed by a barrier that drains the whole GPU, and then started a render pass on the same target that loaded the cleared contents. A clear is now held back and folded into the next render pass on that texture as a clear on load when the pass covers the whole texture, which needs neither the separate command nor the barrier. Buffer uploads and timestamps may pass a held clear because they never touch the image. Any other command, or a pass that does not cover the texture, records the held clear first exactly as before.
