@@ -118,6 +118,10 @@ Every frame cleared the world target, the depth before the held item and the dep
 
 The Vulkan backend follows every buffer upload with a barrier that makes the whole GPU finish all earlier work before anything else may start. Several uniform uploads happen back to back each frame (global settings, projection matrices, lighting), so the GPU drained once per upload. Consecutive uploads and buffer-to-buffer copies to separate buffer ranges now share a single barrier (a copy also waits when its source or destination overlaps a range still waiting), which is recorded before the next command of any other kind, before an upload that overlaps one still waiting for its barrier, and before the command buffer ends. Timestamp queries do not trigger it.
 
+### Precise barriers
+
+The Vulkan backend ended every render pass and every buffer upload with a barrier from all stages to all stages that flushes and invalidates all memory, so the GPU drained completely and dropped every cache at each of the dozen or so pass boundaries per frame. A render pass only writes color and depth attachments, so its barrier now makes exactly those writes visible to shader reads, attachment reads and writes and copies, and lets the next pass already fetch vertices and indirect commands, which no render pass ever writes. A buffer upload or copy only writes through the copy engine, so its barrier makes those writes visible to vertex, index, indirect, uniform, shader and copy reads. The waiting side still includes everything earlier, so everything that read or wrote before is ordered exactly as before.
+
 ### Feature renderer list
 
 Preparing each frame walked the list of feature renderers through a freshly built Guava filter that skips empty slots, three times per frame preparation. The filtered list only changes when a renderer is registered, so it is built once at registration and reused.

@@ -3,6 +3,7 @@ package com.teslicek.txoptimizations.mixin;
 import com.mojang.renderpearl.api.buffers.GpuBufferSlice;
 import com.mojang.renderpearl.backend.vulkan.VulkanCommandEncoder;
 import com.mojang.renderpearl.backend.vulkan.VulkanGpuBuffer;
+import com.teslicek.txoptimizations.PreciseBarriers;
 import it.unimi.dsi.fastutil.longs.LongArrayList;
 import java.nio.ByteBuffer;
 import org.lwjgl.system.MemoryStack;
@@ -153,8 +154,6 @@ public abstract class VulkanCommandEncoderUploadBarrierMixin {
         this.txoptimizations$barrierPending = false;
         this.txoptimizations$pendingRanges.clear();
 
-        try (MemoryStack stack = MemoryStack.stackPush()) {
-            VulkanCommandEncoder.memoryBarrier(this.currentCommandBuffer, stack);
-        }
+        PreciseBarriers.afterUpload(this.currentCommandBuffer);
     }
 }
