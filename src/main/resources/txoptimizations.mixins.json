@@ -49,7 +49,6 @@
     "QuadParticleLayerCacheMixin",
     "RenderRegionPassArrayMixin",
     "ScissorStateEqualityMixin",
-    "ShaderManagerTerrainTransformMixin",
     "ShapeOutlineEdgeCacheMixin",
     "SodiumExtraFrameCounterMixin",
     "SoundEngineListenerMixin",

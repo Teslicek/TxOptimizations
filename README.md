@@ -122,10 +122,6 @@ The Vulkan backend follows every buffer upload with a barrier that makes the who
 
 The Vulkan backend ended every render pass and every buffer upload with a barrier from all stages to all stages that flushes and invalidates all memory, so the GPU drained completely and dropped every cache at each of the dozen or so pass boundaries per frame. A render pass only writes color and depth attachments, so its barrier now makes exactly those writes visible to shader reads, attachment reads and writes and copies, and lets the next pass already fetch vertices and indirect commands, which no render pass ever writes. A buffer upload or copy only writes through the copy engine, so its barrier makes those writes visible to vertex, index, indirect, uniform, shader and copy reads. The waiting side still includes everything earlier, so everything that read or wrote before is ordered exactly as before.
 
-### Terrain vertex transform
-
-Sodium's terrain vertex shader computed `u_ProjectionMatrix * u_ModelViewMatrix * vec4(position, 1.0)`, which GLSL evaluates left to right, so every terrain vertex multiplied two 4x4 matrices (64 multiply-adds) before transforming its position. The shader source is patched as it loads to multiply the position by the model-view matrix first and then by the projection, 32 multiply-adds for the same transform. Only the last bit of float rounding can differ, and every terrain vertex uses the same formula, so shared edges stay identical. If the line is ever not in the shader, loading fails with an error instead of silently using an unpatched shader.
-
 ### Feature renderer list
 
 Preparing each frame walked the list of feature renderers through a freshly built Guava filter that skips empty slots, three times per frame preparation. The filtered list only changes when a renderer is registered, so it is built once at registration and reused.
