@@ -232,29 +232,30 @@ public final class OcclusionCuller {
             top     = Math.max(top, screenY);
         }
 
-        int pixelMinX = Math.max((int) Math.floor(left - SCREEN_MARGIN), 0);
-        int pixelMinY = Math.max((int) Math.floor(bottom - SCREEN_MARGIN), 0);
-        int pixelMaxX = Math.min((int) Math.floor(right + SCREEN_MARGIN), WIDTH - 1);
-        int pixelMaxY = Math.min((int) Math.floor(top + SCREEN_MARGIN), HEIGHT - 1);
-
-        if (pixelMinX > pixelMaxX || pixelMinY > pixelMaxY)
+        if (right + SCREEN_MARGIN < 0.0F || top + SCREEN_MARGIN < 0.0F || left - SCREEN_MARGIN >= WIDTH || bottom - SCREEN_MARGIN >= HEIGHT)
             return false;
 
-        int level = 0;
+        int pixelMinX = Math.max((int) (left - SCREEN_MARGIN), 0);
+        int pixelMinY = Math.max((int) (bottom - SCREEN_MARGIN), 0);
+        int pixelMaxX = Math.min((int) (right + SCREEN_MARGIN), WIDTH - 1);
+        int pixelMaxY = Math.min((int) (top + SCREEN_MARGIN), HEIGHT - 1);
+        int level     = 0;
 
         while ((pixelMaxX >> level) - (pixelMinX >> level) >= LEVEL_SPAN || (pixelMaxY >> level) - (pixelMinY >> level) >= LEVEL_SPAN)
             level ++;
 
         float[] depths     = PYRAMID[level];
         int     levelWidth = LEVEL_WIDTHS[level];
-        float   farthest   = Float.POSITIVE_INFINITY;
+        float   threshold  = nearest * (1.0F + DEPTH_RELATIVE);
 
         for (int y = pixelMinY >> level; y <= pixelMaxY >> level; y ++) {
-            for (int x = pixelMinX >> level; x <= pixelMaxX >> level; x ++)
-                farthest = Math.min(farthest, depths[y * levelWidth + x]);
+            for (int x = pixelMinX >> level; x <= pixelMaxX >> level; x ++) {
+                if (depths[y * levelWidth + x] <= threshold)
+                    return false;
+            }
         }
 
-        return farthest > nearest * (1.0F + DEPTH_RELATIVE);
+        return true;
     }
 
     private static void buildPyramid() {

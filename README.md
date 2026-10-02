@@ -109,10 +109,6 @@ Hitboxes and other debug lines are built with a pose that is always the identity
 
 Sodium writes item model quads by transforming and renormalizing the normal of every vertex, although the four vertices of a quad nearly always share one normal. The transformed normal is now reused while consecutive vertices carry the same normal, so most quads do this work once instead of four times.
 
-### Visible section regions
-
-While walking the visibility tree, Sodium looked up the region of every visible section in a hash map. Consecutive sections almost always belong to the same region, so the last region is remembered for the rest of that traversal and the map is only consulted when the region changes.
-
 ### Upload barriers
 
 The Vulkan backend follows every buffer upload with a barrier that makes the whole GPU finish all earlier work before anything else may start. Several uniform uploads happen back to back each frame (global settings, projection matrices, lighting), so the GPU drained once per upload. Consecutive uploads to separate buffer ranges now share a single barrier, which is recorded before the next command of any other kind, before an upload that overlaps one still waiting for its barrier, and before the command buffer ends. Timestamp queries do not trigger it.

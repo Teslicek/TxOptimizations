@@ -52,7 +52,6 @@
     "StateHolderNeighborTableMixin",
     "TranslatableTemplateCacheMixin",
     "VertexFormatElementCacheMixin",
-    "VisibleChunkCollectorRegionCacheMixin",
     "VulkanBackendCheckpointMixin",
     "VulkanCommandEncoderPollMixin",
     "VulkanCommandEncoderUploadBarrierMixin",
