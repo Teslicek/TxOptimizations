@@ -92,7 +92,7 @@ For every particle, Sodium rotated the four corners of the quad by the particle 
 
 ### Debug lines
 
-Hitboxes and other debug lines are built with a pose that is always the identity, yet vanilla transformed every vertex position and normal through it, allocating a vector each time. With hitboxes shown this cost several percent of the render thread. The values are now written directly, and an error is thrown if the pose is ever anything but the identity.
+Hitboxes and other debug lines are built with a pose that is always the identity, yet vanilla transformed every vertex position and normal through it, allocating a vector each time, and multiplied both ends of every line by the full view matrix only to read the view depth for near-plane clipping. With hitboxes shown this cost several percent of the render thread. The values are now written directly, only the depth row of the view matrix is evaluated with the same arithmetic, and an error is thrown if the pose is ever anything but the identity.
 
 ### Item quad normals
 
