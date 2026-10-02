@@ -14,8 +14,8 @@ final class HudFramebuffers {
 
     private static final Vector4fc CLEAR_COLOR = new Vector4f(0.0F);
 
-    private RenderTarget back  = new TextureTarget("txoptimizations_hud_back", 1, 1, GpuFormat.RGBA8_UNORM, GpuFormat.D32_FLOAT);
-    private RenderTarget front = new TextureTarget("txoptimizations_hud_front", 1, 1, GpuFormat.RGBA8_UNORM, GpuFormat.D32_FLOAT);
+    private RenderTarget back  = new TextureTarget("txoptimizations_hud_back", 1, 1, GpuFormat.RGBA8_UNORM, null);
+    private RenderTarget front = new TextureTarget("txoptimizations_hud_front", 1, 1, GpuFormat.RGBA8_UNORM, null);
     private RenderTarget mainTarget;
     private boolean      dropFrame;
     private int          serial;
@@ -52,7 +52,7 @@ final class HudFramebuffers {
             this.serial ++;
         }
 
-        RenderSystem.getDevice().createCommandEncoder().clearColorAndDepthTextures(this.back.getColorTexture(), CLEAR_COLOR, this.back.getDepthTexture(), 1.0);
+        RenderSystem.getDevice().createCommandEncoder().clearColorTexture(this.back.getColorTexture(), CLEAR_COLOR);
         this.dropFrame = false;
 
         return swapped;
