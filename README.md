@@ -106,6 +106,10 @@ On GPUs with the multi-draw extension Sodium hands every section's draw commands
 
 Each region kept its per-pass section data and cached draw batches in hash maps keyed by render pass, looked up for every region and pass each frame. With only three passes they are now also held in arrays indexed by pass, and the lookups read the arrays.
 
+### Clears on load
+
+Every frame cleared the world target, the depth before the held item and the depth before the GUI with separate clear commands, each followed by a barrier that drains the whole GPU, and then started a render pass on the same target that loaded the cleared contents. A clear is now held back and folded into the next render pass on that texture as a clear on load when the pass covers the whole texture, which needs neither the separate command nor the barrier. Buffer uploads and timestamps may pass a held clear because they never touch the image. Any other command, or a pass that does not cover the texture, records the held clear first exactly as before.
+
 ### Upload barriers
 
 The Vulkan backend follows every buffer upload with a barrier that makes the whole GPU finish all earlier work before anything else may start. Several uniform uploads happen back to back each frame (global settings, projection matrices, lighting), so the GPU drained once per upload. Consecutive uploads and buffer-to-buffer copies to separate buffer ranges now share a single barrier (a copy also waits when its source or destination overlaps a range still waiting), which is recorded before the next command of any other kind, before an upload that overlaps one still waiting for its barrier, and before the command buffer ends. Timestamp queries do not trigger it.
