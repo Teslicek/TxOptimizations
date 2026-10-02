@@ -30,6 +30,7 @@
   "breaks": {
     "immediatelyfast": "*",
     "obe": "*",
+    "entityculling": "*",
     "ferritecore": "*",
     "gnetum": "*",
     "moreculling": "*"

@@ -190,6 +190,14 @@ Rain and snow are built column by column around the camera every frame. Columns 
 
 For every column that is drawn, vanilla also asked the level for the precipitation type at that block, which looks up the biome through the biome zoom noise and the biome temperature. In rain a spark profile showed this at 20% of the render thread. The answer only depends on the chunk being loaded and its biome data, so it is cached per block position and the cache is dropped whenever a chunk is loaded, unloaded or gets new biomes, and when the level changes. The column bounds come from the values vanilla already computed instead of a second heightmap lookup.
 
+### Entity culling
+
+Entities and block entities hidden behind solid blocks are not extracted or drawn. Every 5 ticks the client tick records the culling box and position of every loaded entity, plus every block entity within 64 blocks of the camera whose renderer isn't drawn off screen. A background thread then traces rays from the camera to sample points on the camera-facing faces of each box, through blocks whose state is a solid render cube, and marks it culled when no ray gets through. This runs again every tick the camera moves or a new capture arrives. Ray results per block are cached for the pass, and only the touched cache entries are cleared before the next one.
+
+Entities farther than 128 blocks, glowing entities, the player, entities whose renderer ignores culling and boxes larger than 50 blocks are never culled, and anything found visible stays visible for at least one second. Culled entities that show their name still draw the name tag and the below-name score through walls, at the same distances vanilla uses. Block entities outside the camera's view are skipped as well, without allocating a box.
+
+Entities that are culled or were not extracted in the last frame only run a basic tick on the client: old position and rotation, tick count, `aiStep`, hurt time, position interpolation and the warden heartbeat. The camera entity, vehicles, boats, minecarts, display entities and firework rockets always tick fully.
+
 ### Memory
 
 Less live memory means shorter and rarer garbage collections.

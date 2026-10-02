@@ -1,18 +1,22 @@
 package com.teslicek.txoptimizations;
 
 import com.teslicek.txoptimizations.bake.Cushions;
+import com.teslicek.txoptimizations.cull.EntityCulling;
 import com.teslicek.txoptimizations.gpu.GpuPassProfiler;
 import com.teslicek.txoptimizations.gpu.OcclusionProbe;
 import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.fabric.api.client.command.v2.ClientCommandRegistrationCallback;
 import net.fabricmc.fabric.api.client.command.v2.ClientCommands;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientEntityEvents;
+import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
 import net.minecraft.network.chat.Component;
 
 public final class TxOptimizationsClient implements ClientModInitializer {
 
     @Override
     public void onInitializeClient() {
+        EntityCulling.start();
+        ClientTickEvents.START_CLIENT_TICK.register(EntityCulling::tick);
         ClientEntityEvents.ENTITY_LOAD.register((entity, level) -> Cushions.track(entity));
         ClientEntityEvents.ENTITY_UNLOAD.register((entity, level) -> Cushions.untrack(entity));
         ClientCommandRegistrationCallback.EVENT.register((dispatcher, context) -> {
