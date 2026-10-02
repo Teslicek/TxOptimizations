@@ -268,7 +268,9 @@ public final class OcclusionProbe {
             throw new UncheckedIOException("Could not write the occlusion probe to " + file, exception);
         }
 
-        Minecraft.getInstance().gui.hud.getChat().addClientSystemMessage(Component.literal("Occlusion probe saved to logs/" + file.getFileName() + "\n" + report.toString().strip()));
+        Component message = Component.literal("Occlusion probe saved to logs/" + file.getFileName() + "\n" + report.toString().strip());
+
+        Minecraft.getInstance().schedule(() -> Minecraft.getInstance().gui.hud.getChat().addClientSystemMessage(message));
     }
 
     private static void check(int result, String action) {
