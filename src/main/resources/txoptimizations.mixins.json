@@ -55,6 +55,7 @@
     "TranslatableTemplateCacheMixin",
     "VertexFormatElementCacheMixin",
     "VulkanBackendCheckpointMixin",
+    "VulkanCommandEncoderDeferredClearMixin",
     "VulkanCommandEncoderPollMixin",
     "VulkanCommandEncoderUploadBarrierMixin",
     "VulkanRenderPassRedundantStateMixin",
