@@ -57,6 +57,7 @@
     "VulkanBackendCheckpointMixin",
     "VulkanCommandEncoderPollMixin",
     "VulkanCommandEncoderUploadBarrierMixin",
+    "VulkanRenderPassRedundantStateMixin",
     "WeatherColumnCullMixin",
     "bake.BannerRendererBakeMixin",
     "bake.BellBlockEntityBakeMixin",

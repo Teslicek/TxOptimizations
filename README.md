@@ -106,6 +106,10 @@ On GPUs with the multi-draw extension Sodium hands every section's draw commands
 
 Each region kept its per-pass section data and cached draw batches in hash maps keyed by render pass, looked up for every region and pass each frame. With only three passes they are now also held in arrays indexed by pass, and the lookups read the arrays.
 
+### Redundant pipeline and uniform binds
+
+Binding a pipeline in the Vulkan render pass always recorded `vkCmdBindPipeline` and forgot every uniform, and setting any uniform marked the whole descriptor set for a new push, even when the pipeline or value was already bound. Rebinding the bound pipeline and setting a uniform to the value it already holds are now skipped, so consecutive draws with the same state push nothing again. Vulkan keeps a bound pipeline and pushed descriptors until they change, so every draw sees the same state as before.
+
 ### Upload barriers
 
 The Vulkan backend follows every buffer upload with a barrier that makes the whole GPU finish all earlier work before anything else may start. Several uniform uploads happen back to back each frame (global settings, projection matrices, lighting), so the GPU drained once per upload. Consecutive uploads to separate buffer ranges now share a single barrier, which is recorded before the next command of any other kind, before an upload that overlaps one still waiting for its barrier, and before the command buffer ends. Timestamp queries do not trigger it.
