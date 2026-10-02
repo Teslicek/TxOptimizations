@@ -90,6 +90,17 @@ Every frame cleared the main color and depth target before rendering, and the wo
 
 For every particle, Sodium rotated the four corners of the quad by the particle rotation, four quaternion rotations per particle per frame. Camera-facing particles all carry the camera rotation, so the rotated corners are the same for each of them. The rotated corners are kept while the rotation stays bit-for-bit the same, and only the per-particle scale and offset are applied, in the same order as before, so every vertex is identical.
 
+### Terrain occlusion culling
+
+Sodium draws every terrain section that its visibility graph and the view frustum let through, even when other terrain completely hides it. At render distance 32 a GPU occlusion probe (`/txocclusion`) found a third of the drawn terrain vertices in fully hidden sections. While the render thread spends a noticeable share of its time waiting for the GPU, TxOptimizations skips those sections using the GPU's own depth:
+
+- The main render pass is split right after opaque terrain and solid entities, before water, translucent features and clouds. Between the two halves the depth buffer is reduced to 160x90, each texel keeping the farthest depth of its screen block, and copied to the CPU.
+- When a copy arrives, about two frames later, every drawn section's box is projected with the camera of that frame and tested against a farthest-depth pyramid of it. Sections whose whole screen rectangle lies behind the stored depth are left out of Sodium's draw commands. Sections that were off screen in that frame are always drawn.
+- Turning the camera never reveals hidden terrain, so it is unaffected. Terrain that comes out from behind something because the camera or an entity moved appears up to two frames late.
+- The culler measures how long the render thread waits for the GPU over half-second windows and only runs while that wait is above 10 percent, switching off below 3 percent, so CPU-limited scenes pay nothing.
+
+`/txocclusion` reports the culled share and how many culled sections were visible.
+
 ### Feature renderer list
 
 Preparing each frame walked the list of feature renderers through a freshly built Guava filter that skips empty slots, three times per frame preparation. The filtered list only changes when a renderer is registered, so it is built once at registration and reused.
