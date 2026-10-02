@@ -22,6 +22,7 @@
     "FeatureRendererMapValuesMixin",
     "FontTextureSizeMixin",
     "FormattedBidiReorderFastPathMixin",
+    "FrustumAccessor",
     "GameRendererLevelClearMixin",
     "GizmoLineIdentityPoseMixin",
     "GlyphRendererVertexBuilderMixin",

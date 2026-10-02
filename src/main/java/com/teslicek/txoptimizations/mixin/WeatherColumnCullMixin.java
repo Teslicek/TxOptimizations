@@ -9,7 +9,7 @@ import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.client.renderer.WeatherEffectRenderer;
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.level.biome.Biome;
-import net.minecraft.world.phys.AABB;
+import org.joml.FrustumIntersection;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 
@@ -18,9 +18,9 @@ public abstract class WeatherColumnCullMixin {
 
     @WrapOperation(method = "extractRenderState", at = @At(value = "INVOKE", target = "Lnet/minecraft/client/multiplayer/ClientLevel;getPrecipitationAt(Lnet/minecraft/core/BlockPos;)Lnet/minecraft/world/level/biome/Biome$Precipitation;"))
     private Biome.Precipitation txoptimizations$skipColumnsOutsideView(ClientLevel level, BlockPos pos, Operation<Biome.Precipitation> original, @Local(ordinal = 6) int bottom, @Local(ordinal = 7) int top) {
-        AABB column = new AABB(pos.getX(), bottom, pos.getZ(), pos.getX() + 1, top + 1, pos.getZ() + 1);
+        int visibility = ((FrustumAccessor) Minecraft.getInstance().gameRenderer.mainCamera().getCullFrustum()).txoptimizations$cubeInFrustum(pos.getX(), bottom, pos.getZ(), pos.getX() + 1, top + 1, pos.getZ() + 1);
 
-        if (!Minecraft.getInstance().gameRenderer.mainCamera().getCullFrustum().isVisible(column))
+        if (visibility != FrustumIntersection.INSIDE && visibility != FrustumIntersection.INTERSECT)
             return Biome.Precipitation.NONE;
 
         return PrecipitationCache.get(level, pos, original);
