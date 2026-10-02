@@ -11,6 +11,7 @@
     "BufferBuilderElementCacheMixin",
     "CameraFluidCacheMixin",
     "DebugScreenEntryListLookupMixin",
+    "DrawBackendIndirectMixin",
     "EntityRenderDispatcherCacheMixin",
     "EntityRenderDispatcherSkinCacheMixin",
     "EntityRendererCacheMixin",
