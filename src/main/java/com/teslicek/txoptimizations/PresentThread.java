@@ -8,7 +8,7 @@ import java.util.concurrent.locks.LockSupport;
 public final class PresentThread {
 
     private static final int    SPINS  = 1024;
-    private static final Thread WORKER = Thread.ofPlatform().name("TxOptimizations Present").daemon().start(PresentThread::work);
+    private static final Thread WORKER = Thread.ofPlatform().name("TxOptimizations Present").daemon().priority(Thread.MAX_PRIORITY).start(PresentThread::work);
 
     private static volatile Runnable  job;
     private static volatile Thread    waiting;
