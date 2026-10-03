@@ -298,6 +298,10 @@ Every model reset its parts before animating by walking an immutable list throug
 
 Before drawing its layers, every armor stand set up its full pose and then asked the armor, held item, wings and head layers to draw, even when it wore and held nothing, which is what servers use for floating text. When the renderer has exactly the vanilla layers and the stand has no equipment, no held items and no head, that pose setup and the four empty layer calls are skipped. The stand's own model still animates when it is drawn.
 
+### Indirect command reuse
+
+Sodium keeps each region's terrain draw commands cached between frames, but still copied all of them into the frame's indirect buffer every frame (1.7% of the render thread in singleplayer). That buffer is one of three host-visible slots that keep their contents, so each slot now remembers which batch, at which version, it holds at each position. When the frame prepares the same batches in the same order and none of them was rebuilt since that slot was last written, the bytes already there are identical and the copy is skipped. From the first changed batch on, the rest of the frame is copied as before.
+
 ### Memory
 
 Less live memory means shorter and rarer garbage collections.
