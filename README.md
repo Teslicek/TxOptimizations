@@ -168,7 +168,7 @@ Sodium Extra records every frame and sorts the last 5 seconds of frame times twi
 
 Chests, ender chests, shulker boxes, bells, skulls, banner poles, decorated pots, copper golem statues and cushions are baked into the chunk mesh like normal blocks instead of being drawn again every frame. They switch back to per-frame rendering only while they move: a chest or shulker box while its lid is open, a bell while it swings, a decorated pot while it wobbles, an animated dragon or piglin head. Banner flags keep waving because only the pole and bar are baked. Player heads and decorated pots with sherds stay per-frame, and a named cushion only draws its name tag per frame. In a server lobby profile this cut block entity rendering from about 4.1% to 0.35% of the render thread.
 
-Block entities with nothing to draw are skipped: signs without text, beacons without a beam, campfires and shelves without items and lecterns without a book. Sign text facing away from the camera is not drawn.
+Block entities with nothing to draw are skipped: signs without text, beacons without a beam, campfires and shelves without items and lecterns without a book. The answer is remembered on each block entity for the current client tick, so a sign that gains text shows it at most one tick later. Sign text facing away from the camera is not drawn.
 
 ### Atlases and batching
 

@@ -20,6 +20,20 @@ public final class EmptyBlockEntities {
     }
 
     public static boolean isEmpty(BlockEntity blockEntity) {
+        BakeableBlockEntity memo = (BakeableBlockEntity) blockEntity;
+        long                tick = ClientClock.tick();
+
+        if (memo.txoptimizations$getEmptyTick() == tick)
+            return memo.txoptimizations$isEmpty();
+
+        boolean empty = computeEmpty(blockEntity);
+
+        memo.txoptimizations$setEmpty(tick, empty);
+
+        return empty;
+    }
+
+    private static boolean computeEmpty(BlockEntity blockEntity) {
         if (blockEntity instanceof SignBlockEntity sign)
             return !hasMessage(sign, SignTextSlot.FRONT) && !hasMessage(sign, SignTextSlot.BACK);
 

@@ -39,6 +39,12 @@ public abstract class BlockEntityBakeStateMixin implements BakeableBlockEntity {
     @Unique
     private boolean txoptimizations$forcedEntity;
 
+    @Unique
+    private long txoptimizations$emptyTick = -1L;
+
+    @Unique
+    private boolean txoptimizations$empty;
+
     @Shadow
     public abstract BlockEntityType<?> getType();
 
@@ -109,6 +115,22 @@ public abstract class BlockEntityBakeStateMixin implements BakeableBlockEntity {
     @Override
     public void txoptimizations$setForcedEntity(boolean forcedEntity) {
         this.txoptimizations$forcedEntity = forcedEntity;
+    }
+
+    @Override
+    public long txoptimizations$getEmptyTick() {
+        return this.txoptimizations$emptyTick;
+    }
+
+    @Override
+    public boolean txoptimizations$isEmpty() {
+        return this.txoptimizations$empty;
+    }
+
+    @Override
+    public void txoptimizations$setEmpty(long tick, boolean empty) {
+        this.txoptimizations$emptyTick = tick;
+        this.txoptimizations$empty     = empty;
     }
 
     @Unique

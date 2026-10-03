@@ -9,4 +9,10 @@ public interface BakeableBlockEntity extends Bakeable {
     boolean txoptimizations$isForcedEntity();
 
     void txoptimizations$setForcedEntity(boolean forcedEntity);
+
+    long txoptimizations$getEmptyTick();
+
+    boolean txoptimizations$isEmpty();
+
+    void txoptimizations$setEmpty(long tick, boolean empty);
 }
