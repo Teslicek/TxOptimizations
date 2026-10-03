@@ -198,6 +198,34 @@ Entities farther than 128 blocks, glowing entities, the player, entities whose r
 
 Entities that are culled, or were not extracted in any frame since the previous tick, only run a basic tick on the client: vanilla's common tick (old position and rotation, invulnerability timer, position interpolation, tick count), `aiStep`, hurt time and the warden heartbeat. A tick with no frame since the previous one, below 20 FPS, never counts entities as out of camera. The camera entity, vehicles, boats, minecarts, display entities and firework rockets always tick fully.
 
+### Persistent buffer mapping
+
+Every write into a CPU-visible GPU buffer (dynamic transforms, uniforms, fog, clouds, vertex staging, Sodium's indirect command and uniform buffers) mapped the buffer's memory with `vmaMapMemory` and unmapped it again when the view closed, two native calls per write. A spark profile showed these calls at 2.8% of the render thread. Each buffer is now mapped the first time it is written and stays mapped until it is destroyed. Every mappable buffer is allocated host-visible and host-coherent, so the GPU sees the same bytes at the same addresses without any flush, and vanilla's check that a buffer is not closed while a view is open still works.
+
+### Texel buffer views
+
+Pushing descriptors that use a texel buffer (Sodium's section time buffer for every terrain layer, the cloud buffer) created a Vulkan buffer view on every push and queued it for destruction two frames later, 1.4% of the render thread. The view only depends on the buffer, offset, size and format, so it is now kept on the buffer (up to 8 per buffer) and destroyed together with the buffer, after the GPU is done with it.
+
+### Pipeline switches
+
+Switching pipelines inside a render pass re-applied every uniform ever set in that pass through a hash map pass, and checked the pipeline's color formats against the pass attachments again. Only the new pipeline's own uniforms are now applied, which gives the backend the same values, and the format check runs once per pipeline per render pass.
+
+### Early present
+
+The frame's single submit waits for the previous frame to finish on the GPU before Minecraft presents the finished frame. The finished frame is now presented right after it is submitted, before that wait, so the driver's present work overlaps the GPU finishing the previous frame. The same image is presented in the same order.
+
+### Submit collections
+
+The hand and screen effect passes drained their submit collections twice per frame and threw away the empty ones, so the next frame built them again with all their phases. Empty collections are now kept and reused; an empty phase draws nothing.
+
+### GUI item atlas sweep
+
+At the end of every frame the GUI item atlas walked all its slots looking for slots marked to be dropped after the frame. The sweep now only runs when a slot was marked since the last sweep.
+
+### Sodium per-frame checks
+
+Sodium read the operating system name to pick the sub-texel precision every frame and updated its chunk build time estimators every frame. The precision is computed once, and the estimators only update after new build results arrived; without new data the update leaves them unchanged.
+
 ### Memory
 
 Less live memory means shorter and rarer garbage collections.
