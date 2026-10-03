@@ -326,6 +326,10 @@ Every model asked its render type function for the render type of its texture on
 
 When an entity asks for a vertex builder, its prepared render type is searched in the current draw group with `List.indexOf`, comparing it with every draw so far (1.5% of the render thread with many different mob textures). Each group now keeps a hash index from prepared render type to its first position, filled when vanilla adds it, so the lookup finds the same draw directly.
 
+### Sky behind terrain
+
+Vanilla draws the sky disc, sunrise glow, sun, moon and stars over the whole screen before any terrain, and the opaque terrain then paints over most of it. In a server lobby these sky passes took 0.019 ms of a 0.131 ms GPU frame. In the overworld with the default transparency, the sky is now drawn right after opaque and cutout terrain and before everything else, with copies of the vanilla sky pipelines whose vertices are placed at the far plane and depth tested against the terrain, so only pixels without terrain are shaded. Terrain does not blend and always writes depth, entities, particles, text, outlines and translucent terrain are still drawn after the sky, and the sky layers keep their order and blending, so the image is the same. The vanilla sky shaders get the far plane line only under a define that just these copies set; if a resource pack replaces one of them and the expected line is missing, the sky is drawn the vanilla way.
+
 ### Memory
 
 Less live memory means shorter and rarer garbage collections.
