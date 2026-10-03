@@ -234,6 +234,10 @@ Every render pass set the viewport and scissor again, even when the command buff
 
 Particles were turned into vertices one at a time: a callback per particle, Sodium's per-particle hook with its own buffer lookup, and a separate vertex reservation for each quad. Each particle layer is now written in one pass straight from the stored particle arrays into one reservation, with the same corner math, colors, UVs and light, so the vertex data is identical. Buffers that cannot be written directly still go through the vanilla per-particle path.
 
+### Model part rotation
+
+Every rotated model part (entity limbs, heads, armor) rotated both its pose matrix and its normal matrix with JOML's `rotateZYX`, and each call computed the same three sines and cosines again. The angles are now turned into sines and cosines once and both matrices are rotated with JOML's own formulas, including its separate paths for identity, translation-only and affine matrices and the matrix property flags it sets. A test of 2,000,000 random matrices and angles against JOML 1.10.9 matched every bit.
+
 ### Memory
 
 Less live memory means shorter and rarer garbage collections.
