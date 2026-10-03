@@ -318,6 +318,14 @@ Before every frame's entity, text, item and debug geometry goes to the GPU, each
 
 The block breaking crack overlay computes its texture coordinates per vertex and called `Direction.getRotation()` for every vertex, which allocates a new quaternion and evaluates its sines and cosines (1.3% of the render thread in a CubeCraft lobby). The six rotations are now built once by that same method and reused. The overlay only reads them, so every vertex gets the same values.
 
+### Entity render types
+
+Every model asked its render type function for the render type of its texture once per entity per frame, which looks it up in a concurrent memo map keyed by a `Pair` (0.7% of the render thread with many mobs on screen). Each model now remembers the last texture and the render type it got for it, in one immutable pair, and returns that render type again while the texture is the same object. Vanilla's model render type functions are memoized, so the same texture always gives the same render type.
+
+### Draw group lookup
+
+When an entity asks for a vertex builder, its prepared render type is searched in the current draw group with `List.indexOf`, comparing it with every draw so far (1.5% of the render thread with many different mob textures). Each group now keeps a hash index from prepared render type to its first position, filled when vanilla adds it, so the lookup finds the same draw directly.
+
 ### Memory
 
 Less live memory means shorter and rarer garbage collections.
