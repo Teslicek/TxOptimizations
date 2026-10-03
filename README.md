@@ -278,6 +278,10 @@ Every entity, block entity and rain column visibility check asked JOML for a ful
 
 Each draw's model-view, color, offset and texture matrix are compared with the previously written ones to reuse the uniform slice. That record's generated `equals` went through method-handle dispatch on every comparison (0.2 to 0.4% of the render thread). It is now a plain comparison of the same four components with `Objects.equals`, the cheap vectors first, which returns the same answer.
 
+### Identity model parts
+
+Every visible model part pushed a copy of the pose stack, applied its offset, rotation and scale, drew, and popped the copy again. Sodium already skips the transform when a part has no offset, no rotation and unit scale, so for those parts (roots, hats, jackets, sleeves and other overlay layers) the push and pop only copied two matrices. Such parts now draw and recurse into their children on the current pose directly; parts with any transform still push, transform and pop.
+
 ### Memory
 
 Less live memory means shorter and rarer garbage collections.
