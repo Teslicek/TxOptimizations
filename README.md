@@ -238,6 +238,10 @@ Particles were turned into vertices one at a time: a callback per particle, Sodi
 
 Every rotated model part (entity limbs, heads, armor) rotated both its pose matrix and its normal matrix with JOML's `rotateZYX`, and each call computed the same three sines and cosines again. The angles are now turned into sines and cosines once and both matrices are rotated with JOML's own formulas, including its separate paths for identity, translation-only and affine matrices and the matrix property flags it sets. A test of 2,000,000 random matrices and angles against JOML 1.10.9 matched every bit.
 
+### Item model bounds
+
+Items on shelves and dropped items asked for their model's bounding box every frame, and because their render state is cleared or recreated every frame, vanilla rebuilt the box from every vertex of the model each time (about 1% of the render thread at a server spawn full of shelves). The box only depends on the model's extents, its item transform, the hand and its local transform, so single-layer items now keep it in a cache keyed by exactly those values. Items with Fabric mesh quads, which add their own vertices to the box, and multi-layer items still compute it every time.
+
 ### Memory
 
 Less live memory means shorter and rarer garbage collections.

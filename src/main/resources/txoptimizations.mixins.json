@@ -38,6 +38,8 @@
     "GuiGraphicsExtractorMapAtlasMixin",
     "GuiRendererAnimatedItemAtlasMixin",
     "HudFpsCounterMixin",
+    "ItemLayerRenderStateAccessor",
+    "ItemStackRenderStateBoundsMixin",
     "LevelExtractorEntityVisibilityMixin",
     "MapInstanceAtlasMixin",
     "MapInstanceColorTableMixin",
