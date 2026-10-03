@@ -18,6 +18,7 @@
     "CameraFluidCacheMixin",
     "ClientChunkCachePrecipitationMixin",
     "ClipContextAirMixin",
+    "CommandSuggestionsRenderThreadMixin",
     "CuboidGizmoSharedCornersMixin",
     "CursorCounterMixin",
     "DataLayerUniformMixin",

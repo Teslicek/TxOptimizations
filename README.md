@@ -343,6 +343,12 @@ Less live memory means shorter and rarer garbage collections.
 - Empty item component patches: items with no changed components share one empty map instead of each allocating their own.
 - Uniform light layers: a 2 KB light array where every value is the same non-zero level (sky sections at full light, sent by the server or loaded from disk) is stored as just that level, the form vanilla already uses for freshly lit sections. Reads return the same value and the array comes back filled on the first write. A heap dump of a 32 chunk singleplayer world had about 14,000 such arrays (29 MB).
 
+## Fixes
+
+### Command suggestion crash
+
+Typing a command in chat updates the usage hint once the suggestions arrive, on whichever thread finished them. Measuring that hint can bake a new font glyph, which records a texture upload into the render thread's command buffer from another thread and crashed the NVIDIA driver. The update now runs on the render thread, and is skipped if newer suggestions replaced it in the meantime.
+
 ## Build
 
 ```
