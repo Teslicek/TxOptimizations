@@ -258,6 +258,10 @@ Every particle with physics checked its movement against the blocks around it ea
 
 Sodium only animates textures that are on screen, so every frame it marked every animated sprite in every visible section as active (0.85% of the render thread in a singleplayer profile). The mark is only cleared when the texture atlases advance their animations once per client tick, so marking the same sprites again in later frames of the same tick changes nothing. The marking pass now runs again only after an atlas animation step, a new set of render lists, or a change to any section's animated sprites.
 
+### Translucent sort reuse
+
+Translucent entity, item and text quads are sorted back to front before every upload, 3.4 to 4.7% of the render thread at busy server spawns. Each sort's result is now remembered by its position among the frame's sorts, and the next frame first checks in one pass whether the remembered order is still sorted under the new distances (ties ordered by quad index). If it is, it is exactly the order a stable sort would produce, so it is used without sorting. Otherwise the quads are sorted with the same orderings Sodium uses (signed keys up to 80 quads, unsigned above), using packed key and index values, a reused buffer, and skipping radix passes where every key lands in the same bucket. A test of 26,037 random sorts against Sodium's own sort matched every result.
+
 ### Memory
 
 Less live memory means shorter and rarer garbage collections.

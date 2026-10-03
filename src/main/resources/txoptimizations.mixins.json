@@ -80,6 +80,7 @@
     "TextureAtlasSpriteMarkMixin",
     "TranslatableTemplateCacheMixin",
     "VertexFormatElementCacheMixin",
+    "VertexSorterReuseMixin",
     "VulkanBackendCheckpointMixin",
     "VulkanCommandEncoderDeferralMixin",
     "VulkanCommandEncoderDynamicStateMixin",
