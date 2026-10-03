@@ -21,6 +21,7 @@
     "CuboidGizmoSharedCornersMixin",
     "CursorCounterMixin",
     "DataLayerUniformMixin",
+    "DecalRotationCacheMixin",
     "DebugScreenEntryListLookupMixin",
     "DrawBackendIndirectMixin",
     "DynamicAtlasAllocatorDiscardMixin",

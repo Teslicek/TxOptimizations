@@ -314,6 +314,10 @@ Batching draws compares prepared render types with their generated record equali
 
 Before every frame's entity, text, item and debug geometry goes to the GPU, each built slice of vertices is copied into the staging buffer. Vanilla wrapped every slice in a newly allocated `ByteBuffer` and copied it with a bounds-checked `put`, which showed up as 5% of the render thread on a CPU-bound server lobby. Each slice is now copied straight from the vertex builder's memory to the same position in the staging buffer, with the same validity and overflow checks, so the GPU receives identical bytes.
 
+### Breaking overlay rotation
+
+The block breaking crack overlay computes its texture coordinates per vertex and called `Direction.getRotation()` for every vertex, which allocates a new quaternion and evaluates its sines and cosines (1.3% of the render thread in a CubeCraft lobby). The six rotations are now built once by that same method and reused. The overlay only reads them, so every vertex gets the same values.
+
 ### Memory
 
 Less live memory means shorter and rarer garbage collections.
