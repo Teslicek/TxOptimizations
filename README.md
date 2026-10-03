@@ -132,7 +132,7 @@ Every attribute read, such as an entity's scale or name tag distance each frame,
 
 ### Descriptor pushes
 
-Every draw with a changed uniform pushed the pass's whole descriptor set to the driver, and uniforms are set again for most draws even when they hold the same buffers and textures as before. Each render pass now remembers the values and pipeline layout of its last push and skips a push whose values and layout are identical. Vulkan keeps pushed descriptors for the same pipeline layout, so every draw reads the same descriptors as before. A new render pass always pushes.
+Every draw with a changed uniform pushed the pass's whole descriptor set to the driver, and uniforms are set again for most draws even when they hold the same buffers and textures as before. Each render pass now remembers the values and pipeline layout of its last push. With the same layout, only the bindings whose value changed are written, and nothing is pushed when none changed. Vulkan keeps pushed descriptors until they are overwritten or a push with a different layout disturbs the set, so every draw reads the same descriptors as before. A new render pass or a different layout pushes every binding.
 
 ### Entity shadow blocks
 
@@ -301,6 +301,10 @@ Before drawing its layers, every armor stand set up its full pose and then asked
 ### Indirect command reuse
 
 Sodium keeps each region's terrain draw commands cached between frames, but still copied all of them into the frame's indirect buffer every frame (1.7% of the render thread in singleplayer). That buffer is one of three host-visible slots that keep their contents, so each slot now remembers which batch, at which version, it holds at each position. When the frame prepares the same batches in the same order and none of them was rebuilt since that slot was last written, the bytes already there are identical and the copy is skipped. From the first changed batch on, the rest of the frame is copied as before.
+
+### Cuboid normals
+
+Sodium transformed all six face normals of an entity cuboid every time the normal matrix changed (1% of the render thread in singleplayer). Opposite faces use exactly the negated matrix column, so their packed normals are the byte-wise negation of each other. Only the up, south and east normals are transformed now, and down, north and west are flipped from them, which gives the same bytes (checked on 40 million matrices including NaN, infinities and signed zeros).
 
 ### Memory
 

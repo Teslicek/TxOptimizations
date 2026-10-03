@@ -2,11 +2,16 @@ package com.teslicek.txoptimizations.mixin;
 
 import com.mojang.blaze3d.vertex.PoseStack.Pose;
 import com.teslicek.txoptimizations.DirectVertexBuffer;
+import net.caffeinemc.mods.sodium.api.math.MatrixHelper;
+import net.caffeinemc.mods.sodium.api.util.NormI8;
 import net.caffeinemc.mods.sodium.api.vertex.buffer.VertexBufferWriter;
 import net.caffeinemc.mods.sodium.api.vertex.format.common.EntityVertex;
 import net.caffeinemc.mods.sodium.client.render.immediate.model.EntityRenderer;
 import net.caffeinemc.mods.sodium.client.render.immediate.model.ModelCuboid;
+import net.minecraft.core.Direction;
+import org.joml.Matrix3f;
 import org.lwjgl.system.MemoryStack;
+import org.spongepowered.asm.mixin.Final;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Overwrite;
 import org.spongepowered.asm.mixin.Shadow;
@@ -27,8 +32,32 @@ public abstract class SodiumEntityRendererDirectWriteMixin {
     }
 
     @Shadow
+    @Final
+    private static Matrix3f prevNormalMatrix;
+
+    @Shadow
+    @Final
+    private static int[] CUBE_FACE_NORMAL;
+
+    @Overwrite
     private static void prepareNormalsIfChanged(Pose matrices) {
-        throw new AssertionError();
+        Matrix3f normal = matrices.normal();
+
+        if (normal.equals(prevNormalMatrix))
+            return;
+
+        boolean trusted = ((PoseAccessor) (Object) matrices).txoptimizations$trustedNormals();
+        int     up      = MatrixHelper.transformNormal(normal, trusted, Direction.UP);
+        int     south   = MatrixHelper.transformNormal(normal, trusted, Direction.SOUTH);
+        int     east    = MatrixHelper.transformNormal(normal, trusted, Direction.EAST);
+
+        CUBE_FACE_NORMAL[0] = NormI8.flipPacked(up);
+        CUBE_FACE_NORMAL[1] = up;
+        CUBE_FACE_NORMAL[2] = east;
+        CUBE_FACE_NORMAL[3] = NormI8.flipPacked(south);
+        CUBE_FACE_NORMAL[4] = NormI8.flipPacked(east);
+        CUBE_FACE_NORMAL[5] = south;
+        prevNormalMatrix.set(normal);
     }
 
     @Shadow
