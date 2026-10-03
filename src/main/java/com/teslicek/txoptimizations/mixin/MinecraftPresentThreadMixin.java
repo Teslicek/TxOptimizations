@@ -4,10 +4,13 @@ import com.llamalad7.mixinextras.injector.ModifyExpressionValue;
 import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
 import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
 import com.mojang.blaze3d.platform.Window;
+import com.mojang.blaze3d.systems.RenderSystem;
 import com.mojang.renderpearl.api.commands.CommandEncoder;
 import com.mojang.renderpearl.api.device.GpuSurface;
 import com.mojang.renderpearl.api.device.SurfaceException;
+import com.mojang.renderpearl.frontend.FrontendCommandEncoder;
 import com.teslicek.txoptimizations.PresentThread;
+import com.teslicek.txoptimizations.SceneSubmit;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.Options;
 import org.objectweb.asm.Opcodes;
@@ -70,6 +73,7 @@ public abstract class MinecraftPresentThreadMixin {
     private boolean txoptimizations$acquireBeforeBlit(GpuSurface surface, Operation<Boolean> original) {
         if (this.txoptimizations$acquireDeferred) {
             this.txoptimizations$acquireDeferred = false;
+            ((SceneSubmit) ((FrontendCommandEncoder) RenderSystem.getDevice().createCommandEncoder()).backend()).txoptimizations$submitScene();
             this.txoptimizations$configureAndAcquire();
         }
 

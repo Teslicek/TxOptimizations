@@ -47,14 +47,19 @@ public abstract class VulkanGpuSurfacePresentThreadMixin {
     @Shadow
     private boolean swapchainOutOfDate;
 
-    @Inject(method = {"close", "configure", "acquireNextTexture"}, at = @At("HEAD"))
+    @Inject(method = {"close", "configure"}, at = @At("HEAD"))
     private void txoptimizations$drainPresentThread(CallbackInfo ci) {
         PresentThread.drain();
     }
 
+    @Inject(method = "acquireNextTexture", at = @At("HEAD"))
+    private void txoptimizations$drainPresentsBeforeAcquire(CallbackInfo ci) {
+        PresentThread.drainPresents();
+    }
+
     @Inject(method = "isSuboptimal", at = @At("HEAD"))
-    private void txoptimizations$drainBeforeSuboptimal(CallbackInfoReturnable<Boolean> cir) {
-        PresentThread.drain();
+    private void txoptimizations$drainPresentsBeforeSuboptimal(CallbackInfoReturnable<Boolean> cir) {
+        PresentThread.drainPresents();
     }
 
     @Inject(method = "present", at = @At("HEAD"), cancellable = true)
