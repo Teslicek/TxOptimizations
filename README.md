@@ -242,6 +242,14 @@ Every rotated model part (entity limbs, heads, armor) rotated both its pose matr
 
 Items on shelves and dropped items asked for their model's bounding box every frame, and because their render state is cleared or recreated every frame, vanilla rebuilt the box from every vertex of the model each time (about 1% of the render thread at a server spawn full of shelves). The box only depends on the model's extents, its item transform, the hand and its local transform, so single-layer items now keep it in a cache keyed by exactly those values. Items with Fabric mesh quads, which add their own vertices to the box, and multi-layer items still compute it every time.
 
+### Region bookkeeping
+
+Sodium walked its whole hash table of terrain regions every frame to let each region free GPU memory it no longer needs, and most of that time went into stepping over empty table slots (0.87% of the render thread in a singleplayer profile). Regions are now also kept in a plain list that is updated when a region is created or removed, and the per-frame pass walks that list. Every region is still visited once per frame; only the order differs, which only changes which free region id is handed out next.
+
+### Raycast air
+
+Every block a raycast passes through (the per-frame crosshair pick, the third-person camera collision) asked the block for its shape. Air never has a shape in any raycast mode, so air blocks now return the empty shape directly.
+
 ### Memory
 
 Less live memory means shorter and rarer garbage collections.
