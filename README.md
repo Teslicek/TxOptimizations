@@ -310,10 +310,6 @@ Block collision scans (particles moving near blocks, the player's suffocation ch
 
 Batching draws compares prepared render types with their generated record equality, which went through method-handle dispatch and compared the name string before anything else. It now compares the same six components with `Objects.equals`, cheapest first (pipeline, transform slice, scissor, OIT set, name, textures), which returns the same answer.
 
-### Short terrain indices
-
-Singleplayer terrain is limited by vertex work, not pixels: at a fifth of the pixels the solid terrain pass was only 5% faster. Sodium draws opaque terrain through a shared 32-bit quad index buffer. When every opaque draw of the frame uses at most 16,383 quads and starts at index 0, the same index pattern is bound as 16-bit indices instead, so the GPU reads half the index data for identical triangles. Larger draws, translucent terrain and any opaque draw with an index offset keep the 32-bit buffer.
-
 ### Memory
 
 Less live memory means shorter and rarer garbage collections.
