@@ -310,6 +310,10 @@ Block collision scans (particles moving near blocks, the player's suffocation ch
 
 Batching draws compares prepared render types with their generated record equality, which went through method-handle dispatch and compared the name string before anything else. It now compares the same six components with `Objects.equals`, cheapest first (pipeline, transform slice, scissor, OIT set, name, textures), which returns the same answer.
 
+### Vertex upload copy
+
+Before every frame's entity, text, item and debug geometry goes to the GPU, each built slice of vertices is copied into the staging buffer. Vanilla wrapped every slice in a newly allocated `ByteBuffer` and copied it with a bounds-checked `put`, which showed up as 5% of the render thread on a CPU-bound server lobby. Each slice is now copied straight from the vertex builder's memory to the same position in the staging buffer, with the same validity and overflow checks, so the GPU receives identical bytes.
+
 ### Memory
 
 Less live memory means shorter and rarer garbage collections.
