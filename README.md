@@ -254,6 +254,10 @@ Every block a raycast passes through (the per-frame crosshair pick, the third-pe
 
 Every particle with physics checked its movement against the blocks around it each tick by collecting every block collision shape in the swept box into a new list (up to 0.8% of the render thread at a server spawn full of dust particles). Particles have no entity colliders and no world border, so when every block in that box is air, vanilla returns the movement unchanged. The box is now first checked directly in the chunk sections, skipping all-air sections whole, and only boxes that contain any non-air block go through vanilla's collision.
 
+### Animated sprite marks
+
+Sodium only animates textures that are on screen, so every frame it marked every animated sprite in every visible section as active (0.85% of the render thread in a singleplayer profile). The mark is only cleared when the texture atlases advance their animations once per client tick, so marking the same sprites again in later frames of the same tick changes nothing. The marking pass now runs again only after an atlas animation step, a new set of render lists, or a change to any section's animated sprites.
+
 ### Memory
 
 Less live memory means shorter and rarer garbage collections.
