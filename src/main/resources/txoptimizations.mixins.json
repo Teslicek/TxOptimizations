@@ -30,7 +30,7 @@
     "FontManagerTextLayoutCacheMixin",
     "FormattedBidiReorderFastPathMixin",
     "FrontendRenderPassBindingMixin",
-    "FrustumAccessor",
+    "FrustumBoxTestMixin",
     "GameRendererLevelClearMixin",
     "GizmoLineIdentityPoseMixin",
     "GlyphRendererVertexBuilderMixin",

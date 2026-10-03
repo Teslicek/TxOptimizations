@@ -2,7 +2,7 @@ package com.teslicek.txoptimizations.cull;
 
 import com.mojang.logging.LogUtils;
 import com.teslicek.txoptimizations.ClientClock;
-import com.teslicek.txoptimizations.mixin.FrustumAccessor;
+import com.teslicek.txoptimizations.FrustumBoxTest;
 import com.teslicek.txoptimizations.mixin.cull.EntityRendererCullAccessor;
 import java.util.ArrayList;
 import java.util.List;
@@ -34,7 +34,6 @@ import net.minecraft.world.level.chunk.LevelChunk;
 import net.minecraft.world.level.chunk.status.ChunkStatus;
 import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
-import org.joml.FrustumIntersection;
 import org.slf4j.Logger;
 
 public final class EntityCulling {
@@ -105,11 +104,10 @@ public final class EntityCulling {
         if (((Cullable) blockEntity).txoptimizations$isCulled())
             return true;
 
-        BlockPos pos        = blockEntity.getBlockPos();
-        int      extension  = verticalExtension(blockEntity);
-        int      visibility = ((FrustumAccessor) Minecraft.getInstance().gameRenderer.mainCamera().getCullFrustum()).txoptimizations$cubeInFrustum(pos.getX(), pos.getY() - extension, pos.getZ(), pos.getX() + 1, pos.getY() + 1 + extension, pos.getZ() + 1);
+        BlockPos pos       = blockEntity.getBlockPos();
+        int      extension = verticalExtension(blockEntity);
 
-        return visibility != FrustumIntersection.INSIDE && visibility != FrustumIntersection.INTERSECT;
+        return !((FrustumBoxTest) Minecraft.getInstance().gameRenderer.mainCamera().getCullFrustum()).txoptimizations$isBoxVisible(pos.getX(), pos.getY() - extension, pos.getZ(), pos.getX() + 1, pos.getY() + 1 + extension, pos.getZ() + 1);
     }
 
     public static boolean skipsTick(Entity entity) {
