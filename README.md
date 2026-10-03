@@ -310,6 +310,10 @@ Block collision scans (particles moving near blocks, the player's suffocation ch
 
 Batching draws compares prepared render types with their generated record equality, which went through method-handle dispatch and compared the name string before anything else. It now compares the same six components with `Objects.equals`, cheapest first (pipeline, transform slice, scissor, OIT set, name, textures), which returns the same answer.
 
+### Combined terrain matrix
+
+Sodium's terrain vertex shader computed `u_ProjectionMatrix * u_ModelViewMatrix * vec4(position, 1.0)`, which GLSL evaluates left to right: a full 4x4 matrix product (64 multiply-adds) for every vertex, then the vertex transform. Singleplayer terrain is limited by vertex work (a fifth of the pixels made it only 5% faster). The projection and model-view are now multiplied once per frame and uploaded in the projection slot with an identity model-view, and the shader line is rewritten to `u_ProjectionMatrix * vec4(position, 1.0)` while the source is loaded. A shader replaced by a resource pack still gets the identity model-view and renders the same. Positions can differ in the last bit of float rounding, the same freedom the driver already has in how it fuses those multiply-adds.
+
 ### Memory
 
 Less live memory means shorter and rarer garbage collections.
