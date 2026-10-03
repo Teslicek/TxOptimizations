@@ -282,6 +282,10 @@ Each draw's model-view, color, offset and texture matrix are compared with the p
 
 Every visible model part pushed a copy of the pose stack, applied its offset, rotation and scale, drew, and popped the copy again. Sodium already skips the transform when a part has no offset, no rotation and unit scale, so for those parts (roots, hats, jackets, sleeves and other overlay layers) the push and pop only copied two matrices. Such parts now draw and recurse into their children on the current pose directly; parts with any transform still push, transform and pop.
 
+### Rotation-only culling
+
+Sodium's cull thread rebuilds three section trees every frame the camera changes, which on servers kept it busy for 21 to 67% of a core while just looking around. Only the narrow tree is frustum tested; the regular and wide trees depend on the camera position, the search distances, the occlusion setting and which sections are waiting to rebuild. While none of those change and no section is pending, a rotation-only frame now keeps the previous regular and wide trees, which the renderer already frustum tests per frame during movement. The sections right next to the camera are added to those two trees even outside the frustum, so they no longer depend on the view direction. When the camera stops, a full cull runs once and the narrow tree comes back as before.
+
 ### Memory
 
 Less live memory means shorter and rarer garbage collections.
