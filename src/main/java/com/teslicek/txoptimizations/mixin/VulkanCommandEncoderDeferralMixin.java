@@ -5,18 +5,26 @@ import com.mojang.renderpearl.api.commands.RenderPass;
 import com.mojang.renderpearl.api.commands.RenderPassDescriptor;
 import com.mojang.renderpearl.api.textures.GpuTexture;
 import com.mojang.renderpearl.api.textures.GpuTextureView;
+import com.mojang.renderpearl.backend.api.RenderPassBackend;
 import com.mojang.renderpearl.backend.vulkan.VulkanCommandEncoder;
+import com.mojang.renderpearl.backend.vulkan.VulkanDebug;
+import com.mojang.renderpearl.backend.vulkan.VulkanDevice;
 import com.mojang.renderpearl.backend.vulkan.VulkanGpuBuffer;
 import com.mojang.renderpearl.backend.vulkan.VulkanRenderPass;
+import com.mojang.renderpearl.backend.vulkan.checkpoints.CheckpointExtension;
+import com.teslicek.txoptimizations.gpu.GpuPassProfiler;
 import it.unimi.dsi.fastutil.longs.LongArrayList;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.OptionalDouble;
+import java.util.function.Supplier;
 import org.joml.Vector4fc;
 import org.lwjgl.system.MemoryStack;
+import org.lwjgl.vulkan.KHRDynamicRendering;
 import org.lwjgl.vulkan.VkCommandBuffer;
+import org.spongepowered.asm.mixin.Final;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Overwrite;
 import org.spongepowered.asm.mixin.Shadow;
@@ -26,6 +34,7 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.ModifyVariable;
 import org.spongepowered.asm.mixin.injection.Redirect;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
+import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 @Mixin(VulkanCommandEncoder.class)
 public abstract class VulkanCommandEncoderDeferralMixin {
@@ -35,6 +44,14 @@ public abstract class VulkanCommandEncoderDeferralMixin {
 
     @Shadow
     private VulkanRenderPass currentRenderPass;
+
+    @Shadow
+    @Final
+    private VulkanDevice device;
+
+    @Shadow
+    @Final
+    private CheckpointExtension.CheckpointStorage checkpointStorage;
 
     @Unique
     private final LongArrayList txoptimizations$pendingRanges = new LongArrayList();
@@ -75,6 +92,15 @@ public abstract class VulkanCommandEncoderDeferralMixin {
     @Unique
     private long txoptimizations$readEnd;
 
+    @Unique
+    private VulkanRenderPass txoptimizations$suspendedPass;
+
+    @Unique
+    private RenderPassDescriptor txoptimizations$suspendedDescriptor;
+
+    @Unique
+    private RenderPassDescriptor txoptimizations$openDescriptor;
+
     @Shadow
     public abstract VkCommandBuffer allocateAndBeginTransientCommandBuffer();
 
@@ -93,6 +119,8 @@ public abstract class VulkanCommandEncoderDeferralMixin {
 
     @Overwrite
     private VkCommandBuffer commandBuffer() {
+        this.txoptimizations$endSuspendedPass();
+
         if (this.txoptimizations$deferDepth == 0) {
             this.txoptimizations$flushClears();
             this.txoptimizations$flushBarrier();
@@ -111,6 +139,7 @@ public abstract class VulkanCommandEncoderDeferralMixin {
 
     @Inject(method = "endCommandBuffer", at = @At("HEAD"))
     private void txoptimizations$flushBeforeEnd(CallbackInfo ci) {
+        this.txoptimizations$endSuspendedPass();
         this.txoptimizations$flushClears();
         this.txoptimizations$flushBarrier();
     }
@@ -130,6 +159,47 @@ public abstract class VulkanCommandEncoderDeferralMixin {
         this.txoptimizations$clearColor        = clearColor;
         this.txoptimizations$clearDepthTexture = depthTexture;
         this.txoptimizations$clearDepth        = clearDepth;
+        ci.cancel();
+    }
+
+    @Inject(method = "createRenderPass", at = @At("HEAD"), cancellable = true)
+    private void txoptimizations$continueSuspendedPass(RenderPassDescriptor descriptor, CallbackInfoReturnable<RenderPassBackend> cir) {
+        if (!this.txoptimizations$canContinue(descriptor))
+            return;
+
+        VkCommandBuffer  commandBuffer = this.currentCommandBuffer;
+        Supplier<String> previousLabel = this.txoptimizations$suspendedPass.getLabel();
+        VulkanDebug      debug         = this.device.instance().debug();
+
+        debug.endDebugGroup(commandBuffer);
+        this.checkpointStorage.recordCheckpoint(commandBuffer, CheckpointExtension.CheckpointType.END_RENDER_PASS, previousLabel);
+        debug.beginDebugGroup(commandBuffer, descriptor.label());
+        this.checkpointStorage.recordCheckpoint(commandBuffer, CheckpointExtension.CheckpointType.BEGIN_RENDER_PASS, descriptor.label());
+
+        this.txoptimizations$suspendedPass       = null;
+        this.txoptimizations$suspendedDescriptor = null;
+        this.txoptimizations$openDescriptor      = descriptor;
+        this.currentRenderPass                   = new VulkanRenderPass(this.device, (VulkanCommandEncoder) (Object) this, commandBuffer, this.checkpointStorage, descriptor.renderArea(), txoptimizations$outputWidth(descriptor), txoptimizations$outputHeight(descriptor), descriptor.depthAttachment() != null, descriptor.label());
+
+        cir.setReturnValue(this.currentRenderPass);
+    }
+
+    @Inject(method = "createRenderPass", at = @At("RETURN"))
+    private void txoptimizations$rememberDescriptor(RenderPassDescriptor descriptor, CallbackInfoReturnable<RenderPassBackend> cir) {
+        this.txoptimizations$openDescriptor = descriptor;
+    }
+
+    @Inject(method = "submitRenderPass", at = @At("HEAD"), cancellable = true)
+    private void txoptimizations$suspendPass(CallbackInfo ci) {
+        if (this.currentRenderPass == null || GpuPassProfiler.isRunning())
+            return;
+
+        if (this.txoptimizations$suspendedPass != null)
+            throw new IllegalStateException("A render pass is already suspended");
+
+        this.txoptimizations$suspendedPass       = this.currentRenderPass;
+        this.txoptimizations$suspendedDescriptor = this.txoptimizations$openDescriptor;
+        this.currentRenderPass                   = null;
         ci.cancel();
     }
 
@@ -229,7 +299,67 @@ public abstract class VulkanCommandEncoderDeferralMixin {
     }
 
     @Unique
+    private boolean txoptimizations$canContinue(RenderPassDescriptor descriptor) {
+        RenderPassDescriptor previous = this.txoptimizations$suspendedDescriptor;
+
+        if (this.txoptimizations$suspendedPass == null || GpuPassProfiler.isRunning() || this.txoptimizations$barrierPending)
+            return false;
+
+        if (this.txoptimizations$clearColorTexture != null || this.txoptimizations$clearDepthTexture != null)
+            return false;
+
+        if (!descriptor.renderArea().equals(previous.renderArea()) || descriptor.colorAttachments().size() != previous.colorAttachments().size())
+            return false;
+
+        for (int index = 0; index < descriptor.colorAttachments().size(); index ++) {
+            RenderPassDescriptor.Attachment<Optional<Vector4fc>> color         = descriptor.colorAttachments().get(index);
+            RenderPassDescriptor.Attachment<Optional<Vector4fc>> previousColor = previous.colorAttachments().get(index);
+
+            if (color == null || previousColor == null) {
+                if (color != previousColor)
+                    return false;
+
+                continue;
+            }
+
+            if (color.textureView() != previousColor.textureView() || color.clearValue().isPresent())
+                return false;
+        }
+
+        RenderPassDescriptor.Attachment<OptionalDouble> depth         = descriptor.depthAttachment();
+        RenderPassDescriptor.Attachment<OptionalDouble> previousDepth = previous.depthAttachment();
+
+        if (depth == null || previousDepth == null)
+            return depth == previousDepth;
+
+        return depth.textureView() == previousDepth.textureView() && depth.clearValue().isEmpty();
+    }
+
+    @Unique
+    private void txoptimizations$endSuspendedPass() {
+        VulkanRenderPass pass = this.txoptimizations$suspendedPass;
+
+        if (pass == null)
+            return;
+
+        VkCommandBuffer commandBuffer = this.currentCommandBuffer;
+
+        this.txoptimizations$suspendedPass       = null;
+        this.txoptimizations$suspendedDescriptor = null;
+
+        KHRDynamicRendering.vkCmdEndRenderingKHR(commandBuffer);
+        this.device.instance().debug().endDebugGroup(commandBuffer);
+        this.checkpointStorage.recordCheckpoint(commandBuffer, CheckpointExtension.CheckpointType.END_RENDER_PASS, pass.getLabel());
+
+        try (MemoryStack stack = MemoryStack.stackPush()) {
+            VulkanCommandEncoder.memoryBarrier(commandBuffer, stack);
+        }
+    }
+
+    @Unique
     private void txoptimizations$flushClears() {
+        this.txoptimizations$endSuspendedPass();
+
         GpuTexture color = this.txoptimizations$clearColorTexture;
         GpuTexture depth = this.txoptimizations$clearDepthTexture;
 
@@ -252,6 +382,8 @@ public abstract class VulkanCommandEncoderDeferralMixin {
 
     @Unique
     private void txoptimizations$flushBarrier() {
+        this.txoptimizations$endSuspendedPass();
+
         if (!this.txoptimizations$barrierPending)
             return;
 
@@ -276,6 +408,36 @@ public abstract class VulkanCommandEncoderDeferralMixin {
         }
 
         return false;
+    }
+
+    @Unique
+    private static int txoptimizations$outputWidth(RenderPassDescriptor descriptor) {
+        int width = 0;
+
+        for (RenderPassDescriptor.Attachment<Optional<Vector4fc>> color : descriptor.colorAttachments()) {
+            if (color != null)
+                width = color.textureView().getWidth(0);
+        }
+
+        if (descriptor.colorAttachments().isEmpty() && descriptor.depthAttachment() != null)
+            width = descriptor.depthAttachment().textureView().getWidth(0);
+
+        return width;
+    }
+
+    @Unique
+    private static int txoptimizations$outputHeight(RenderPassDescriptor descriptor) {
+        int height = 0;
+
+        for (RenderPassDescriptor.Attachment<Optional<Vector4fc>> color : descriptor.colorAttachments()) {
+            if (color != null)
+                height = color.textureView().getHeight(0);
+        }
+
+        if (descriptor.colorAttachments().isEmpty() && descriptor.depthAttachment() != null)
+            height = descriptor.depthAttachment().textureView().getHeight(0);
+
+        return height;
     }
 
     @Unique

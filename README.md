@@ -266,6 +266,10 @@ Translucent entity, item and text quads are sorted back to front before every up
 
 Every frame started a command buffer for copies into transient GPU memory and submitted it first, even though nothing in the game records such copies in a normal frame. That buffer is now only started when the first copy is recorded, and it is then placed first in the frame's submission, exactly where it would have been. Frames without such copies submit one command buffer fewer.
 
+### Continued render passes
+
+Ending a render pass recorded the end of the rendering instance and a full barrier right away, and the next pass began a new instance, even when it drew into exactly the same color and depth textures. The end of a pass is now held back. If the next pass uses the same attachments and render area, clears nothing and nothing else was recorded in between, it keeps drawing in the same rendering instance, as happens from the sky pass into the main world pass in clear weather. Draws inside one rendering instance keep their order for color, depth and blending, and a pass cannot sample its own attachments, so the image is the same. Anything else that records a command, ends the command buffer, or begins a different pass ends the held pass first, exactly as before. The GPU pass profiler disables this while it records.
+
 ### Memory
 
 Less live memory means shorter and rarer garbage collections.
