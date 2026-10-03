@@ -3,6 +3,7 @@
   "package": "com.teslicek.txoptimizations.mixin",
   "compatibilityLevel": "JAVA_25",
   "client": [
+    "ArmorStandBareLayersMixin",
     "AtmosphericFogTickCacheMixin",
     "AttributeMapLookupMixin",
     "AvatarSkinCacheMixin",
@@ -56,6 +57,7 @@
     "MinecraftEarlyPresentMixin",
     "MinecraftGlowSpectatorCacheMixin",
     "ModelPartIdentityMixin",
+    "ModelResetPoseMixin",
     "OcclusionCullerNearbyMixin",
     "ParticleAirCollisionMixin",
     "ParticleLightCacheMixin",
@@ -75,6 +77,7 @@
     "RendererCacheMixin",
     "ScissorStateEqualityMixin",
     "ShapeOutlineEdgeCacheMixin",
+    "SodiumEntityCullOrderMixin",
     "SodiumEntityRendererDirectWriteMixin",
     "SodiumExtraFrameCounterMixin",
     "SoundEngineListenerMixin",

@@ -286,6 +286,18 @@ Every visible model part pushed a copy of the pose stack, applied its offset, ro
 
 Sodium's cull thread rebuilds three section trees every frame the camera changes, which on servers kept it busy for 21 to 67% of a core while just looking around. Only the narrow tree is frustum tested; the regular and wide trees depend on the camera position, the search distances, the occlusion setting and which sections are waiting to rebuild. While none of those change and no section is pending, a rotation-only frame now keeps the previous regular and wide trees, which the renderer already frustum tests per frame during movement. The sections right next to the camera are added to those two trees even outside the frustum, so they no longer depend on the view direction. When the camera stops, a full cull runs once and the narrow tree comes back as before.
 
+### Entity check order
+
+Sodium wraps every entity renderer's visibility check and runs its own section test first, which reads the entity's glowing flag, builds its culling box and walks the section tree, and only then lets vanilla reject the entity by distance and frustum. On servers that cost about 2% of the render thread, mostly spent on entities behind the camera. Both checks are side-effect free, so the entity pass now asks vanilla first and runs Sodium's test only for entities vanilla would draw. Renderers that override the check (shulkers, guardians, end crystals and any modded override) keep the original order.
+
+### Model pose reset
+
+Every model reset its parts before animating by walking an immutable list through its iterator. The parts are now copied into an array when the model is built and reset in a plain loop, with the same parts in the same order.
+
+### Bare armor stands
+
+Before drawing its layers, every armor stand set up its full pose and then asked the armor, held item, wings and head layers to draw, even when it wore and held nothing, which is what servers use for floating text. When the renderer has exactly the vanilla layers and the stand has no equipment, no held items and no head, that pose setup and the four empty layer calls are skipped. The stand's own model still animates when it is drawn.
+
 ### Memory
 
 Less live memory means shorter and rarer garbage collections.
