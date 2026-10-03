@@ -226,6 +226,14 @@ At the end of every frame the GUI item atlas walked all its slots looking for sl
 
 Sodium read the operating system name to pick the sub-texel precision every frame and updated its chunk build time estimators every frame. The precision is computed once, and the estimators only update after new build results arrived; without new data the update leaves them unchanged.
 
+### Viewport and scissor
+
+Every render pass set the viewport and scissor again, even when the command buffer already had exactly those values from the previous pass. All pipelines declare both as dynamic state, which stays valid across render passes in the same command buffer, so a value that is already set is no longer recorded again. The remembered state is dropped whenever a new command buffer starts recording.
+
+### Particle vertices
+
+Particles were turned into vertices one at a time: a callback per particle, Sodium's per-particle hook with its own buffer lookup, and a separate vertex reservation for each quad. Each particle layer is now written in one pass straight from the stored particle arrays into one reservation, with the same corner math, colors, UVs and light, so the vertex data is identical. Buffers that cannot be written directly still go through the vanilla per-particle path.
+
 ### Memory
 
 Less live memory means shorter and rarer garbage collections.
