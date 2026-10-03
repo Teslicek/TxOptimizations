@@ -312,7 +312,7 @@ Batching draws compares prepared render types with their generated record equali
 
 ### Vertex upload copy
 
-Before every frame's entity, text, item and debug geometry goes to the GPU, each built slice of vertices is copied into the staging buffer. Vanilla wrapped every slice in a newly allocated `ByteBuffer` and copied it with a bounds-checked `put`, which showed up as 5% of the render thread on a CPU-bound server lobby. Each slice is now copied straight from the vertex builder's memory to the same position in the staging buffer, with the same validity and overflow checks, so the GPU receives identical bytes.
+Every frame's entity, text, item, GUI and debug geometry used to be written into a CPU-side staging buffer, then copied by the GPU into the real vertex and index buffers, with a barrier around each copy. That was 5 copies per frame and 0.018 ms of GPU time in a GPU-bound world. The vertex and index buffers are now allocated mappable, and the vertices and sorted indices are written straight into them, so both copies and the staging buffer are gone. Buffers only return to the pool after the GPU has finished with them, so nothing in use is overwritten. Each slice is copied straight from the vertex builder's memory with the same validity and overflow checks, and the GPU receives identical bytes.
 
 ### Breaking overlay rotation
 

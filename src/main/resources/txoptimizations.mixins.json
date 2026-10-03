@@ -97,6 +97,7 @@
     "StateDefinitionNeighborTableMixin",
     "StateHolderNeighborTableMixin",
     "StagedVertexBufferDirectCopyMixin",
+    "StagedVertexBufferDrawAccessor",
     "TextFeatureRendererLayoutCacheMixin",
     "TextureAtlasSpriteMarkMixin",
     "TranslatableTemplateCacheMixin",
