@@ -210,9 +210,9 @@ Pushing descriptors that use a texel buffer (Sodium's section time buffer for ev
 
 Switching pipelines inside a render pass re-applied every uniform ever set in that pass through a hash map pass, and checked the pipeline's color formats against the pass attachments again. Only the new pipeline's own uniforms are now applied, which gives the backend the same values, and the format check runs once per pipeline per render pass.
 
-### Early present
+### Present thread
 
-The frame's single submit waits for the previous frame to finish on the GPU before Minecraft presents the finished frame. The finished frame is now presented right after it is submitted, before that wait, so the driver's present work overlaps the GPU finishing the previous frame. The same image is presented in the same order.
+The frame's queue submit and its present are native driver calls that took a third of the render thread in the prelobby. Both now run in the same order on one dedicated thread, while the render thread already moves on to the next frame. With vsync off, the next frame acquires its screen image just before it copies to the screen instead of at the start, after the present thread has finished, so the render thread builds the whole frame while the previous one is being presented. Every other queue or swapchain call waits for the present thread first, and the same image is presented in the same order. With vsync on, the image is still acquired at the start of the frame, so input latency is unchanged.
 
 ### Submit collections
 
