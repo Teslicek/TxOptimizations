@@ -1,6 +1,7 @@
 package com.teslicek.txoptimizations;
 
 import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
 import java.util.Arrays;
 import net.minecraft.client.renderer.culling.Frustum;
 import net.minecraft.client.renderer.entity.EntityRenderer;
@@ -41,11 +42,11 @@ public final class EntityCullOrder {
 
     private static String findShouldRender() {
         Method[] matches = Arrays.stream(EntityRenderer.class.getDeclaredMethods())
-            .filter(method -> method.getReturnType() == boolean.class && Arrays.equals(method.getParameterTypes(), PARAMETERS))
+            .filter(method -> Modifier.isPublic(method.getModifiers()) && !method.isSynthetic() && method.getName().indexOf('$') < 0 && method.getReturnType() == boolean.class && Arrays.equals(method.getParameterTypes(), PARAMETERS))
             .toArray(Method[]::new);
 
         if (matches.length != 1)
-            throw new IllegalStateException("Expected one EntityRenderer.shouldRender method, found " + matches.length);
+            throw new IllegalStateException("Expected one public EntityRenderer.shouldRender method, found " + Arrays.toString(matches));
 
         return matches[0].getName();
     }
