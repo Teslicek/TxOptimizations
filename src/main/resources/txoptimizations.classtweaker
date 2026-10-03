@@ -57,3 +57,6 @@ accessible field net/minecraft/client/renderer/GameRenderer guiRenderer Lnet/min
 accessible field net/minecraft/client/gui/GuiGraphicsExtractor guiRenderState Lnet/minecraft/client/renderer/state/gui/GuiRenderState;
 accessible field com/mojang/renderpearl/api/pipeline/RenderPipeline colorTargetStates Ljava/util/List;
 mutable field com/mojang/renderpearl/api/pipeline/RenderPipeline colorTargetStates Ljava/util/List;
+
+# Lazy transient command buffer
+accessible class com/mojang/renderpearl/backend/vulkan/VulkanQueue$Submission$SubmitStage

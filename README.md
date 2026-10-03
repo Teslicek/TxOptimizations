@@ -262,6 +262,10 @@ Sodium only animates textures that are on screen, so every frame it marked every
 
 Translucent entity, item and text quads are sorted back to front before every upload, 3.4 to 4.7% of the render thread at busy server spawns. Each sort's result is now remembered by its position among the frame's sorts, and the next frame first checks in one pass whether the remembered order is still sorted under the new distances (ties ordered by quad index). If it is, it is exactly the order a stable sort would produce, so it is used without sorting. Otherwise the quads are sorted with the same orderings Sodium uses (signed keys up to 80 quads, unsigned above), using packed key and index values, a reused buffer, and skipping radix passes where every key lands in the same bucket. A test of 26,037 random sorts against Sodium's own sort matched every result.
 
+### Transient command buffer
+
+Every frame started a command buffer for copies into transient GPU memory and submitted it first, even though nothing in the game records such copies in a normal frame. That buffer is now only started when the first copy is recorded, and it is then placed first in the frame's submission, exactly where it would have been. Frames without such copies submit one command buffer fewer.
+
 ### Memory
 
 Less live memory means shorter and rarer garbage collections.
