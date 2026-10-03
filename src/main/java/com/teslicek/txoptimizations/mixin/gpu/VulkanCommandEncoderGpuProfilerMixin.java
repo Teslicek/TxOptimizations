@@ -42,7 +42,7 @@ public abstract class VulkanCommandEncoderGpuProfilerMixin {
     @ModifyVariable(method = {"writeToBuffer", "copyToBuffer"}, at = @At("HEAD"), argsOnly = true, ordinal = 0)
     private GpuBufferSlice txoptimizations$profileBufferCopy(GpuBufferSlice slice) {
         if (GpuPassProfiler.isRunning())
-            this.txoptimizations$mark("copy");
+            this.txoptimizations$mark(GpuPassProfiler.copyLabel());
 
         return slice;
     }
@@ -50,7 +50,7 @@ public abstract class VulkanCommandEncoderGpuProfilerMixin {
     @Inject(method = {"writeToTexture", "copyBufferToTexture", "copyTextureToBuffer", "copyTextureToTexture"}, at = @At("HEAD"))
     private void txoptimizations$profileTextureCopy(CallbackInfo ci) {
         if (GpuPassProfiler.isRunning())
-            this.txoptimizations$mark("copy");
+            this.txoptimizations$mark(GpuPassProfiler.copyLabel());
     }
 
     @Inject(method = "submit", at = @At("HEAD"))
