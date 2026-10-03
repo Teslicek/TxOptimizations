@@ -33,7 +33,7 @@ public final class GpuPassProfiler {
     private static long                  startNanos;
     private static double                nanosPerTick;
     private static long                  terrainDraws;
-    private static long                  terrainDrawsUnmerged;
+    private static long                  terrainIndices;
 
     private GpuPassProfiler() {
     }
@@ -43,16 +43,25 @@ public final class GpuPassProfiler {
             throw new IllegalStateException("GPU profile is already running");
 
         PASSES.clear();
-        recording            = true;
-        framesRead           = 0;
-        gpuNanos             = 0L;
-        terrainDraws         = 0L;
-        terrainDrawsUnmerged = 0L;
-        startNanos           = System.nanoTime();
+        recording      = true;
+        framesRead     = 0;
+        gpuNanos       = 0L;
+        terrainDraws   = 0L;
+        terrainIndices = 0L;
+        startNanos     = System.nanoTime();
     }
 
     public static boolean isRunning() {
         return recording || framesPending > 0;
+    }
+
+    public static boolean isRecording() {
+        return recording;
+    }
+
+    public static void countTerrainDraws(int draws, long indices) {
+        terrainDraws   += draws;
+        terrainIndices += indices;
     }
 
     public static void mark(VulkanDevice frameDevice, CommandEncoderBackend frameEncoder, String label) {
@@ -73,14 +82,6 @@ public final class GpuPassProfiler {
         frameEncoder.writeTimestamp(POOLS[slot], index);
         LABELS[slot][index] = label;
         COUNTS[slot]        = index + 1;
-    }
-
-    public static void countTerrainDraws(int submitted, int unmerged) {
-        if (!recording)
-            return;
-
-        terrainDraws         += submitted;
-        terrainDrawsUnmerged += unmerged;
     }
 
     public static void markPipeline(String pipeline) {
@@ -171,7 +172,7 @@ public final class GpuPassProfiler {
         StringBuilder report  = new StringBuilder();
 
         report.append(String.format(Locale.ROOT, "%d frames in %.1f s (%.0f fps), GPU %.3f ms per frame, GPU busy %.0f%% of the time%n", framesRead, seconds, framesRead / seconds, frameMs, gpuNanos / 1.0e7 / seconds));
-        report.append(String.format(Locale.ROOT, "Terrain draws %.0f per frame, %.0f before merging%n", (double) terrainDraws / framesRead, (double) terrainDrawsUnmerged / framesRead));
+        report.append(String.format(Locale.ROOT, "Terrain %.0f draws and %.3f million triangles per frame%n", (double) terrainDraws / framesRead, terrainIndices / 3.0 / 1.0e6 / framesRead));
 
         PASSES.entrySet().stream()
             .sorted((first, second) -> Long.compare(second.getValue().nanos, first.getValue().nanos))
