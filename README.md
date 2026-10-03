@@ -330,6 +330,10 @@ When an entity asks for a vertex builder, its prepared render type is searched i
 
 Vanilla draws the sky disc, sunrise glow, sun, moon and stars over the whole screen before any terrain, and the opaque terrain then paints over most of it. In a server lobby these sky passes took 0.019 ms of a 0.131 ms GPU frame. In the overworld with the default transparency, the sky is now drawn right after opaque and cutout terrain and before everything else, with copies of the vanilla sky pipelines whose vertices are placed at the far plane and depth tested against the terrain, so only pixels without terrain are shaded. Terrain does not blend and always writes depth, entities, particles, text, outlines and translucent terrain are still drawn after the sky, and the sky layers keep their order and blending, so the image is the same. The vanilla sky shaders get the far plane line only under a define that just these copies set; if a resource pack replaces one of them and the expected line is missing, the sky is drawn the vanilla way.
 
+### RGSS close-up terrain
+
+With RGSS texture filtering, Sodium's terrain shader takes four texture samples around every pixel, plus one sharp sample, and blends them by how small the texture is on screen. In a server lobby terrain is limited by pixel shading (a fifth of the pixels made solid terrain three times faster), and most nearby terrain shows texels at least a pixel wide, where that blend weight is exactly 0 and the result is exactly the sharp sample. The shader now returns the sharp sample right away in that case and skips the four RGSS samples; every other pixel is computed as before. The line is added to Sodium's shader source as it loads, and a replaced shader without the expected line is left alone.
+
 ### Memory
 
 Less live memory means shorter and rarer garbage collections.

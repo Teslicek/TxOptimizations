@@ -86,7 +86,7 @@
     "ScissorStateEqualityMixin",
     "ShapeOutlineEdgeCacheMixin",
     "RenderTypeGroupIndexMixin",
-    "ShaderManagerSkyFarPlaneMixin",
+    "ShaderManagerSourcePatchMixin",
     "SkyRendererFarPlaneMixin",
     "SodiumEntityCullOrderMixin",
     "SodiumEntityRendererDirectWriteMixin",
