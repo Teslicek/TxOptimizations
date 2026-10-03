@@ -274,6 +274,10 @@ Ending a render pass recorded the end of the rendering instance and a full barri
 
 Every entity, block entity and rain column visibility check asked JOML for a full box/frustum classification (outside, inside or intersecting), which tests each plane twice, and then only used whether the box was outside. The check now uses JOML's plain box test, which runs exactly the first of those two tests per plane in the same order, so the answer is identical with half the plane math.
 
+### Dynamic transform equality
+
+Each draw's model-view, color, offset and texture matrix are compared with the previously written ones to reuse the uniform slice. That record's generated `equals` went through method-handle dispatch on every comparison (0.2 to 0.4% of the render thread). It is now a plain comparison of the same four components with `Objects.equals`, the cheap vectors first, which returns the same answer.
+
 ### Memory
 
 Less live memory means shorter and rarer garbage collections.

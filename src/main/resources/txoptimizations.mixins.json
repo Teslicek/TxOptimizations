@@ -19,6 +19,7 @@
     "DebugScreenEntryListLookupMixin",
     "DrawBackendIndirectMixin",
     "DynamicAtlasAllocatorDiscardMixin",
+    "DynamicTransformEqualsMixin",
     "EntityRenderDispatcherCacheMixin",
     "EntityRenderDispatcherSkinCacheMixin",
     "EntityRendererShadowBlockMixin",
