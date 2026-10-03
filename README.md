@@ -306,6 +306,14 @@ Sodium keeps each region's terrain draw commands cached between frames, but stil
 
 Sodium transformed all six face normals of an entity cuboid every time the normal matrix changed (1% of the render thread in singleplayer). Opposite faces use exactly the negated matrix column, so their packed normals are the byte-wise negation of each other. Only the up, south and east normals are transformed now, and down, north and west are flipped from them, which gives the same bytes (checked on 40 million matrices including NaN, infinities and signed zeros).
 
+### Collision cursor
+
+Block collision scans (particles moving near blocks, the player's suffocation check) walked their cells by splitting a running index with two divisions and two remainders per cell. The cursor now steps x, then y, then z with counters, which visits the same cells in the same order (checked against the division form on every box up to 12 by 12 by 12).
+
+### Render type equality
+
+Batching draws compares prepared render types with their generated record equality, which went through method-handle dispatch and compared the name string before anything else. It now compares the same six components with `Objects.equals`, cheapest first (pipeline, transform slice, scissor, OIT set, name, textures), which returns the same answer.
+
 ### Memory
 
 Less live memory means shorter and rarer garbage collections.
