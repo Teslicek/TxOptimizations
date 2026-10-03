@@ -54,6 +54,7 @@
     "MinecraftClockMixin",
     "MinecraftEarlyPresentMixin",
     "MinecraftGlowSpectatorCacheMixin",
+    "ParticleAirCollisionMixin",
     "ParticleLightCacheMixin",
     "ParticleRotationMixin",
     "PatchedDataComponentMapEmptyPatchMixin",

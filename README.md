@@ -250,6 +250,10 @@ Sodium walked its whole hash table of terrain regions every frame to let each re
 
 Every block a raycast passes through (the per-frame crosshair pick, the third-person camera collision) asked the block for its shape. Air never has a shape in any raycast mode, so air blocks now return the empty shape directly.
 
+### Particle collision
+
+Every particle with physics checked its movement against the blocks around it each tick by collecting every block collision shape in the swept box into a new list (up to 0.8% of the render thread at a server spawn full of dust particles). Particles have no entity colliders and no world border, so when every block in that box is air, vanilla returns the movement unchanged. The box is now first checked directly in the chunk sections, skipping all-air sections whole, and only boxes that contain any non-air block go through vanilla's collision.
+
 ### Memory
 
 Less live memory means shorter and rarer garbage collections.
