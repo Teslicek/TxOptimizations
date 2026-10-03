@@ -102,6 +102,10 @@ Sodium writes item model quads by transforming and renormalizing the normal of e
 
 On GPUs with the multi-draw extension Sodium hands every section's draw commands to the driver through `vkCmdDrawMultiIndexedEXT`, and the driver walks all of them on the render thread each frame. Sodium's indirect path writes the same commands into a GPU-visible buffer and issues one indirect draw per region, so the GPU reads the list instead. It is now used whenever the device supports indirect multi-draw.
 
+### Merged terrain draws
+
+Each region's indirect draw list has one command per visible section, and the GPU front end processes every command on its own. When a command's vertices start exactly where the previous command's vertices end and both read the shared quad index pattern from the same start, the two are now one command covering both. The GPU draws the same triangles in the same order, since each vertex carries its own section index. Merging stops at the size the shared index buffer already has, so it never allocates more memory. `/txgpu` reports the terrain draws per frame before and after merging.
+
 ### Region pass lookups
 
 Each region kept its per-pass section data and cached draw batches in hash maps keyed by render pass, looked up for every region and pass each frame. With only three passes they are now also held in arrays indexed by pass, and the lookups read the arrays.
