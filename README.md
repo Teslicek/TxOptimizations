@@ -317,6 +317,7 @@ Less live memory means shorter and rarer garbage collections.
 - Block state neighbor table: instead of every block state holding its own table of neighbor states, all states of a block share one bit-packed table that `setValue` indexes into. `getValue` keeps reading vanilla's per-state value array.
 - Block state cache deduplication: identical collision shapes and face sturdiness arrays in the per-state cache are shared instead of stored once per state.
 - Empty item component patches: items with no changed components share one empty map instead of each allocating their own.
+- Uniform light layers: a 2 KB light array where every value is the same non-zero level (sky sections at full light, sent by the server or loaded from disk) is stored as just that level, the form vanilla already uses for freshly lit sections. Reads return the same value and the array comes back filled on the first write. A heap dump of a 32 chunk singleplayer world had about 14,000 such arrays (29 MB).
 
 ## Build
 

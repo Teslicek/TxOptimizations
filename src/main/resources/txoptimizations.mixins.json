@@ -18,6 +18,7 @@
     "ClipContextAirMixin",
     "CuboidGizmoSharedCornersMixin",
     "CursorCounterMixin",
+    "DataLayerUniformMixin",
     "DebugScreenEntryListLookupMixin",
     "DrawBackendIndirectMixin",
     "DynamicAtlasAllocatorDiscardMixin",
