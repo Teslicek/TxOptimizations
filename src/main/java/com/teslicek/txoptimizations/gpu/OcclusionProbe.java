@@ -11,6 +11,7 @@ import com.mojang.renderpearl.api.pipeline.DepthStencilState;
 import com.mojang.renderpearl.api.pipeline.PrimitiveTopology;
 import com.mojang.renderpearl.api.pipeline.RenderPipeline;
 import com.mojang.renderpearl.api.pipeline.UniformType;
+import com.teslicek.txoptimizations.cull.OcclusionCuller;
 import com.teslicek.txoptimizations.mixin.gpu.FrontendRenderPassAccessor;
 import com.teslicek.txoptimizations.mixin.gpu.VulkanRenderPassAccessor;
 import java.nio.ByteBuffer;
@@ -67,6 +68,7 @@ public final class OcclusionProbe {
     private static int       queries;
     private static int       untestedSections;
     private static long[][]  sectionVertices;
+    private static boolean[] sectionCulled;
     private static long[]    untestedVertices;
 
     private OcclusionProbe() {
@@ -107,6 +109,7 @@ public final class OcclusionProbe {
         queries          = 0;
         untestedSections = 0;
         sectionVertices  = new long[sections][];
+        sectionCulled    = new boolean[sections];
         untestedVertices = new long[PASSES];
 
         pass.setPipeline(RenderSystem.getCompiledPipeline(PIPELINE));
@@ -147,6 +150,7 @@ public final class OcclusionProbe {
                     VK10.vkCmdBeginQuery(commandBuffer, queryPool, queries, 0);
                     pass.draw(BOX_VERTICES, 1, 0, 0);
                     VK10.vkCmdEndQuery(commandBuffer, queryPool, queries);
+                    sectionCulled[queries]      = OcclusionCuller.isHidden(region, sectionIndex);
                     sectionVertices[queries ++] = vertices;
                 }
             }
@@ -218,41 +222,57 @@ public final class OcclusionProbe {
 
     private static void write(LongBuffer samples) {
         long[] total          = untestedVertices.clone();
+        long[] culled         = new long[PASSES];
         long[] hidden         = new long[PASSES];
+        int    culledSections = 0;
+        int    visibleCulled  = 0;
         int    hiddenSections = 0;
         int    sections       = queries + untestedSections;
 
         for (int query = 0; query < queries; query ++) {
             boolean occluded = samples.get(query) == 0L;
+            boolean skipped  = sectionCulled[query];
 
-            if (occluded)
+            if (skipped)
+                culledSections ++;
+
+            if (skipped && !occluded)
+                visibleCulled ++;
+
+            if (!skipped && occluded)
                 hiddenSections ++;
 
             for (int index = 0; index < PASSES; index ++) {
                 total[index] += sectionVertices[query][index];
 
-                if (occluded)
+                if (skipped)
+                    culled[index] += sectionVertices[query][index];
+                else if (occluded)
                     hidden[index] += sectionVertices[query][index];
             }
         }
 
         long allTotal  = 0L;
+        long allCulled = 0L;
         long allHidden = 0L;
 
         for (int index = 0; index < PASSES; index ++) {
             allTotal  += total[index];
+            allCulled += culled[index];
             allHidden += hidden[index];
         }
 
         StringBuilder report = new StringBuilder();
 
         report.append(String.format(Locale.ROOT, "%d terrain sections in view, %d next to the camera not tested%n", sections, untestedSections));
-        report.append(String.format(Locale.ROOT, "Drawn but hidden behind terrain: %d sections, %.1f%% of terrain vertices%n", hiddenSections, allHidden * 100.0 / allTotal));
+        report.append(String.format(Locale.ROOT, "Culled by TxOptimizations: %d sections, %.1f%% of terrain vertices%n", culledSections, allCulled * 100.0 / allTotal));
+        report.append(String.format(Locale.ROOT, "Culled but visible: %d sections (must be 0)%n", visibleCulled));
+        report.append(String.format(Locale.ROOT, "Still drawn but hidden behind terrain: %d sections, %.1f%% of terrain vertices%n", hiddenSections, allHidden * 100.0 / allTotal));
 
         for (TerrainRenderPass terrainPass : DefaultTerrainRenderPasses.ALL) {
             int index = DefaultTerrainRenderPasses.getPassIndex(terrainPass);
 
-            report.append(String.format(Locale.ROOT, "%s: %d vertices, %.1f%% drawn but hidden%n", terrainPass.getPipeline().getLocation().getPath(), total[index], total[index] == 0L ? 0.0 : hidden[index] * 100.0 / total[index]));
+            report.append(String.format(Locale.ROOT, "%s: %d vertices, %.1f%% culled, %.1f%% still drawn but hidden%n", terrainPass.getPipeline().getLocation().getPath(), total[index], total[index] == 0L ? 0.0 : culled[index] * 100.0 / total[index], total[index] == 0L ? 0.0 : hidden[index] * 100.0 / total[index]));
         }
 
         Path      file    = ReportFiles.write("txocclusion", report.toString());
