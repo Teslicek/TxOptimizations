@@ -27,6 +27,9 @@ public abstract class CushionBakeMixin extends BlockAttachedEntity implements Ba
     @Unique
     private boolean txoptimizations$bakeSupported;
 
+    @Unique
+    private boolean txoptimizations$hasId;
+
     protected CushionBakeMixin(EntityType<? extends BlockAttachedEntity> type, Level level) {
         super(type, level);
     }
@@ -38,11 +41,20 @@ public abstract class CushionBakeMixin extends BlockAttachedEntity implements Ba
 
     @Inject(method = "setPos(DDD)V", at = @At("HEAD"))
     private void txoptimizations$untrackOldPosition(double x, double y, double z, CallbackInfo ci) {
-        Cushions.untrack(this);
+        if (this.txoptimizations$hasId)
+            Cushions.untrack(this);
     }
 
     @Inject(method = "setPos(DDD)V", at = @At("TAIL"))
     private void txoptimizations$trackNewPosition(double x, double y, double z, CallbackInfo ci) {
+        if (this.txoptimizations$hasId)
+            Cushions.track(this);
+    }
+
+    @Override
+    public void setId(int id) {
+        super.setId(id);
+        this.txoptimizations$hasId = true;
         Cushions.track(this);
     }
 
@@ -50,7 +62,7 @@ public abstract class CushionBakeMixin extends BlockAttachedEntity implements Ba
     public void onSyncedDataUpdated(EntityDataAccessor<?> accessor) {
         super.onSyncedDataUpdated(accessor);
 
-        if (this.txoptimizations$bakeSupported)
+        if (this.txoptimizations$bakeSupported && this.txoptimizations$hasId)
             Cushions.track(this);
     }
 
