@@ -69,23 +69,7 @@ public abstract class VulkanGpuSurfacePresentThreadMixin {
     @Inject(method = {"close", "configure"}, at = @At("HEAD"))
     private void txoptimizations$drainAndReleaseAhead(CallbackInfo ci) {
         PresentThread.drain();
-
-        if (!this.txoptimizations$acquiredAhead)
-            return;
-
-        this.txoptimizations$acquiredAhead = false;
-
-        if (this.txoptimizations$acquireAheadFailure != null) {
-            this.txoptimizations$acquireAheadFailure = null;
-
-            return;
-        }
-
-        try (VulkanQueue.Submission release = this.device.graphicsQueue().beginSubmit()) {
-            release.waitSemaphore(this.acquireSemaphores[this.currentAcquireSemaphore], 0L, VK13.VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT);
-        }
-
-        this.currentImageIndex = -1;
+        this.txoptimizations$releaseAcquiredAhead();
     }
 
     @Inject(method = "acquireNextTexture", at = @At("HEAD"), cancellable = true)
@@ -97,6 +81,12 @@ public abstract class VulkanGpuSurfacePresentThreadMixin {
 
         if (!this.txoptimizations$acquiredAhead)
             return;
+
+        if (this.eatenException != null) {
+            this.txoptimizations$releaseAcquiredAhead();
+
+            return;
+        }
 
         SurfaceException failure = this.txoptimizations$acquireAheadFailure;
 
@@ -145,12 +135,32 @@ public abstract class VulkanGpuSurfacePresentThreadMixin {
         boolean acquireAhead = PresentThread.acquiresAhead();
 
         PresentThread.capture(() -> {
-            this.txoptimizations$queuePresent(semaphore, frameChain, imageIndex);
-
             if (acquireAhead)
                 this.txoptimizations$acquireAhead();
+
+            this.txoptimizations$queuePresent(semaphore, frameChain, imageIndex);
         });
         ci.cancel();
+    }
+
+    @Unique
+    private void txoptimizations$releaseAcquiredAhead() {
+        if (!this.txoptimizations$acquiredAhead)
+            return;
+
+        this.txoptimizations$acquiredAhead = false;
+
+        if (this.txoptimizations$acquireAheadFailure != null) {
+            this.txoptimizations$acquireAheadFailure = null;
+
+            return;
+        }
+
+        try (VulkanQueue.Submission release = this.device.graphicsQueue().beginSubmit()) {
+            release.waitSemaphore(this.acquireSemaphores[this.currentAcquireSemaphore], 0L, VK13.VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT);
+        }
+
+        this.currentImageIndex = -1;
     }
 
     @Unique
