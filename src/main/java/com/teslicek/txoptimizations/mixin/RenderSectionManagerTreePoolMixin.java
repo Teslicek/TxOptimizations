@@ -29,10 +29,10 @@ public abstract class RenderSectionManagerTreePoolMixin {
     private SectionTree renderTree;
 
     @Unique
-    private Set<SectionTree> txoptimizations$trackedTrees = Collections.newSetFromMap(new IdentityHashMap<>());
+    private final Set<SectionTree> txoptimizations$trackedTrees = Collections.newSetFromMap(new IdentityHashMap<>());
 
     @Unique
-    private Set<SectionTree> txoptimizations$liveTrees = Collections.newSetFromMap(new IdentityHashMap<>());
+    private final Set<SectionTree> txoptimizations$liveTrees = Collections.newSetFromMap(new IdentityHashMap<>());
 
     @ModifyExpressionValue(method = "consumeCullTaskResults", at = @At(value = "INVOKE", target = "Lnet/caffeinemc/mods/sodium/client/render/chunk/async/CullTask;getResult()Ljava/lang/Object;"))
     private Object txoptimizations$trackResultTrees(Object result) {
@@ -60,7 +60,7 @@ public abstract class RenderSectionManagerTreePoolMixin {
                 TreeArrayPool.release(tree);
         }
 
-        this.txoptimizations$liveTrees    = this.txoptimizations$trackedTrees;
-        this.txoptimizations$trackedTrees = live;
+        this.txoptimizations$trackedTrees.clear();
+        this.txoptimizations$trackedTrees.addAll(live);
     }
 }
