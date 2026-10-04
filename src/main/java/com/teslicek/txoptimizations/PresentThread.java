@@ -16,6 +16,7 @@ public final class PresentThread {
     private static GpuSurface         armed;
     private static Runnable           captured;
     private static boolean            capturing;
+    private static boolean            acquireAhead;
 
     private PresentThread() {
     }
@@ -44,8 +45,9 @@ public final class PresentThread {
     public static void handOff(VulkanQueue.Submission submission) {
         GpuSurface surface = armed;
 
-        armed     = null;
-        capturing = true;
+        armed        = null;
+        capturing    = true;
+        acquireAhead = canDeferAcquire(surface);
 
         try {
             surface.present();
@@ -70,6 +72,14 @@ public final class PresentThread {
 
     public static boolean isCapturing() {
         return capturing;
+    }
+
+    public static boolean acquiresAhead() {
+        return acquireAhead;
+    }
+
+    public static boolean isWorker() {
+        return Thread.currentThread() == WORKER;
     }
 
     public static void capture(Runnable present) {
