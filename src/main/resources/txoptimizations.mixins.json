@@ -55,6 +55,7 @@
     "ItemStackRenderStateBoundsMixin",
     "LevelRendererDeferredSkyMixin",
     "LevelExtractorEntityVisibilityMixin",
+    "LevelRendererGizmoReuseMixin",
     "MapInstanceAtlasMixin",
     "MapInstanceColorTableMixin",
     "MapRenderStateAtlasMixin",

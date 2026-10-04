@@ -120,7 +120,7 @@ Garbage collection pauses of 6 to 8 ms were the worst frames, and their frequenc
 
 ### Packed gizmo lines
 
-With hitboxes shown, every entity's box became 8 corner `Vec3`s and 12 `Line` records each frame, plus the list storage for them, about 35 MB/s in the BedWars prelobby. Gizmo groups now keep their lines as plain numbers (start and end coordinates, color and width), box edges are written from the box coordinates directly, and the line renderer reads those numbers. The coordinates are the same doubles the `Vec3`s held, in the same order. Anything that still reads the list as `Line` objects gets them built on access.
+With hitboxes shown, every entity's box became 8 corner `Vec3`s and 12 `Line` records each frame, plus the list storage for them, about 35 MB/s in the BedWars prelobby. Gizmo groups now keep their lines as plain numbers (start and end coordinates, color and width), box edges are written from the box coordinates directly, and the line renderer reads those numbers. The coordinates are the same doubles the `Vec3`s held, in the same order. Anything that still reads the list as `Line` objects gets them built on access. The two gizmo collections that `LevelRenderer` rebuilt every frame are now cleared and refilled instead, since the previous frame's collections are dropped at that point and were already drawn, so the line arrays keep their capacity and stop being reallocated.
 
 ### Region pass lookups
 

@@ -4,15 +4,25 @@ import com.teslicek.txoptimizations.GizmoLineList;
 import com.teslicek.txoptimizations.PackedGizmoLines;
 import net.minecraft.client.renderer.gizmos.DrawableGizmoPrimitives;
 import net.minecraft.world.phys.Vec3;
+import org.spongepowered.asm.mixin.Final;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Overwrite;
 import org.spongepowered.asm.mixin.Shadow;
+import org.spongepowered.asm.mixin.Unique;
 
 @Mixin(DrawableGizmoPrimitives.class)
 public abstract class DrawableGizmoPrimitivesPackedMixin implements PackedGizmoLines {
 
     @Shadow
     private boolean isEmpty;
+
+    @Shadow
+    @Final
+    private DrawableGizmoPrimitives.Group opaque;
+
+    @Shadow
+    @Final
+    private DrawableGizmoPrimitives.Group translucent;
 
     @Shadow
     protected abstract DrawableGizmoPrimitives.Group getGroup(int color);
@@ -26,5 +36,21 @@ public abstract class DrawableGizmoPrimitivesPackedMixin implements PackedGizmoL
     public void txoptimizations$addLine(double startX, double startY, double startZ, double endX, double endY, double endZ, int color, float width) {
         ((GizmoLineList) this.getGroup(color).lines()).add(startX, startY, startZ, endX, endY, endZ, color, width);
         this.isEmpty = false;
+    }
+
+    @Override
+    public void txoptimizations$clear() {
+        txoptimizations$clear(this.opaque);
+        txoptimizations$clear(this.translucent);
+        this.isEmpty = true;
+    }
+
+    @Unique
+    private static void txoptimizations$clear(DrawableGizmoPrimitives.Group group) {
+        group.lines().clear();
+        group.quads().clear();
+        group.triangleFans().clear();
+        group.texts().clear();
+        group.points().clear();
     }
 }
