@@ -5,12 +5,10 @@ import com.mojang.renderpearl.api.device.GpuSurface;
 import com.mojang.renderpearl.api.device.SurfaceException;
 import com.mojang.renderpearl.backend.vulkan.VulkanDevice;
 import com.mojang.renderpearl.backend.vulkan.VulkanGpuSurface;
-import com.mojang.renderpearl.backend.vulkan.VulkanQueue;
 import com.mojang.renderpearl.backend.vulkan.VulkanUtils;
 import com.teslicek.txoptimizations.PresentThread;
 import org.lwjgl.system.MemoryStack;
 import org.lwjgl.vulkan.KHRSwapchain;
-import org.lwjgl.vulkan.VK13;
 import org.lwjgl.vulkan.VkPresentInfoKHR;
 import org.lwjgl.vulkan.VkQueue;
 import org.lwjgl.vulkan.VkSurfaceCapabilitiesKHR;
@@ -53,49 +51,9 @@ public abstract class VulkanGpuSurfacePresentThreadMixin {
     @Shadow
     private boolean swapchainOutOfDate;
 
-    @Shadow
-    @Final
-    private long[] acquireSemaphores;
-
-    @Shadow
-    private int currentAcquireSemaphore;
-
-    @Unique
-    private boolean txoptimizations$acquiredAhead;
-
-    @Unique
-    private SurfaceException txoptimizations$acquireAheadFailure;
-
-    @Inject(method = {"close", "configure"}, at = @At("HEAD"))
-    private void txoptimizations$drainAndReleaseAhead(CallbackInfo ci) {
+    @Inject(method = {"close", "configure", "acquireNextTexture"}, at = @At("HEAD"))
+    private void txoptimizations$drainPresentThread(CallbackInfo ci) {
         PresentThread.drain();
-        this.txoptimizations$releaseAcquiredAhead();
-    }
-
-    @Inject(method = "acquireNextTexture", at = @At("HEAD"), cancellable = true)
-    private void txoptimizations$takeAcquiredAhead(CallbackInfo ci) throws SurfaceException {
-        if (PresentThread.isWorker())
-            return;
-
-        PresentThread.drain();
-
-        if (!this.txoptimizations$acquiredAhead)
-            return;
-
-        if (this.eatenException != null) {
-            this.txoptimizations$releaseAcquiredAhead();
-
-            return;
-        }
-
-        SurfaceException failure = this.txoptimizations$acquireAheadFailure;
-
-        this.txoptimizations$acquiredAhead       = false;
-        this.txoptimizations$acquireAheadFailure = null;
-        ci.cancel();
-
-        if (failure != null)
-            throw failure;
     }
 
     @Inject(method = "isSuboptimal", at = @At("HEAD"))
@@ -132,49 +90,8 @@ public abstract class VulkanGpuSurfacePresentThreadMixin {
         int  imageIndex = this.currentImageIndex;
 
         this.currentImageIndex = -1;
-        boolean acquireAhead = PresentThread.acquiresAhead();
-
-        PresentThread.capture(() -> {
-            if (acquireAhead)
-                this.txoptimizations$acquireAhead();
-
-            this.txoptimizations$queuePresent(semaphore, frameChain, imageIndex);
-        });
+        PresentThread.capture(() -> this.txoptimizations$queuePresent(semaphore, frameChain, imageIndex));
         ci.cancel();
-    }
-
-    @Unique
-    private void txoptimizations$releaseAcquiredAhead() {
-        if (!this.txoptimizations$acquiredAhead)
-            return;
-
-        this.txoptimizations$acquiredAhead = false;
-
-        if (this.txoptimizations$acquireAheadFailure != null) {
-            this.txoptimizations$acquireAheadFailure = null;
-
-            return;
-        }
-
-        try (VulkanQueue.Submission release = this.device.graphicsQueue().beginSubmit()) {
-            release.waitSemaphore(this.acquireSemaphores[this.currentAcquireSemaphore], 0L, VK13.VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT);
-        }
-
-        this.currentImageIndex = -1;
-    }
-
-    @Unique
-    private void txoptimizations$acquireAhead() {
-        if (this.swapchainOutOfDate || this.eatenException != null)
-            return;
-
-        try {
-            ((VulkanGpuSurface) (Object) this).acquireNextTexture();
-        } catch (SurfaceException failure) {
-            this.txoptimizations$acquireAheadFailure = failure;
-        }
-
-        this.txoptimizations$acquiredAhead = true;
     }
 
     @Unique
