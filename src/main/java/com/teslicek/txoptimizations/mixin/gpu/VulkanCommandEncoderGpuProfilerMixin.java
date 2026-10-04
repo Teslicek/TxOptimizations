@@ -1,12 +1,16 @@
 package com.teslicek.txoptimizations.mixin.gpu;
 
+import com.llamalad7.mixinextras.injector.v2.WrapWithCondition;
+import com.llamalad7.mixinextras.sugar.Local;
 import com.mojang.renderpearl.api.buffers.GpuBufferSlice;
+import com.mojang.renderpearl.api.commands.GpuQueryPool;
 import com.mojang.renderpearl.api.commands.RenderPassDescriptor;
 import com.mojang.renderpearl.backend.api.CommandEncoderBackend;
 import com.mojang.renderpearl.backend.vulkan.VulkanCommandEncoder;
 import com.mojang.renderpearl.backend.vulkan.VulkanDevice;
 import com.mojang.renderpearl.backend.vulkan.VulkanRenderPass;
 import com.teslicek.txoptimizations.gpu.GpuPassProfiler;
+import org.lwjgl.vulkan.VkDevice;
 import org.spongepowered.asm.mixin.Final;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
@@ -42,7 +46,7 @@ public abstract class VulkanCommandEncoderGpuProfilerMixin {
     @ModifyVariable(method = {"writeToBuffer", "copyToBuffer"}, at = @At("HEAD"), argsOnly = true, ordinal = 0)
     private GpuBufferSlice txoptimizations$profileBufferCopy(GpuBufferSlice slice) {
         if (GpuPassProfiler.isRunning())
-            this.txoptimizations$mark(GpuPassProfiler.copyLabel());
+            this.txoptimizations$mark(GpuPassProfiler.copyLabel(slice.buffer()));
 
         return slice;
     }
@@ -56,6 +60,11 @@ public abstract class VulkanCommandEncoderGpuProfilerMixin {
     @Inject(method = "submit", at = @At("HEAD"))
     private void txoptimizations$profileFrameEnd(CallbackInfo ci) {
         GpuPassProfiler.endFrame(this.device, (CommandEncoderBackend) this);
+    }
+
+    @WrapWithCondition(method = "writeTimestamp", at = @At(value = "INVOKE", target = "Lorg/lwjgl/vulkan/VK12;vkResetQueryPool(Lorg/lwjgl/vulkan/VkDevice;JII)V"))
+    private boolean txoptimizations$skipProfilerQueryReset(VkDevice vkDevice, long queryPool, int firstQuery, int queryCount, @Local(argsOnly = true) GpuQueryPool pool) {
+        return !GpuPassProfiler.ownsPool(pool);
     }
 
     @Unique
