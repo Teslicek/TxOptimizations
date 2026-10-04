@@ -110,6 +110,10 @@ Every LWJGL call that needs scratch memory (descriptor pushes, buffer copies, ma
 
 Draining the frame's submit collections asked every feature render phase whether it was empty, and each check walked all of the phase's per-feature lists and batch maps, 0.3% of the render thread in the BedWars prelobby. Each phase now remembers whether anything was submitted since it was last cleared, which is the only way its lists can fill or empty.
 
+### Camera fluid lookups
+
+Every frame the camera checks whether it is in water, lava or powder snow: one fluid lookup at its block, then a fluid lookup and usually a block lookup at five points of the near plane. The near plane is a few hundredths of a block across, so these points almost always fall in the camera's own block. A point in the same block as the previous one now reuses that lookup. The points, their order and every comparison are unchanged.
+
 ### Region pass lookups
 
 Each region kept its per-pass section data and cached draw batches in hash maps keyed by render pass, looked up for every region and pass each frame. With only three passes they are now also held in arrays indexed by pass, and the lookups read the arrays.
@@ -353,7 +357,7 @@ Less live memory means shorter and rarer garbage collections.
 
 ## Commands
 
-`/txprofile` records 10 seconds and saves one report to the `txoptimizations` folder. The GPU part lists the time of every render pass and pipeline per frame, plus terrain draws and triangles. The CPU part samples the render thread's call stack every 2 ms and lists every sampled method by its own time (with its top callers) and by its time including callees, plus the CPU time of every thread. About 5000 samples make one sample roughly 0.02%, so shares below that are not measurable. Sampling another thread's stack briefly pauses it, so the render thread runs a little slower while the profile records.
+`/txprofile` records 10 seconds and saves one report to the `txoptimizations` folder. The GPU part lists the time of every render pass and pipeline per frame, plus terrain draws and triangles. The CPU part samples the render thread's call stack every 2 ms and lists every sampled method by its own time (with its top callers) and by its time including callees, plus the CPU time of every thread. About 5000 samples make one sample roughly 0.02%, so shares below that are not measurable. Sampling another thread's stack briefly pauses it, so the render thread runs a little slower while the profile records. Copy labels are worked out once per buffer, and the profiler's timestamp queries are reset in one call per frame after reading them instead of one call per query, to keep the profile's own cost low.
 
 `/txocclusion` measures how much drawn terrain in the next frame is hidden behind other terrain.
 
