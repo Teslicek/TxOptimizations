@@ -1,5 +1,7 @@
 package com.teslicek.txoptimizations.mixin;
 
+import com.llamalad7.mixinextras.sugar.Local;
+import com.mojang.renderpearl.api.device.GpuSurface;
 import com.mojang.renderpearl.api.device.SurfaceException;
 import com.mojang.renderpearl.backend.vulkan.VulkanDevice;
 import com.mojang.renderpearl.backend.vulkan.VulkanGpuSurface;
@@ -9,12 +11,14 @@ import org.lwjgl.system.MemoryStack;
 import org.lwjgl.vulkan.KHRSwapchain;
 import org.lwjgl.vulkan.VkPresentInfoKHR;
 import org.lwjgl.vulkan.VkQueue;
+import org.lwjgl.vulkan.VkSurfaceCapabilitiesKHR;
 import org.spongepowered.asm.mixin.Final;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
+import org.spongepowered.asm.mixin.injection.ModifyArg;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
@@ -55,6 +59,19 @@ public abstract class VulkanGpuSurfacePresentThreadMixin {
     @Inject(method = "isSuboptimal", at = @At("HEAD"))
     private void txoptimizations$drainBeforeSuboptimal(CallbackInfoReturnable<Boolean> cir) {
         PresentThread.drain();
+    }
+
+    @ModifyArg(method = "configure", at = @At(value = "INVOKE", target = "Lorg/lwjgl/vulkan/VkSwapchainCreateInfoKHR;minImageCount(I)Lorg/lwjgl/vulkan/VkSwapchainCreateInfoKHR;"))
+    private int txoptimizations$spareImmediateImage(int imageCount, @Local(argsOnly = true) GpuSurface.Configuration config, @Local VkSurfaceCapabilitiesKHR capabilities) {
+        if (config.presentMode() != GpuSurface.PresentMode.IMMEDIATE)
+            return imageCount;
+
+        int maxImageCount = capabilities.maxImageCount();
+
+        if (maxImageCount != 0 && imageCount + 1 > maxImageCount)
+            return imageCount;
+
+        return imageCount + 1;
     }
 
     @Inject(method = "present", at = @At("HEAD"), cancellable = true)
