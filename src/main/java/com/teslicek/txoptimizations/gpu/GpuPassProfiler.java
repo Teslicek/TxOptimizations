@@ -63,6 +63,7 @@ public final class GpuPassProfiler {
         FramePath.resetCounts();
         frameTimeCount = 0;
         GcPauses.start();
+        AllocationSampler.start();
         CpuSampler.start(Thread.currentThread(), DURATION);
     }
 
@@ -214,7 +215,7 @@ public final class GpuPassProfiler {
 
         double           seconds = (System.nanoTime() - startNanos) / 1.0e9;
         String           gpu     = report(seconds);
-        Path             file    = ReportFiles.write("txprofile", gpu + CpuSampler.finish(frameEnds, frameTimes, frameTimeCount, GcPauses.finish()));
+        Path             file    = ReportFiles.write("txprofile", gpu + CpuSampler.finish(frameEnds, frameTimes, frameTimeCount, GcPauses.finish()) + AllocationSampler.finish(seconds));
         String[]         lines   = gpu.split("\n");
         MutableComponent chat    = ReportFiles.savedMessage("Profile", file);
 
