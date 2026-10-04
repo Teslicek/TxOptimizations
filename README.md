@@ -353,7 +353,7 @@ Less live memory means shorter and rarer garbage collections.
 
 ## Commands
 
-`/txprofile` records 10 seconds and saves one report to the `txoptimizations` folder. The GPU part lists the time of every render pass and pipeline per frame, plus terrain draws and triangles. The CPU part samples the render thread's call stack every 2 ms and lists the methods it spends its own time in (with their top callers), the methods it spends the most time under including callees, and the CPU time of every thread. Sampling another thread's stack briefly pauses it, so the render thread runs a little slower while the profile records.
+`/txprofile` records 10 seconds and saves one report to the `txoptimizations` folder. The GPU part lists the time of every render pass and pipeline per frame, plus terrain draws and triangles. The CPU part samples the render thread's call stack every 2 ms and lists every sampled method by its own time (with its top callers) and by its time including callees, plus the CPU time of every thread. About 5000 samples make one sample roughly 0.02%, so shares below that are not measurable. Sampling another thread's stack briefly pauses it, so the render thread runs a little slower while the profile records.
 
 `/txocclusion` measures how much drawn terrain in the next frame is hidden behind other terrain.
 

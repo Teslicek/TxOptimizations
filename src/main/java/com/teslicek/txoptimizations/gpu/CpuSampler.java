@@ -14,9 +14,7 @@ import java.util.concurrent.locks.LockSupport;
 final class CpuSampler {
 
     private static final long         INTERVAL_NANOS = 2_000_000L;
-    private static final int          TOP_METHODS    = 45;
     private static final int          TOP_CALLERS    = 3;
-    private static final int          TOP_THREADS    = 15;
     private static final ThreadMXBean THREADS        = ManagementFactory.getThreadMXBean();
 
     private static Thread sampler;
@@ -152,7 +150,6 @@ final class CpuSampler {
             report.append(String.format(Locale.ROOT, "%nCPU: %d render thread samples over %.1f s%n%nRender thread self time%n", this.samples, this.seconds));
             this.self.entrySet().stream()
                 .sorted(Map.Entry.<String, Integer>comparingByValue().reversed())
-                .limit(TOP_METHODS)
                 .forEach(entry -> {
                     report.append(String.format(Locale.ROOT, "%6.2f%%  %s%n", this.share(entry.getValue()), entry.getKey()));
                     this.callers.get(entry.getKey()).entrySet().stream()
@@ -164,7 +161,6 @@ final class CpuSampler {
             report.append(String.format(Locale.ROOT, "%nRender thread total time including callees%n"));
             this.inclusive.entrySet().stream()
                 .sorted(Map.Entry.<String, Integer>comparingByValue().reversed())
-                .limit(TOP_METHODS)
                 .forEach(entry -> report.append(String.format(Locale.ROOT, "%6.2f%%  %s%n", this.share(entry.getValue()), entry.getKey())));
 
             report.append(String.format(Locale.ROOT, "%nCPU time per thread (one core = 100%%)%n"));
@@ -172,7 +168,6 @@ final class CpuSampler {
                 .filter(entry -> entry.getValue() >= 0L && this.cpuBefore.containsKey(entry.getKey()))
                 .map(entry -> Map.entry(entry.getKey(), entry.getValue() - this.cpuBefore.get(entry.getKey())))
                 .sorted(Map.Entry.<Long, Long>comparingByValue(Comparator.reverseOrder()))
-                .limit(TOP_THREADS)
                 .forEach(entry -> report.append(String.format(Locale.ROOT, "%6.1f%%  %s%n", entry.getValue() / 1.0e7 / this.seconds, threadName(entry.getKey()))));
 
             return report.toString();
