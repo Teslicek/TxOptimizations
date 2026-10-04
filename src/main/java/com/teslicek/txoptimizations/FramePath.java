@@ -4,20 +4,18 @@ import com.teslicek.txoptimizations.gpu.GpuPassProfiler;
 
 public final class FramePath {
 
-    private static final long   PROBE_INTERVAL_NANOS = 5_000_000_000L;
-    private static final int    PROBE_FRAMES         = 64;
-    private static final int    SETTLE_FRAMES        = 4;
-    private static final double STEADY_WEIGHT        = 1.0 / 64.0;
-    private static final double REQUIRED_GAIN        = 0.98;
+    private static final int    WINDOW_FRAMES = 128;
+    private static final double WAIT_LIMIT    = 0.10;
+    private static final double ACQUIRE_LIMIT = 0.08;
 
-    private static boolean worker = true;
-    private static boolean probing;
+    private static boolean worker;
     private static boolean frameUsesWorker;
+    private static boolean frameEligible;
     private static long    lastSubmit;
-    private static long    nextProbe;
-    private static double  steadyNanos;
-    private static long    probeNanos;
-    private static int     probeFrames;
+    private static long    windowFrameNanos;
+    private static long    windowWaitNanos;
+    private static long    windowAcquireNanos;
+    private static int     windowFrames;
     private static long    workerFrames;
     private static long    inlineFrames;
 
@@ -25,13 +23,22 @@ public final class FramePath {
     }
 
     public static boolean beginFrame(boolean eligible) {
-        frameUsesWorker = eligible && (worker != probing);
+        frameEligible   = eligible;
+        frameUsesWorker = eligible && worker;
 
         return frameUsesWorker;
     }
 
     public static boolean frameUsesWorker() {
         return frameUsesWorker;
+    }
+
+    public static void recordGpuWait(long nanos) {
+        windowWaitNanos += nanos;
+    }
+
+    public static void recordAcquire(long nanos) {
+        windowAcquireNanos += nanos;
     }
 
     public static void resetCounts() {
@@ -58,7 +65,6 @@ public final class FramePath {
 
         if (lastSubmit == 0L) {
             lastSubmit = now;
-            nextProbe  = now + PROBE_INTERVAL_NANOS;
 
             return;
         }
@@ -68,36 +74,30 @@ public final class FramePath {
         lastSubmit = now;
         GpuPassProfiler.recordFrameTime(frameNanos);
 
-        if (!probing) {
-            steadyNanos = steadyNanos == 0.0 ? frameNanos : steadyNanos + (frameNanos - steadyNanos) * STEADY_WEIGHT;
-
-            if (now >= nextProbe) {
-                probing     = true;
-                probeNanos  = 0L;
-                probeFrames = 0;
-            }
+        if (!frameEligible) {
+            resetWindow();
 
             return;
         }
 
-        probeFrames ++;
+        windowFrameNanos += frameNanos;
+        windowFrames ++;
 
-        if (probeFrames <= SETTLE_FRAMES)
+        if (windowFrames < WINDOW_FRAMES)
             return;
 
-        probeNanos += frameNanos;
+        if (worker)
+            worker = windowAcquireNanos <= windowFrameNanos * ACQUIRE_LIMIT;
+        else
+            worker = windowWaitNanos < windowFrameNanos * WAIT_LIMIT;
 
-        if (probeFrames < SETTLE_FRAMES + PROBE_FRAMES)
-            return;
+        resetWindow();
+    }
 
-        double probeAverage = (double) probeNanos / PROBE_FRAMES;
-
-        if (probeAverage < steadyNanos * REQUIRED_GAIN) {
-            worker      = !worker;
-            steadyNanos = probeAverage;
-        }
-
-        probing   = false;
-        nextProbe = now + PROBE_INTERVAL_NANOS;
+    private static void resetWindow() {
+        windowFrameNanos   = 0L;
+        windowWaitNanos    = 0L;
+        windowAcquireNanos = 0L;
+        windowFrames       = 0;
     }
 }

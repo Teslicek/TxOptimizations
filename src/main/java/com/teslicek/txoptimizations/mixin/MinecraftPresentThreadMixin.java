@@ -113,6 +113,8 @@ public abstract class MinecraftPresentThreadMixin {
         if (this.surfaceIsInvalid)
             return;
 
+        long acquireStart = System.nanoTime();
+
         try {
             this.windowSurface.acquireNextTexture();
         } catch (SurfaceException ex) {
@@ -120,5 +122,7 @@ public abstract class MinecraftPresentThreadMixin {
             this.surfaceIsInvalid                = true;
             this.windowSurfaceNeedsReconfiguring = true;
         }
+
+        FramePath.recordAcquire(System.nanoTime() - acquireStart);
     }
 }
