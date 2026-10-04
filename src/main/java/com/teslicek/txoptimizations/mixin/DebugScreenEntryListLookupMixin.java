@@ -2,6 +2,7 @@ package com.teslicek.txoptimizations.mixin;
 
 import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
 import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
+import java.util.Collection;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -23,6 +24,22 @@ public abstract class DebugScreenEntryListLookupMixin {
 
     @Unique
     private long txoptimizations$enabledLookupVersion = -1L;
+
+    @Unique
+    private List<Identifier> txoptimizations$enabledCopy;
+
+    @Unique
+    private long txoptimizations$enabledCopyVersion = -1L;
+
+    @WrapOperation(method = "getCurrentlyEnabled", at = @At(value = "INVOKE", target = "Ljava/util/List;copyOf(Ljava/util/Collection;)Ljava/util/List;"))
+    private List<Identifier> txoptimizations$reuseEnabledCopy(Collection<Identifier> currentlyEnabled, Operation<List<Identifier>> original) {
+        if (this.txoptimizations$enabledCopyVersion != this.currentlyEnabledVersion) {
+            this.txoptimizations$enabledCopy        = original.call(currentlyEnabled);
+            this.txoptimizations$enabledCopyVersion = this.currentlyEnabledVersion;
+        }
+
+        return this.txoptimizations$enabledCopy;
+    }
 
     @WrapOperation(method = "isCurrentlyEnabled", at = @At(value = "INVOKE", target = "Ljava/util/List;contains(Ljava/lang/Object;)Z"))
     private boolean txoptimizations$lookupEnabled(List<Identifier> currentlyEnabled, Object id, Operation<Boolean> original) {

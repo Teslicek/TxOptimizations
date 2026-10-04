@@ -48,7 +48,7 @@ Every time a translated text is resolved, `TranslatableContents.decomposeTemplat
 
 ### F3 entry checks
 
-`DebugScreenEntryList.isCurrentlyEnabled` searches the list of enabled F3 entries one by one, and it is called for many entries every frame. TxOptimizations answers from a hash set built from that list, rebuilt whenever vanilla's own version counter for the list changes.
+`DebugScreenEntryList.isCurrentlyEnabled` searches the list of enabled F3 entries one by one, and it is called for many entries every frame. TxOptimizations answers from a hash set built from that list, rebuilt whenever vanilla's own version counter for the list changes. `getCurrentlyEnabled` also made a fresh immutable copy of the list on every call, several times per frame; the copy is now kept and handed out again until that same version counter changes.
 
 ### Particle layers
 
