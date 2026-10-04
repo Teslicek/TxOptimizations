@@ -3,9 +3,12 @@ package com.teslicek.txoptimizations.gpu;
 import java.lang.management.ManagementFactory;
 import java.lang.management.ThreadInfo;
 import java.lang.management.ThreadMXBean;
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
@@ -17,6 +20,8 @@ final class CpuSampler {
     private static final int          TOP_CALLERS       = 3;
     private static final String       NATIVE_TRAMPOLINE = "org.lwjgl.system.JNI";
     private static final ThreadMXBean THREADS           = ManagementFactory.getThreadMXBean();
+    private static final double       SLOW_FRACTION     = 0.99;
+    private static final int          WORST_FRAMES      = 10;
 
     private static Thread sampler;
     private static Result result;
@@ -35,7 +40,7 @@ final class CpuSampler {
         sampler = Thread.ofPlatform().name("TxOptimizations CPU Sampler").daemon().start(() -> sample(target, durationNanos, sampled));
     }
 
-    static String finish() {
+    static String finish(long[] frameEnds, long[] frameTimes, int frameCount, List<GcPauses.Pause> pauses) {
         Thread running = sampler;
 
         if (running == null)
@@ -53,7 +58,7 @@ final class CpuSampler {
         sampler = null;
         result  = null;
 
-        return finished.report();
+        return finished.report() + finished.slowFrameReport(frameEnds, frameTimes, frameCount, pauses);
     }
 
     private static void sample(Thread target, long durationNanos, Result sampled) {
@@ -61,7 +66,9 @@ final class CpuSampler {
         long next  = start;
 
         while (System.nanoTime() - start < durationNanos) {
-            sampled.add(target.getStackTrace());
+            long sampledAt = System.nanoTime();
+
+            sampled.add(sampledAt, target.getStackTrace());
             next += INTERVAL_NANOS;
 
             long wait = next - System.nanoTime();
@@ -106,14 +113,19 @@ final class CpuSampler {
         private Map<Long, Long>                         cpuAfter;
         private double                                  seconds;
         private int                                     samples;
+        private final List<Long>                        sampleTimes  = new ArrayList<>();
+        private final List<StackTraceElement[]>         sampleStacks = new ArrayList<>();
 
         private Result(Map<Long, Long> cpuBefore) {
             this.cpuBefore = cpuBefore;
         }
 
-        private void add(StackTraceElement[] stack) {
+        private void add(long sampledAt, StackTraceElement[] stack) {
             if (stack.length == 0)
                 return;
+
+            this.sampleTimes.add(sampledAt);
+            this.sampleStacks.add(stack);
 
             this.samples ++;
 
@@ -182,6 +194,129 @@ final class CpuSampler {
                 .forEach(entry -> report.append(String.format(Locale.ROOT, "%6.1f%%  %s%n", entry.getValue() / 1.0e7 / this.seconds, threadName(entry.getKey()))));
 
             return report.toString();
+        }
+
+        private String slowFrameReport(long[] frameEnds, long[] frameTimes, int frameCount, List<GcPauses.Pause> pauses) {
+            if (frameCount == 0)
+                throw new IllegalStateException("No frames were recorded");
+
+            long[] sorted = Arrays.copyOf(frameTimes, frameCount);
+
+            Arrays.sort(sorted);
+
+            long                              threshold  = sorted[Math.min(frameCount - 1, (int) Math.ceil(frameCount * SLOW_FRACTION) - 1)];
+            Map<String, Integer>              slowSelf   = new HashMap<>();
+            Map<String, Map<String, Integer>> slowCalls  = new HashMap<>();
+            Map<String, Integer>              slowTotal  = new HashMap<>();
+            Map<Integer, List<String>>        worstLeafs = new HashMap<>();
+            Integer[]                         order      = new Integer[frameCount];
+            int                               slowCount  = 0;
+            int                               slowFrames = 0;
+
+            for (int frame = 0; frame < frameCount; frame ++) {
+                order[frame] = frame;
+
+                if (frameTimes[frame] >= threshold)
+                    slowFrames ++;
+            }
+
+            Arrays.sort(order, (first, second) -> Long.compare(frameTimes[second], frameTimes[first]));
+
+            Set<Integer> worst = new HashSet<>();
+
+            for (int index = 0; index < Math.min(WORST_FRAMES, frameCount); index ++)
+                worst.add(order[index]);
+
+            for (int sample = 0; sample < this.sampleTimes.size(); sample ++) {
+                int frame = frameAt(frameEnds, frameTimes, frameCount, this.sampleTimes.get(sample));
+
+                if (frame < 0 || frameTimes[frame] < threshold)
+                    continue;
+
+                StackTraceElement[] stack     = this.sampleStacks.get(sample);
+                int                 leafIndex = leafIndex(stack);
+                String              leaf      = frameName(stack[leafIndex]);
+                String              caller    = this.caller(stack, leafIndex);
+
+                slowCount ++;
+                slowSelf.merge(leaf, 1, Integer::sum);
+                slowCalls.computeIfAbsent(leaf, ignored -> new HashMap<>()).merge(caller, 1, Integer::sum);
+                this.seen.clear();
+
+                for (StackTraceElement element : stack) {
+                    String name = frameName(element);
+
+                    if (this.seen.add(name))
+                        slowTotal.merge(name, 1, Integer::sum);
+                }
+
+                if (worst.contains(frame))
+                    worstLeafs.computeIfAbsent(frame, ignored -> new ArrayList<>()).add(leaf + " <- " + caller);
+            }
+
+            StringBuilder report = new StringBuilder();
+            int           total  = Math.max(slowCount, 1);
+
+            report.append(String.format(Locale.ROOT, "%nSlow frames: %d frames at or above %.3f ms (the slowest %.0f%%), %d samples inside them%n", slowFrames, threshold / 1.0e6, (1.0 - SLOW_FRACTION) * 100.0, slowCount));
+            report.append(String.format(Locale.ROOT, "%nSlow frame self time%n"));
+            slowSelf.entrySet().stream()
+                .sorted(Map.Entry.<String, Integer>comparingByValue().reversed())
+                .forEach(entry -> {
+                    report.append(String.format(Locale.ROOT, "%6.2f%%  %s%n", entry.getValue() * 100.0 / total, entry.getKey()));
+                    slowCalls.get(entry.getKey()).entrySet().stream()
+                        .sorted(Map.Entry.<String, Integer>comparingByValue().reversed())
+                        .limit(TOP_CALLERS)
+                        .forEach(call -> report.append(String.format(Locale.ROOT, "          %6.2f%%  <- %s%n", call.getValue() * 100.0 / total, call.getKey())));
+                });
+
+            report.append(String.format(Locale.ROOT, "%nSlow frame total time including callees%n"));
+            slowTotal.entrySet().stream()
+                .sorted(Map.Entry.<String, Integer>comparingByValue().reversed())
+                .forEach(entry -> report.append(String.format(Locale.ROOT, "%6.2f%%  %s%n", entry.getValue() * 100.0 / total, entry.getKey())));
+
+            report.append(String.format(Locale.ROOT, "%nWorst frames%n"));
+
+            for (int index = 0; index < Math.min(WORST_FRAMES, frameCount); index ++) {
+                int  frame = order[index];
+                long end   = frameEnds[frame];
+                long start = end - frameTimes[frame];
+
+                report.append(String.format(Locale.ROOT, "%8.3f ms  at %.3f s%n", frameTimes[frame] / 1.0e6, (end - frameEnds[0]) / 1.0e9));
+
+                for (GcPauses.Pause pause : pauses) {
+                    if (pause.endNanos() >= start && pause.startNanos() <= end)
+                        report.append(String.format(Locale.ROOT, "            overlaps GC %s, %.1f ms%n", pause.name(), (pause.endNanos() - pause.startNanos()) / 1.0e6));
+                }
+
+                for (String leaf : worstLeafs.getOrDefault(frame, List.of()))
+                    report.append("            sample ").append(leaf).append('\n');
+            }
+
+            report.append(String.format(Locale.ROOT, "%nGarbage collections: %d%n", pauses.size()));
+
+            for (GcPauses.Pause pause : pauses)
+                report.append(String.format(Locale.ROOT, "%8.1f ms  at %.3f s  %s%n", (pause.endNanos() - pause.startNanos()) / 1.0e6, (pause.startNanos() - frameEnds[0]) / 1.0e9, pause.name()));
+
+            return report.toString();
+        }
+
+        private static int frameAt(long[] frameEnds, long[] frameTimes, int frameCount, long time) {
+            int low  = 0;
+            int high = frameCount - 1;
+
+            while (low < high) {
+                int middle = (low + high) >>> 1;
+
+                if (frameEnds[middle] < time)
+                    low = middle + 1;
+                else
+                    high = middle;
+            }
+
+            if (frameEnds[low] < time || frameEnds[low] - frameTimes[low] > time)
+                return -1;
+
+            return low;
         }
 
         private double share(int count) {

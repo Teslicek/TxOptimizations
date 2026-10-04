@@ -42,6 +42,7 @@ public final class GpuPassProfiler {
     private static long                  terrainDraws;
     private static long                  terrainIndices;
     private static long[]                frameTimes = new long[1 << 16];
+    private static long[]                frameEnds  = new long[1 << 16];
     private static int                   frameTimeCount;
 
     private GpuPassProfiler() {
@@ -61,6 +62,7 @@ public final class GpuPassProfiler {
         startNanos     = System.nanoTime();
         FramePath.resetCounts();
         frameTimeCount = 0;
+        GcPauses.start();
         CpuSampler.start(Thread.currentThread(), DURATION);
     }
 
@@ -76,10 +78,14 @@ public final class GpuPassProfiler {
         if (!recording)
             return;
 
-        if (frameTimeCount == frameTimes.length)
+        if (frameTimeCount == frameTimes.length) {
             frameTimes = Arrays.copyOf(frameTimes, frameTimes.length * 2);
+            frameEnds  = Arrays.copyOf(frameEnds, frameEnds.length * 2);
+        }
 
-        frameTimes[frameTimeCount ++] = frameNanos;
+        frameTimes[frameTimeCount] = frameNanos;
+        frameEnds[frameTimeCount]  = System.nanoTime();
+        frameTimeCount ++;
     }
 
     public static void countTerrainDraws(int draws, long indices) {
@@ -208,7 +214,7 @@ public final class GpuPassProfiler {
 
         double           seconds = (System.nanoTime() - startNanos) / 1.0e9;
         String           gpu     = report(seconds);
-        Path             file    = ReportFiles.write("txprofile", gpu + CpuSampler.finish());
+        Path             file    = ReportFiles.write("txprofile", gpu + CpuSampler.finish(frameEnds, frameTimes, frameTimeCount, GcPauses.finish()));
         String[]         lines   = gpu.split("\n");
         MutableComponent chat    = ReportFiles.savedMessage("Profile", file);
 
