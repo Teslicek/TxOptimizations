@@ -123,6 +123,7 @@
     "VulkanRenderPassDescriptorReuseMixin",
     "VulkanRenderPassDynamicStateMixin",
     "VulkanRenderPassTexelViewMixin",
+    "VulkanRenderPassVertexBindMixin",
     "VulkanSubmissionDrainMixin",
     "VulkanSubmissionFrontMixin",
     "VulkanTransientMemoryLazyMixin",

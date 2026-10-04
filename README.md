@@ -114,6 +114,10 @@ Draining the frame's submit collections asked every feature render phase whether
 
 Every frame the camera checks whether it is in water, lava or powder snow: one fluid lookup at its block, then a fluid lookup and usually a block lookup at five points of the near plane. The near plane is a few hundredths of a block across, so these points almost always fall in the camera's own block. A point in the same block as the previous one now reuses that lookup. The points, their order and every comparison are unchanged.
 
+### Per-frame allocations
+
+Garbage collection pauses of 6 to 8 ms were the worst frames, and their frequency follows how fast the game allocates. `/txprofile`'s allocation sampling showed several sources in TxOptimizations' own code. Wrapped calls with many arguments boxed every float and int into an array on each call: the glyph writer, when it fell back to vanilla for GUI text, and the baked block entity model swap in Sodium's chunk meshing. They now use injectors that pass arguments without boxing. The per-render-pass set of validated pipelines is one shared set cleared at each new pass, since only one pass can be open at a time. Pipeline uniforms are iterated through the open hash map behind the unmodifiable wrapper, so iteration reuses one entry object. Binding a vertex buffer writes the buffer and offset straight to stack memory instead of wrapping each in a new `LongBuffer`. The driver receives the same values in every case.
+
 ### Region pass lookups
 
 Each region kept its per-pass section data and cached draw batches in hash maps keyed by render pass, looked up for every region and pass each frame. With only three passes they are now also held in arrays indexed by pass, and the lookups read the arrays.
