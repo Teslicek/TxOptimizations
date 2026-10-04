@@ -122,10 +122,6 @@ Garbage collection pauses of 6 to 8 ms were the worst frames, and their frequenc
 
 With hitboxes shown, every entity's box became 8 corner `Vec3`s and 12 `Line` records each frame, plus the list storage for them, about 35 MB/s in the BedWars prelobby. Gizmo groups now keep their lines as plain numbers (start and end coordinates, color and width), box edges are written from the box coordinates directly, and the line renderer reads those numbers. The coordinates are the same doubles the `Vec3`s held, in the same order. Anything that still reads the list as `Line` objects gets them built on access.
 
-### Sodium cull tree arrays
-
-Every async cull pass builds new section trees for the wide, regular and local results, and each tree allocates a 32 KB bit array. That was 157 MB/s on Sodium's cull thread in the BedWars prelobby, a quarter of everything the game allocated. The render thread is the only place that holds finished trees: in Sodium's map of cull results and as the tree the current render list was read from. After each update of those, every tree that was held before and is not held anymore returns its arrays to a pool, including a local result that was never taken and the ray occlusion portal trees that are only used while the cull pass runs. New trees take a cleared array from the pool. Each tree is released exactly once, and the pool keeps at most 64 arrays.
-
 ### Region pass lookups
 
 Each region kept its per-pass section data and cached draw batches in hash maps keyed by render pass, looked up for every region and pass each frame. With only three passes they are now also held in arrays indexed by pass, and the lookups read the arrays.
