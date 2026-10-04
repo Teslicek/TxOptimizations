@@ -61,6 +61,14 @@ public final class PresentThread {
             throw new IllegalStateException("The surface did not hand over its present");
 
         drain();
+
+        if (!FramePath.frameUsesWorker()) {
+            submission.close();
+            present.run();
+
+            return;
+        }
+
         job = () -> {
             submission.close();
             present.run();

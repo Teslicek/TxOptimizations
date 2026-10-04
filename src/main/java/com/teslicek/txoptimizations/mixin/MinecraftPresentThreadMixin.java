@@ -7,6 +7,7 @@ import com.mojang.blaze3d.platform.Window;
 import com.mojang.renderpearl.api.commands.CommandEncoder;
 import com.mojang.renderpearl.api.device.GpuSurface;
 import com.mojang.renderpearl.api.device.SurfaceException;
+import com.teslicek.txoptimizations.FramePath;
 import com.teslicek.txoptimizations.PresentThread;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.Options;
@@ -48,7 +49,9 @@ public abstract class MinecraftPresentThreadMixin {
 
     @ModifyExpressionValue(method = "renderFrame", at = @At(value = "FIELD", target = "Lnet/minecraft/client/Minecraft;windowSurfaceNeedsReconfiguring:Z", opcode = Opcodes.GETFIELD))
     private boolean txoptimizations$deferAcquire(boolean needsReconfiguring) {
-        this.txoptimizations$acquireDeferred = !needsReconfiguring && PresentThread.canDeferAcquire(this.windowSurface);
+        boolean worker = FramePath.beginFrame(PresentThread.canDeferAcquire(this.windowSurface));
+
+        this.txoptimizations$acquireDeferred = !needsReconfiguring && worker;
 
         return needsReconfiguring;
     }
@@ -86,6 +89,8 @@ public abstract class MinecraftPresentThreadMixin {
         } finally {
             PresentThread.disarm();
         }
+
+        FramePath.frameSubmitted();
     }
 
     @Unique

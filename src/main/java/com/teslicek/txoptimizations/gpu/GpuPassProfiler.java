@@ -4,6 +4,7 @@ import com.mojang.renderpearl.api.commands.GpuQueryPool;
 import com.mojang.renderpearl.backend.api.CommandEncoderBackend;
 import com.mojang.renderpearl.backend.vulkan.VulkanDevice;
 import com.mojang.renderpearl.backend.vulkan.VulkanQueryPool;
+import com.teslicek.txoptimizations.FramePath;
 import com.teslicek.txoptimizations.mixin.gpu.VulkanQueryPoolAccessor;
 import org.lwjgl.vulkan.VK12;
 import java.nio.file.Path;
@@ -55,6 +56,7 @@ public final class GpuPassProfiler {
         terrainDraws   = 0L;
         terrainIndices = 0L;
         startNanos     = System.nanoTime();
+        FramePath.resetCounts();
         CpuSampler.start(Thread.currentThread(), DURATION);
     }
 
@@ -207,6 +209,7 @@ public final class GpuPassProfiler {
         StringBuilder report  = new StringBuilder();
 
         report.append(String.format(Locale.ROOT, "%d frames in %.1f s (%.0f fps), GPU %.3f ms per frame, GPU busy %.0f%% of the time%n", framesRead, seconds, framesRead / seconds, frameMs, gpuNanos / 1.0e7 / seconds));
+        report.append(String.format(Locale.ROOT, "Present thread used for %.0f%% of frames%n", FramePath.workerShare() * 100.0));
         report.append(String.format(Locale.ROOT, "Terrain %.0f draws and %.3f million triangles per frame%n", (double) terrainDraws / framesRead, terrainIndices / 3.0 / 1.0e6 / framesRead));
 
         PASSES.entrySet().stream()
