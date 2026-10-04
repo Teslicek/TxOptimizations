@@ -13,9 +13,10 @@ import java.util.concurrent.locks.LockSupport;
 
 final class CpuSampler {
 
-    private static final long         INTERVAL_NANOS = 2_000_000L;
-    private static final int          TOP_CALLERS    = 3;
-    private static final ThreadMXBean THREADS        = ManagementFactory.getThreadMXBean();
+    private static final long         INTERVAL_NANOS    = 2_000_000L;
+    private static final int          TOP_CALLERS       = 3;
+    private static final String       NATIVE_TRAMPOLINE = "org.lwjgl.system.JNI";
+    private static final ThreadMXBean THREADS           = ManagementFactory.getThreadMXBean();
 
     private static Thread sampler;
     private static Result result;
@@ -116,10 +117,11 @@ final class CpuSampler {
 
             this.samples ++;
 
-            String leaf = frameName(stack[0]);
+            int    leafIndex = leafIndex(stack);
+            String leaf      = frameName(stack[leafIndex]);
 
             this.self.merge(leaf, 1, Integer::sum);
-            this.callers.computeIfAbsent(leaf, ignored -> new HashMap<>()).merge(this.caller(stack), 1, Integer::sum);
+            this.callers.computeIfAbsent(leaf, ignored -> new HashMap<>()).merge(this.caller(stack, leafIndex), 1, Integer::sum);
             this.seen.clear();
 
             for (StackTraceElement frame : stack) {
@@ -130,8 +132,17 @@ final class CpuSampler {
             }
         }
 
-        private String caller(StackTraceElement[] stack) {
-            for (int index = 1; index < stack.length; index ++) {
+        private static int leafIndex(StackTraceElement[] stack) {
+            int index = 0;
+
+            while (index + 1 < stack.length && stack[index].getClassName().equals(NATIVE_TRAMPOLINE))
+                index ++;
+
+            return index;
+        }
+
+        private String caller(StackTraceElement[] stack, int leafIndex) {
+            for (int index = leafIndex + 1; index < stack.length; index ++) {
                 if (!isPlumbing(stack[index]))
                     return frameName(stack[index]);
             }
