@@ -236,7 +236,7 @@ Sodium read the operating system name to pick the sub-texel precision every fram
 
 ### Viewport, scissor and pipeline binds
 
-Every render pass set the viewport and scissor and bound its first pipeline again, even when the command buffer already had exactly that state from the previous pass. The bound pipeline and both dynamic states stay valid across render passes in the same command buffer, so a viewport, scissor or pipeline that is already set is no longer recorded again. `vkCmdBindPipeline` alone was 2.8% of the render thread in the BedWars prelobby. The remembered state is dropped whenever a new command buffer starts recording.
+Every render pass set the viewport and scissor and bound its first pipeline again, even when the command buffer already had exactly that state from the previous pass. The bound pipeline and both dynamic states stay valid across render passes in the same command buffer, so a viewport, scissor or pipeline that is already set is no longer recorded again. `vkCmdBindPipeline` alone was 2.8% of the render thread in the BedWars prelobby. Pushed descriptors also stay valid across render passes, so the check that skips pushing an identical descriptor set with the same pipeline layout now spans the whole command buffer instead of a single pass. The remembered state is dropped whenever a new command buffer starts recording.
 
 ### Particle vertices
 
