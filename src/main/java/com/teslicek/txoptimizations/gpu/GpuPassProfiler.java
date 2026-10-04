@@ -49,6 +49,7 @@ public final class GpuPassProfiler {
         terrainDraws   = 0L;
         terrainIndices = 0L;
         startNanos     = System.nanoTime();
+        CpuSampler.start(Thread.currentThread(), DURATION);
     }
 
     public static boolean isRunning() {
@@ -164,10 +165,10 @@ public final class GpuPassProfiler {
         }
 
         double           seconds = (System.nanoTime() - startNanos) / 1.0e9;
-        String           report  = report(seconds);
-        Path             file    = ReportFiles.write("txgpu", report);
-        String[]         lines   = report.split("\n");
-        MutableComponent chat    = ReportFiles.savedMessage("GPU profile", file);
+        String           gpu     = report(seconds);
+        Path             file    = ReportFiles.write("txprofile", gpu + CpuSampler.finish());
+        String[]         lines   = gpu.split("\n");
+        MutableComponent chat    = ReportFiles.savedMessage("Profile", file);
 
         for (int index = 0; index < Math.min(CHAT_LINES, lines.length); index ++)
             chat.append("\n" + lines[index]);

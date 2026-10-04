@@ -351,6 +351,12 @@ Less live memory means shorter and rarer garbage collections.
 - Empty item component patches: items with no changed components share one empty map instead of each allocating their own.
 - Uniform light layers: a 2 KB light array where every value is the same non-zero level (sky sections at full light, sent by the server or loaded from disk) is stored as just that level, the form vanilla already uses for freshly lit sections. Reads return the same value and the array comes back filled on the first write. A heap dump of a 32 chunk singleplayer world had about 14,000 such arrays (29 MB).
 
+## Commands
+
+`/txprofile` records 10 seconds and saves one report to the `txoptimizations` folder. The GPU part lists the time of every render pass and pipeline per frame, plus terrain draws and triangles. The CPU part samples the render thread's call stack every 2 ms and lists the methods it spends its own time in (with their top callers), the methods it spends the most time under including callees, and the CPU time of every thread. Sampling another thread's stack briefly pauses it, so the render thread runs a little slower while the profile records.
+
+`/txocclusion` measures how much drawn terrain in the next frame is hidden behind other terrain.
+
 ## Fixes
 
 ### Command suggestion crash
