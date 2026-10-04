@@ -102,6 +102,14 @@ Sodium writes item model quads by transforming and renormalizing the normal of e
 
 On GPUs with the multi-draw extension Sodium hands every section's draw commands to the driver through `vkCmdDrawMultiIndexedEXT`, and the driver walks all of them on the render thread each frame. Sodium's indirect path writes the same commands into a GPU-visible buffer and issues one indirect draw per region, so the GPU reads the list instead. It is now used whenever the device supports indirect multi-draw.
 
+### Render thread memory stack
+
+Every LWJGL call that needs scratch memory (descriptor pushes, buffer copies, mapping, glyph drawing, terrain push constants) fetches the thread's `MemoryStack` from a `ThreadLocal`. The render thread's ThreadLocal table is crowded, so this lookup missed its first slot and probed on almost every call, 1.7% of the render thread in the BedWars prelobby. The render thread's stack is now captured once when Minecraft starts, and `MemoryStack.stackGet` returns it directly when called from that thread. It is the same object the ThreadLocal returns, and every other thread still uses the ThreadLocal.
+
+### Empty render phase checks
+
+Draining the frame's submit collections asked every feature render phase whether it was empty, and each check walked all of the phase's per-feature lists and batch maps, about 0.7% of the render thread. Each phase now remembers whether anything was submitted since it was last cleared, which is the only way its lists can fill or empty.
+
 ### Region pass lookups
 
 Each region kept its per-pass section data and cached draw batches in hash maps keyed by render pass, looked up for every region and pass each frame. With only three passes they are now also held in arrays indexed by pass, and the lookups read the arrays.
