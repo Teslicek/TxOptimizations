@@ -12,11 +12,9 @@ import javax.management.openmbean.CompositeData;
 
 final class GcPauses {
 
-    private static final List<Pause>                   PAUSES    = new ArrayList<>();
+    private static final List<Pause>                  PAUSES     = new ArrayList<>();
     private static final List<GarbageCollectorMXBean> COLLECTORS = ManagementFactory.getGarbageCollectorMXBeans();
-    private static final NotificationListener          LISTENER  = GcPauses::onNotification;
-
-    private static long jvmStartNanos;
+    private static final NotificationListener         LISTENER   = GcPauses::onNotification;
 
     private GcPauses() {
     }
@@ -25,8 +23,6 @@ final class GcPauses {
         synchronized (PAUSES) {
             PAUSES.clear();
         }
-
-        jvmStartNanos = System.nanoTime() - ManagementFactory.getRuntimeMXBean().getUptime() * 1_000_000L;
 
         for (GarbageCollectorMXBean collector : COLLECTORS)
             ((NotificationEmitter) collector).addNotificationListener(LISTENER, null, null);
@@ -50,9 +46,9 @@ final class GcPauses {
         if (!notification.getType().equals(GarbageCollectionNotificationInfo.GARBAGE_COLLECTION_NOTIFICATION))
             return;
 
+        long                              end   = System.nanoTime();
         GarbageCollectionNotificationInfo info  = GarbageCollectionNotificationInfo.from((CompositeData) notification.getUserData());
-        long                              start = jvmStartNanos + info.getGcInfo().getStartTime() * 1_000_000L;
-        long                              end   = jvmStartNanos + info.getGcInfo().getEndTime() * 1_000_000L;
+        long                              start = end - info.getGcInfo().getDuration() * 1_000_000L;
 
         synchronized (PAUSES) {
             PAUSES.add(new Pause(info.getGcName() + " (" + info.getGcCause() + ")", start, end));

@@ -1,8 +1,8 @@
 package com.teslicek.txoptimizations.gpu;
 
 import java.lang.management.ManagementFactory;
+import com.sun.management.ThreadMXBean;
 import java.lang.management.ThreadInfo;
-import java.lang.management.ThreadMXBean;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Comparator;
@@ -19,7 +19,7 @@ final class CpuSampler {
     private static final long         INTERVAL_NANOS    = 2_000_000L;
     private static final int          TOP_CALLERS       = 3;
     private static final String       NATIVE_TRAMPOLINE = "org.lwjgl.system.JNI";
-    private static final ThreadMXBean THREADS           = ManagementFactory.getThreadMXBean();
+    private static final ThreadMXBean THREADS           = (ThreadMXBean) ManagementFactory.getThreadMXBean();
     private static final double       SLOW_FRACTION     = 0.99;
     private static final int          WORST_FRAMES      = 10;
 
@@ -33,8 +33,9 @@ final class CpuSampler {
         if (sampler != null)
             throw new IllegalStateException("CPU sampler is already running");
 
-        Map<Long, Long> cpuBefore = threadCpuTimes();
-        Result          sampled   = new Result(cpuBefore);
+        Map<Long, Long> cpuBefore   = threadCpuTimes();
+        Map<Long, Long> allocBefore = threadAllocations();
+        Result          sampled     = new Result(target.threadId(), cpuBefore, allocBefore);
 
         result  = sampled;
         sampler = Thread.ofPlatform().name("TxOptimizations CPU Sampler").daemon().start(() -> sample(target, durationNanos, sampled));
@@ -77,7 +78,16 @@ final class CpuSampler {
                 LockSupport.parkNanos(wait);
         }
 
-        sampled.finish(threadCpuTimes(), (System.nanoTime() - start) / 1.0e9);
+        sampled.finish(threadCpuTimes(), threadAllocations(), (System.nanoTime() - start) / 1.0e9);
+    }
+
+    private static Map<Long, Long> threadAllocations() {
+        Map<Long, Long> allocations = new HashMap<>();
+
+        for (long id : THREADS.getAllThreadIds())
+            allocations.put(id, THREADS.getThreadAllocatedBytes(id));
+
+        return allocations;
     }
 
     private static Map<Long, Long> threadCpuTimes() {
@@ -105,7 +115,10 @@ final class CpuSampler {
 
     private static final class Result {
 
+        private final long                              targetId;
         private final Map<Long, Long>                   cpuBefore;
+        private final Map<Long, Long>                   allocBefore;
+        private Map<Long, Long>                         allocAfter;
         private final Map<String, Integer>              self      = new HashMap<>();
         private final Map<String, Map<String, Integer>> callers   = new HashMap<>();
         private final Map<String, Integer>              inclusive = new HashMap<>();
@@ -116,8 +129,10 @@ final class CpuSampler {
         private final List<Long>                        sampleTimes  = new ArrayList<>();
         private final List<StackTraceElement[]>         sampleStacks = new ArrayList<>();
 
-        private Result(Map<Long, Long> cpuBefore) {
-            this.cpuBefore = cpuBefore;
+        private Result(long targetId, Map<Long, Long> cpuBefore, Map<Long, Long> allocBefore) {
+            this.targetId    = targetId;
+            this.cpuBefore   = cpuBefore;
+            this.allocBefore = allocBefore;
         }
 
         private void add(long sampledAt, StackTraceElement[] stack) {
@@ -162,8 +177,9 @@ final class CpuSampler {
             return "<thread root>";
         }
 
-        private void finish(Map<Long, Long> after, double sampledSeconds) {
-            this.cpuAfter = after;
+        private void finish(Map<Long, Long> after, Map<Long, Long> allocations, double sampledSeconds) {
+            this.cpuAfter   = after;
+            this.allocAfter = allocations;
             this.seconds  = sampledSeconds;
         }
 
@@ -256,6 +272,16 @@ final class CpuSampler {
 
             StringBuilder report = new StringBuilder();
             int           total  = Math.max(slowCount, 1);
+
+            long renderAllocated = this.allocAfter.get(this.targetId) - this.allocBefore.get(this.targetId);
+
+            report.append(String.format(Locale.ROOT, "%nMemory allocated per thread (render thread %.1f KB per frame)%n", renderAllocated / 1024.0 / frameCount));
+            this.allocAfter.entrySet().stream()
+                .filter(entry -> entry.getValue() >= 0L && this.allocBefore.containsKey(entry.getKey()))
+                .map(entry -> Map.entry(entry.getKey(), entry.getValue() - this.allocBefore.get(entry.getKey())))
+                .filter(entry -> entry.getValue() > 0L)
+                .sorted(Map.Entry.<Long, Long>comparingByValue(Comparator.reverseOrder()))
+                .forEach(entry -> report.append(String.format(Locale.ROOT, "%8.1f MB/s  %s%n", entry.getValue() / 1048576.0 / this.seconds, threadName(entry.getKey()))));
 
             report.append(String.format(Locale.ROOT, "%nSlow frames: %d frames at or above %.3f ms (the slowest %.0f%%), %d samples inside them%n", slowFrames, threshold / 1.0e6, (1.0 - SLOW_FRACTION) * 100.0, slowCount));
             report.append(String.format(Locale.ROOT, "%nSlow frame self time%n"));
