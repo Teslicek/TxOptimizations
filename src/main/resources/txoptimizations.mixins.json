@@ -106,6 +106,7 @@
     "TextFeatureRendererLayoutCacheMixin",
     "TextureAtlasSpriteMarkMixin",
     "TranslatableTemplateCacheMixin",
+    "UnmodifiableObject2IntMapAccessor",
     "VertexFormatElementCacheMixin",
     "VertexSorterReuseMixin",
     "VulkanBackendCheckpointMixin",

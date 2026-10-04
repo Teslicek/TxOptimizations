@@ -55,10 +55,15 @@ public abstract class FrontendRenderPassBindingMixin {
     private boolean constantsPushed;
 
     @Unique
-    private final Set<FrontendRenderPipeline> txoptimizations$validatedPipelines = new ReferenceOpenHashSet<>();
+    private static final Set<FrontendRenderPipeline> VALIDATED_PIPELINES = new ReferenceOpenHashSet<>();
 
     @Unique
     private IndexType txoptimizations$indexType;
+
+    @Inject(method = "<init>", at = @At("RETURN"))
+    private void txoptimizations$forgetValidatedPipelines(CallbackInfo ci) {
+        VALIDATED_PIPELINES.clear();
+    }
 
     @Overwrite
     public void setPipeline(CompiledRenderPipeline pipeline) {
@@ -68,13 +73,13 @@ public abstract class FrontendRenderPassBindingMixin {
         if (!(pipeline instanceof FrontendRenderPipeline frontendPipeline))
             throw new IllegalArgumentException("Pipeline must be instance of FrontendCompiledRenderPipeline");
 
-        if (this.txoptimizations$validatedPipelines.add(frontendPipeline))
+        if (VALIDATED_PIPELINES.add(frontendPipeline))
             this.txoptimizations$validateColorTargets(frontendPipeline);
 
         this.boundPipeline = frontendPipeline;
         this.backend.setPipeline(frontendPipeline.backendRenderPipeline());
 
-        for (Object2IntMap.Entry<String> uniform : Object2IntMaps.fastIterable(frontendPipeline.uniformIndices())) {
+        for (Object2IntMap.Entry<String> uniform : Object2IntMaps.fastIterable(((UnmodifiableObject2IntMapAccessor) frontendPipeline.uniformIndices()).txoptimizations$map())) {
             Object value = this.uniforms.get(uniform.getKey());
 
             if (value != null)

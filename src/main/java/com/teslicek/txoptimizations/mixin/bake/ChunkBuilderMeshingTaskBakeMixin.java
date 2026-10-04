@@ -24,6 +24,7 @@ import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
+import org.spongepowered.asm.mixin.injection.ModifyArg;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 @Mixin(ChunkBuilderMeshingTask.class)
@@ -49,9 +50,9 @@ public abstract class ChunkBuilderMeshingTaskBakeMixin {
         return Baking.meshedRenderShape(blockEntity.get(), this.txoptimizations$section, original.call(state));
     }
 
-    @WrapOperation(method = "execute", at = @At(value = "INVOKE", target = "Lnet/caffeinemc/mods/sodium/client/render/chunk/compile/pipeline/BlockRenderer;renderModel(Lnet/minecraft/client/renderer/block/dispatch/BlockStateModel;Lnet/minecraft/world/level/block/state/BlockState;Lnet/minecraft/core/BlockPos;Lnet/minecraft/core/BlockPos;)V"))
-    private void txoptimizations$chooseMeshedModel(BlockRenderer renderer, BlockStateModel model, BlockState state, BlockPos pos, BlockPos origin, Operation<Void> original, @Share("blockEntity") LocalRef<BlockEntity> blockEntity) {
-        original.call(renderer, Baking.meshedModel(blockEntity.get(), model), state, pos, origin);
+    @ModifyArg(method = "execute", at = @At(value = "INVOKE", target = "Lnet/caffeinemc/mods/sodium/client/render/chunk/compile/pipeline/BlockRenderer;renderModel(Lnet/minecraft/client/renderer/block/dispatch/BlockStateModel;Lnet/minecraft/world/level/block/state/BlockState;Lnet/minecraft/core/BlockPos;Lnet/minecraft/core/BlockPos;)V"), index = 0)
+    private BlockStateModel txoptimizations$chooseMeshedModel(BlockStateModel model, @Share("blockEntity") LocalRef<BlockEntity> blockEntity) {
+        return Baking.meshedModel(blockEntity.get(), model);
     }
 
     @WrapOperation(method = "execute", at = @At(value = "INVOKE", target = "Lnet/caffeinemc/mods/sodium/client/render/chunk/ExtendedBlockEntityType;shouldRender(Lnet/minecraft/world/level/block/entity/BlockEntityType;Lnet/minecraft/world/level/BlockGetter;Lnet/minecraft/core/BlockPos;Lnet/minecraft/world/level/block/entity/BlockEntity;)Z"))

@@ -1,7 +1,6 @@
 package com.teslicek.txoptimizations.mixin;
 
-import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
-import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
+import com.llamalad7.mixinextras.injector.v2.WrapWithCondition;
 import com.mojang.blaze3d.vertex.VertexConsumer;
 import com.teslicek.txoptimizations.DirectVertexBuffer;
 import net.caffeinemc.mods.sodium.api.math.MatrixHelper;
@@ -53,12 +52,10 @@ public abstract class BakedSheetGlyphDirectWriteMixin {
     @Final
     private float v1;
 
-    @WrapOperation(method = "renderChar", at = @At(value = "INVOKE", target = "Lnet/minecraft/client/gui/font/glyphs/BakedSheetGlyph;render(ZFFFLorg/joml/Matrix4fc;Lcom/mojang/blaze3d/vertex/VertexConsumer;IZI)V"))
-    private void txoptimizations$writeGlyphDirectly(BakedSheetGlyph glyph, boolean italic, float x, float y, float z, Matrix4fc pose, VertexConsumer builder, int color, boolean bold, int light, Operation<Void> original) {
-        if (!(builder instanceof DirectVertexBuffer direct) || !direct.txoptimizations$writesFormat(GlyphVertex.FORMAT)) {
-            original.call(glyph, italic, x, y, z, pose, builder, color, bold, light);
-            return;
-        }
+    @WrapWithCondition(method = "renderChar", at = @At(value = "INVOKE", target = "Lnet/minecraft/client/gui/font/glyphs/BakedSheetGlyph;render(ZFFFLorg/joml/Matrix4fc;Lcom/mojang/blaze3d/vertex/VertexConsumer;IZI)V"))
+    private boolean txoptimizations$writeGlyphDirectly(BakedSheetGlyph glyph, boolean italic, float x, float y, float z, Matrix4fc pose, VertexConsumer builder, int color, boolean bold, int light) {
+        if (!(builder instanceof DirectVertexBuffer direct) || !direct.txoptimizations$writesFormat(GlyphVertex.FORMAT))
+            return true;
 
         float x1     = x + this.left;
         float x2     = x + this.right;
@@ -74,6 +71,8 @@ public abstract class BakedSheetGlyphDirectWriteMixin {
         txoptimizations$put(buffer + GlyphVertex.STRIDE, pose, x1 + w2 - offset, h2 + offset, z, abgr, this.u0, this.v1, light);
         txoptimizations$put(buffer + 2L * GlyphVertex.STRIDE, pose, x2 + w2 + offset, h2 + offset, z, abgr, this.u1, this.v1, light);
         txoptimizations$put(buffer + 3L * GlyphVertex.STRIDE, pose, x2 + w1 + offset, h1 - offset, z, abgr, this.u1, this.v0, light);
+
+        return false;
     }
 
     @Unique
