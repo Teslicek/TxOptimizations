@@ -108,7 +108,7 @@ Every LWJGL call that needs scratch memory (descriptor pushes, buffer copies, ma
 
 ### Empty render phase checks
 
-Draining the frame's submit collections asked every feature render phase whether it was empty, and each check walked all of the phase's per-feature lists and batch maps, about 0.7% of the render thread. Each phase now remembers whether anything was submitted since it was last cleared, which is the only way its lists can fill or empty.
+Draining the frame's submit collections asked every feature render phase whether it was empty, and each check walked all of the phase's per-feature lists and batch maps, 0.3% of the render thread in the BedWars prelobby. Each phase now remembers whether anything was submitted since it was last cleared, which is the only way its lists can fill or empty.
 
 ### Region pass lookups
 
