@@ -27,6 +27,8 @@
     "CursorCounterMixin",
     "DataLayerUniformMixin",
     "DecalRotationCacheMixin",
+    "DrawableGizmoGroupLinesMixin",
+    "DrawableGizmoPrimitivesPackedMixin",
     "DebugScreenEntryListLookupMixin",
     "DrawBackendIndirectMixin",
     "DynamicAtlasAllocatorDiscardMixin",

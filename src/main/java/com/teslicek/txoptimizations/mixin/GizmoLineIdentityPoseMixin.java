@@ -4,6 +4,7 @@ import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.blaze3d.vertex.VertexConsumer;
 import com.mojang.renderpearl.api.vertex.VertexFormat;
 import com.teslicek.txoptimizations.DirectVertexBuffer;
+import com.teslicek.txoptimizations.GizmoLineList;
 import java.nio.ByteOrder;
 import java.util.List;
 import net.minecraft.client.renderer.feature.GizmoFeatureRenderer;
@@ -58,6 +59,9 @@ public abstract class GizmoLineIdentityPoseMixin extends RenderTypeFeatureRender
         if (lines.isEmpty())
             return;
 
+        if (!(lines instanceof GizmoLineList packed))
+            throw new IllegalStateException("Gizmo lines are not packed: " + lines.getClass().getName());
+
         if ((this.poseStack.last().pose().properties() & Matrix4fc.PROPERTY_IDENTITY) == 0)
             throw new IllegalStateException("Gizmo line pose is not the identity: " + this.poseStack.last().pose());
 
@@ -77,13 +81,15 @@ public abstract class GizmoLineIdentityPoseMixin extends RenderTypeFeatureRender
         int            width   = direct ? format.getElement(LINE_WIDTH).offset() : 0;
         int            origin  = direct ? format.getElement(POSITION).offset() : 0;
 
-        for (Line line : lines) {
-            float startX     = (float) (line.start().x() - camX);
-            float startY     = (float) (line.start().y() - camY);
-            float startZ     = (float) (line.start().z() - camZ);
-            float endX       = (float) (line.end().x() - camX);
-            float endY       = (float) (line.end().y() - camY);
-            float endZ       = (float) (line.end().z() - camZ);
+        for (int index = 0; index < packed.size(); index ++) {
+            float startX     = (float) (packed.coordinate(index, 0) - camX);
+            float startY     = (float) (packed.coordinate(index, 1) - camY);
+            float startZ     = (float) (packed.coordinate(index, 2) - camZ);
+            float endX       = (float) (packed.coordinate(index, 3) - camX);
+            float endY       = (float) (packed.coordinate(index, 4) - camY);
+            float endZ       = (float) (packed.coordinate(index, 5) - camZ);
+            int   lineColor  = packed.color(index);
+            float lineWidth  = packed.width(index);
             float startDepth = Math.fma(viewX, startX, Math.fma(viewY, startY, Math.fma(viewZ, startZ, viewW * 1.0F)));
             float endDepth   = Math.fma(viewX, endX, Math.fma(viewY, endY, Math.fma(viewZ, endZ, viewW * 1.0F)));
 
@@ -120,17 +126,17 @@ public abstract class GizmoLineIdentityPoseMixin extends RenderTypeFeatureRender
             float normalZ = endZ - startZ;
 
             if (!direct) {
-                builder.addVertex(startX, startY, startZ).setNormal(normalX, normalY, normalZ).setColor(line.color()).setLineWidth(line.width());
-                builder.addVertex(endX, endY, endZ).setNormal(normalX, normalY, normalZ).setColor(line.color()).setLineWidth(line.width());
+                builder.addVertex(startX, startY, startZ).setNormal(normalX, normalY, normalZ).setColor(lineColor).setLineWidth(lineWidth);
+                builder.addVertex(endX, endY, endZ).setNormal(normalX, normalY, normalZ).setColor(lineColor).setLineWidth(lineWidth);
                 continue;
             }
 
             long pointer = ((DirectVertexBuffer) builder).txoptimizations$reserveAfterLastVertex(LINE_VERTICES);
-            int  abgr    = ARGB.toABGR(line.color());
+            int  abgr    = ARGB.toABGR(lineColor);
 
-            txoptimizations$putVertex(pointer, origin, color, normal, width, startX, startY, startZ, abgr, normalX, normalY, normalZ, line.width());
+            txoptimizations$putVertex(pointer, origin, color, normal, width, startX, startY, startZ, abgr, normalX, normalY, normalZ, lineWidth);
             MemoryUtil.memCopy(pointer, pointer + stride, stride);
-            txoptimizations$putVertex(pointer + 2L * stride, origin, color, normal, width, endX, endY, endZ, abgr, normalX, normalY, normalZ, line.width());
+            txoptimizations$putVertex(pointer + 2L * stride, origin, color, normal, width, endX, endY, endZ, abgr, normalX, normalY, normalZ, lineWidth);
         }
     }
 
