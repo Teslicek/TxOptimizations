@@ -114,6 +114,7 @@
     "VulkanCommandEncoderSubmissionAccessor",
     "VulkanGpuBufferDirectMixin",
     "VulkanGpuBufferUnmapMixin",
+    "VulkanRenderPassBindSkipMixin",
     "VulkanRenderPassDescriptorReuseMixin",
     "VulkanRenderPassDynamicStateMixin",
     "VulkanRenderPassTexelViewMixin",

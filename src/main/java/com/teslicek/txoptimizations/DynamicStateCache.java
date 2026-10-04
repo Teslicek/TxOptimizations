@@ -11,6 +11,7 @@ public final class DynamicStateCache {
     private static int     scissorY;
     private static int     scissorWidth;
     private static int     scissorHeight;
+    private static long    pipeline;
 
     private DynamicStateCache() {
     }
@@ -19,6 +20,17 @@ public final class DynamicStateCache {
         commandBuffer = 0L;
         viewportSet   = false;
         scissorSet    = false;
+        pipeline      = 0L;
+    }
+
+    public static boolean changesPipeline(long buffer, long boundPipeline) {
+        if (buffer == commandBuffer && boundPipeline == pipeline)
+            return false;
+
+        track(buffer);
+        pipeline = boundPipeline;
+
+        return true;
     }
 
     public static boolean changesViewport(long buffer, float width, float height) {
@@ -54,5 +66,6 @@ public final class DynamicStateCache {
         commandBuffer = buffer;
         viewportSet   = false;
         scissorSet    = false;
+        pipeline      = 0L;
     }
 }
