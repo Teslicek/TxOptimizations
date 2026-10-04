@@ -8,6 +8,7 @@ import com.teslicek.txoptimizations.FramePath;
 import com.teslicek.txoptimizations.mixin.gpu.VulkanQueryPoolAccessor;
 import org.lwjgl.vulkan.VK12;
 import java.nio.file.Path;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.IdentityHashMap;
 import java.util.Locale;
@@ -40,6 +41,8 @@ public final class GpuPassProfiler {
     private static double                nanosPerTick;
     private static long                  terrainDraws;
     private static long                  terrainIndices;
+    private static long[]                frameTimes = new long[1 << 16];
+    private static int                   frameTimeCount;
 
     private GpuPassProfiler() {
     }
@@ -57,6 +60,7 @@ public final class GpuPassProfiler {
         terrainIndices = 0L;
         startNanos     = System.nanoTime();
         FramePath.resetCounts();
+        frameTimeCount = 0;
         CpuSampler.start(Thread.currentThread(), DURATION);
     }
 
@@ -66,6 +70,16 @@ public final class GpuPassProfiler {
 
     public static boolean isRecording() {
         return recording;
+    }
+
+    public static void recordFrameTime(long frameNanos) {
+        if (!recording)
+            return;
+
+        if (frameTimeCount == frameTimes.length)
+            frameTimes = Arrays.copyOf(frameTimes, frameTimes.length * 2);
+
+        frameTimes[frameTimeCount ++] = frameNanos;
     }
 
     public static void countTerrainDraws(int draws, long indices) {
@@ -210,6 +224,7 @@ public final class GpuPassProfiler {
 
         report.append(String.format(Locale.ROOT, "%d frames in %.1f s (%.0f fps), GPU %.3f ms per frame, GPU busy %.0f%% of the time%n", framesRead, seconds, framesRead / seconds, frameMs, gpuNanos / 1.0e7 / seconds));
         report.append(String.format(Locale.ROOT, "Present thread used for %.0f%% of frames%n", FramePath.workerShare() * 100.0));
+        report.append(frameTimeReport());
         report.append(String.format(Locale.ROOT, "Terrain %.0f draws and %.3f million triangles per frame%n", (double) terrainDraws / framesRead, terrainIndices / 3.0 / 1.0e6 / framesRead));
 
         PASSES.entrySet().stream()
@@ -217,6 +232,25 @@ public final class GpuPassProfiler {
             .forEach(entry -> report.append(String.format(Locale.ROOT, "%6.2f%%  %7.3f ms  %6.1fx  %s%n", entry.getValue().nanos * 100.0 / gpuNanos, entry.getValue().nanos / 1.0e6 / framesRead, (double) entry.getValue().calls / framesRead, entry.getKey())));
 
         return report.toString();
+    }
+
+    private static String frameTimeReport() {
+        if (frameTimeCount == 0)
+            throw new IllegalStateException("No frame times were recorded");
+
+        long[] sorted = Arrays.copyOf(frameTimes, frameTimeCount);
+        long   total  = 0L;
+
+        Arrays.sort(sorted);
+
+        for (long frame : sorted)
+            total += frame;
+
+        return String.format(Locale.ROOT, "Frame times: average %.0f fps, 1%% low %.0f fps, 0.1%% low %.0f fps, worst frame %.2f ms%n", frameTimeCount / (total / 1.0e9), 1.0e9 / percentile(sorted, 0.99), 1.0e9 / percentile(sorted, 0.999), sorted[sorted.length - 1] / 1.0e6);
+    }
+
+    private static long percentile(long[] sorted, double fraction) {
+        return sorted[Math.min(sorted.length - 1, (int) Math.ceil(sorted.length * fraction) - 1)];
     }
 
     private static final class Pass {

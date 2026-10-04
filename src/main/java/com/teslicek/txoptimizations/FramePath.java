@@ -1,5 +1,7 @@
 package com.teslicek.txoptimizations;
 
+import com.teslicek.txoptimizations.gpu.GpuPassProfiler;
+
 public final class FramePath {
 
     private static final long   PROBE_INTERVAL_NANOS = 5_000_000_000L;
@@ -64,6 +66,7 @@ public final class FramePath {
         long frameNanos = now - lastSubmit;
 
         lastSubmit = now;
+        GpuPassProfiler.recordFrameTime(frameNanos);
 
         if (!probing) {
             steadyNanos = steadyNanos == 0.0 ? frameNanos : steadyNanos + (frameNanos - steadyNanos) * STEADY_WEIGHT;
