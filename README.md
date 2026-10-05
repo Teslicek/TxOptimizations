@@ -482,9 +482,9 @@ A reload compiles every pipeline Minecraft registers while it prepares, but pipe
 
 The language reload read and parsed every language file on the render thread, about 9 ms in a CubeCraft reload. The files are now read and parsed while the reload prepares, and the render thread uses the result when the language and its fallback are still the same; if the language was changed during the reload, it reads the files as before.
 
-### Atlas upload views
+### Atlas upload
 
-To put each texture into its atlas, a reload uploads it to its own small GPU texture and draws that into the atlas once for every mipmap level. It created a new view of the whole small texture for every level, five identical views per texture with 4 mipmap levels, and creating views was the largest part of the 92 ms reload frame on CubeCraft. Each small texture now gets one view that is used for every level, which is the same view the draws sampled before.
+To put each texture into its atlas, a reload created a GPU texture for every sprite, uploaded every mipmap level of it, created five views of it and drew it into the atlas once per mipmap level, thousands of textures, uploads and draws that made up most of the reload frame on CubeCraft and 22 ms of GPU work the next frame waited for. That draw has no blending and samples the sprite with nearest filtering at texel centres, with the quad covering the sprite and its padding on whole texels (every sprite and its padding are a multiple of the mipmap step), so each atlas texel is the sprite texel at the same position, with the padding repeating the nearest edge texel. Each mipmap level of the atlas is now written that way into one staging buffer and copied to the atlas in one copy. Animated sprites are drawn as before.
 
 ### Memory
 
