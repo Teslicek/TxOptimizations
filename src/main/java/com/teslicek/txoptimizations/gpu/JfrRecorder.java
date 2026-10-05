@@ -17,6 +17,7 @@ import jdk.jfr.Recording;
 import jdk.jfr.consumer.RecordedEvent;
 import jdk.jfr.consumer.RecordedFrame;
 import jdk.jfr.consumer.RecordedMethod;
+import jdk.jfr.consumer.RecordedObject;
 import jdk.jfr.consumer.RecordingFile;
 
 final class JfrRecorder {
@@ -34,6 +35,7 @@ final class JfrRecorder {
     private static final String   GC_EVACUATION  = "jdk.EvacuationInformation";
     private static final String   GC_HEAP        = "jdk.G1HeapSummary";
     private static final String   BEFORE_GC      = "Before GC";
+    private static final String   OLD_OBJECT     = "jdk.OldObjectSample";
     private static final Duration WAIT_THRESHOLD = Duration.ofNanos(200_000L);
     private static final int      SITE_FRAMES    = 6;
     private static final int      WAIT_FRAMES    = 6;
@@ -41,6 +43,7 @@ final class JfrRecorder {
     private static final int      TOP_CLASSES    = 25;
     private static final int      TOP_EVENTS     = 15;
     private static final int      TOP_WORKERS    = 8;
+    private static final int      TOP_SURVIVORS  = 40;
 
     private static Recording recording;
     private static Instant   startTime;
@@ -67,6 +70,7 @@ final class JfrRecorder {
         started.enable(GC_WORKER).withThreshold(Duration.ZERO);
         started.enable(GC_EVACUATION);
         started.enable(GC_HEAP);
+        started.enable(OLD_OBJECT).with("cutoff", "0 ns").withStackTrace();
         started.start();
         recording    = started;
         startTime    = Instant.now();
@@ -90,7 +94,7 @@ final class JfrRecorder {
 
                 List<RecordedEvent> events = RecordingFile.readAllEvents(file);
 
-                return jvmReport(events) + gcReport(events) + allocationReport(events, seconds);
+                return jvmReport(events) + gcReport(events) + survivorReport(events) + allocationReport(events, seconds);
             } finally {
                 Files.delete(file);
                 finished.close();
@@ -221,6 +225,39 @@ final class JfrRecorder {
                 .limit(TOP_WORKERS)
                 .forEach(entry -> report.append(String.format(Locale.ROOT, "    %8.3f ms  slowest worker in %s%n", entry.getValue() / 1.0e6, entry.getKey())));
         });
+
+        return report.toString();
+    }
+
+    private static String survivorReport(List<RecordedEvent> events) {
+        Map<String, Long> counts  = new HashMap<>();
+        Map<String, Long> ages    = new HashMap<>();
+        Map<String, Long> sizes   = new HashMap<>();
+        int               samples = 0;
+
+        for (RecordedEvent event : events) {
+            if (!event.getEventType().getName().equals(OLD_OBJECT))
+                continue;
+
+            RecordedObject object = event.getValue("object");
+
+            if (object == null)
+                throw new IllegalStateException("Old object sample has no object: " + event);
+
+            String site = object.getClass("type").getName() + "  " + allocationSite(event);
+
+            counts.merge(site, 1L, Long::sum);
+            ages.merge(site, event.getDuration("objectAge").toNanos(), Long::sum);
+            sizes.merge(site, event.getLong("objectSize"), Long::sum);
+            samples ++;
+        }
+
+        StringBuilder report = new StringBuilder(String.format(Locale.ROOT, "%nObjects still alive when the profile ended (Flight Recorder old object samples, %d samples)%n", samples));
+
+        counts.entrySet().stream()
+            .sorted(Map.Entry.<String, Long>comparingByValue().reversed())
+            .limit(TOP_SURVIVORS)
+            .forEach(entry -> report.append(String.format(Locale.ROOT, "  %4dx  %6.2f s old on average  %9.1f KB sampled  %s%n", entry.getValue(), ages.get(entry.getKey()) / 1.0e9 / entry.getValue(), sizes.get(entry.getKey()) / 1024.0, entry.getKey())));
 
         return report.toString();
     }
