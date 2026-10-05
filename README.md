@@ -468,7 +468,7 @@ With RGSS texture filtering, Sodium's terrain shader takes four texture samples 
 
 ### Shader cache
 
-Every resource reload, including the one when a server sends its resource pack and the one when you leave that server, compiled all 385 shader stages from GLSL to SPIR-V again (1.7 s of worker time in a CubeCraft reload). Each compiled shader is now saved to `txoptimizations/spirv` under a SHA-256 of everything the compiler sees: the shader name, stage, source, defines, every shader include, the compiler flags for the GPU, and the Minecraft and LWJGL versions. The next reload with the same inputs reads the file instead of compiling, so the result is byte for byte what the compiler would produce, and any change to a shader or include compiles it again. Nothing is kept in memory.
+Every resource reload, including the one when a server sends its resource pack and the one when you leave that server, compiled the shaders of all 385 render pipelines from GLSL to SPIR-V again (the shader loader took 1.7 s of worker time in a CubeCraft reload, including creating the Vulkan pipelines). Each compiled shader is now saved to `txoptimizations/spirv` under a SHA-256 of everything the compiler sees: the shader name, stage, source, defines, every shader include, the compiler flags for the GPU, and the Minecraft and LWJGL versions. The next reload with the same inputs reads the file instead of compiling, so the result is byte for byte what the compiler would produce, and any change to a shader or include compiles it again. Nothing is kept in memory.
 
 ### Memory
 
