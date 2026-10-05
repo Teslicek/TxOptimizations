@@ -502,6 +502,10 @@ After a pipeline is built, each of its compiled shader modules frees its SPIR-V 
 
 Every reload unzipped and parsed the three Unifont files, more than 60,000 glyph lines read byte by byte, and font loading finished last in a CubeCraft reload because of it. The parsed font is never changed after loading and closing it does nothing, so a reload now reuses the one from the previous reload when the file's bytes have the same SHA-256 and the size overrides are equal; any other file is parsed as before. Only the fonts loaded by the latest reload are kept, and they are the ones the game is already using.
 
+### Duplicate sprite warnings
+
+To draw chests, shulker boxes, banners, decorated pots and bells in the chunk mesh, the mod adds their textures to the blocks atlas, and vanilla keeps them in their own atlases too, so every reload logged about 110 "Duplicate sprite" warnings on the render thread. The warning is no longer written for textures in the folders the mod's `assets/minecraft/atlases/blocks.json` adds when one of the two atlases is the blocks atlas; any other duplicate is logged as before.
+
 ### Missing texture warnings
 
 Model loading is the last part of a reload to finish, and its final step wrote a warning for every model with a missing texture, one after another on one thread, to the console and to latest.log. CubeCraft's resource pack has about 1,360 such models, so that step held up the end of every reload with its pack. The same warnings are now written by a background thread after the models are done, in the same order and with the same text.
