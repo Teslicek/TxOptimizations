@@ -23,12 +23,16 @@ public final class GpuPassProfiler {
     private static final int                 CAPACITY    = 4096;
     private static final long                DURATION    = 10_000_000_000L;
     private static final int                 CHAT_LINES  = 8;
+    private static final int                 SLOW_FRAMES = 10;
+    private static final int                 SLOW_PASSES = 4;
     private static final String              FRAME_END   = "frame end";
     private static final GpuQueryPool[]      POOLS       = new GpuQueryPool[SLOTS];
     private static final String[][]          LABELS      = new String[SLOTS][CAPACITY];
     private static final int[]               COUNTS      = new int[SLOTS];
     private static final Map<String, Pass>   PASSES      = new HashMap<>();
     private static final Map<Object, String> COPY_LABELS = new IdentityHashMap<>();
+    private static final long[]              SLOW_NANOS  = new long[SLOW_FRAMES];
+    private static final String[]            SLOW_TEXTS  = new String[SLOW_FRAMES];
 
     private static VulkanDevice          device;
     private static CommandEncoderBackend encoder;
@@ -60,6 +64,8 @@ public final class GpuPassProfiler {
         terrainDraws   = 0L;
         terrainIndices = 0L;
         startNanos     = System.nanoTime();
+        Arrays.fill(SLOW_NANOS, 0L);
+        Arrays.fill(SLOW_TEXTS, null);
         FramePath.resetCounts();
         frameTimeCount = 0;
         GcPauses.start();
@@ -198,9 +204,54 @@ public final class GpuPassProfiler {
             PASSES.computeIfAbsent(LABELS[frameSlot][index], label -> new Pass()).add(nanos(ticks[index + 1] - ticks[index]));
 
         resetQueries(device, POOLS[frameSlot], count);
+        recordSlowFrame(frameSlot, ticks, count, nanos(ticks[count - 1] - ticks[0]));
         gpuNanos          += nanos(ticks[count - 1] - ticks[0]);
         framesRead        ++;
         COUNTS[frameSlot]  = 0;
+    }
+
+    private static void recordSlowFrame(int frameSlot, long[] ticks, int count, long frameNanos) {
+        int fastest = 0;
+
+        for (int index = 1; index < SLOW_FRAMES; index ++) {
+            if (SLOW_NANOS[index] < SLOW_NANOS[fastest])
+                fastest = index;
+        }
+
+        if (frameNanos <= SLOW_NANOS[fastest])
+            return;
+
+        Map<String, Long> frame = new HashMap<>();
+
+        for (int index = 0; index + 1 < count; index ++)
+            frame.merge(LABELS[frameSlot][index], nanos(ticks[index + 1] - ticks[index]), Long::sum);
+
+        StringBuilder text = new StringBuilder();
+
+        frame.entrySet().stream()
+            .sorted((first, second) -> Long.compare(second.getValue(), first.getValue()))
+            .limit(SLOW_PASSES)
+            .forEach(entry -> text.append(String.format(Locale.ROOT, "%n            %7.3f ms  %s", entry.getValue() / 1.0e6, entry.getKey())));
+
+        SLOW_NANOS[fastest] = frameNanos;
+        SLOW_TEXTS[fastest] = String.format(Locale.ROOT, "%8.3f ms GPU at %.3f s", frameNanos / 1.0e6, (System.nanoTime() - startNanos) / 1.0e9) + text;
+    }
+
+    private static String slowFrameReport() {
+        StringBuilder report = new StringBuilder("Slowest GPU frames (read when their frame completed)" + System.lineSeparator());
+        Integer[]     order  = new Integer[SLOW_FRAMES];
+
+        for (int index = 0; index < SLOW_FRAMES; index ++)
+            order[index] = index;
+
+        Arrays.sort(order, (first, second) -> Long.compare(SLOW_NANOS[second], SLOW_NANOS[first]));
+
+        for (int index : order) {
+            if (SLOW_TEXTS[index] != null)
+                report.append(SLOW_TEXTS[index]).append(System.lineSeparator());
+        }
+
+        return report.append(System.lineSeparator()).toString();
     }
 
     private static long nanos(long ticks) {
@@ -237,6 +288,8 @@ public final class GpuPassProfiler {
         PASSES.entrySet().stream()
             .sorted((first, second) -> Long.compare(second.getValue().nanos, first.getValue().nanos))
             .forEach(entry -> report.append(String.format(Locale.ROOT, "%6.2f%%  %7.3f ms  %6.1fx  %s%n", entry.getValue().nanos * 100.0 / gpuNanos, entry.getValue().nanos / 1.0e6 / framesRead, (double) entry.getValue().calls / framesRead, entry.getKey())));
+
+        report.append(System.lineSeparator()).append(slowFrameReport());
 
         return report.toString();
     }
