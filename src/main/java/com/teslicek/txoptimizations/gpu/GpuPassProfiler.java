@@ -29,6 +29,7 @@ public final class GpuPassProfiler {
     private static final int                                 SLOW_PASSES     = 4;
     private static final long[]                              FRAME_LIMITS    = {1_000_000L, 2_000_000L, 4_000_000L, 8_000_000L, 16_000_000L};
     private static final String                              FRAME_END       = "frame end";
+    private static final String                              OVERFLOW        = "rest of a frame with more than " + (CAPACITY - 2) + " passes";
     private static final GpuQueryPool[]                      POOLS           = new GpuQueryPool[SLOTS];
     private static final String[][]                          LABELS          = new String[SLOTS][CAPACITY];
     private static final int[]                               COUNTS          = new int[SLOTS];
@@ -127,13 +128,17 @@ public final class GpuPassProfiler {
         if (POOLS[0] == null)
             openPools(frameDevice);
 
-        int index = COUNTS[slot];
+        int    index     = COUNTS[slot];
+        String passLabel = label;
 
-        if (index == CAPACITY)
-            throw new IllegalStateException("GPU profile recorded more than " + CAPACITY + " passes in one frame");
+        if (label != FRAME_END && index == CAPACITY - 1)
+            return;
+
+        if (label != FRAME_END && index == CAPACITY - 2)
+            passLabel = OVERFLOW;
 
         frameEncoder.writeTimestamp(POOLS[slot], index);
-        LABELS[slot][index] = label;
+        LABELS[slot][index] = passLabel;
         COUNTS[slot]        = index + 1;
     }
 
