@@ -426,6 +426,10 @@ Every GUI glyph described its textures with a new texture setup record: its glyp
 
 Every entity, item and text render type prepared for a frame asked its texture transform for a texture matrix, and the default transform built a new identity matrix each time (about 12 MB/s of garbage in a BedWars game). The matrix is only read, when the transform is written into the uniform buffer, and vanilla already shares one identity texture matrix for its other transform writes. Render types with the default transform now pass one shared identity matrix, so the same bytes reach the GPU. Glint and offset transforms still build theirs.
 
+### Item frame offset
+
+Every item frame built a new render offset vector twice per frame, once when its entity was placed and once when the frame was drawn (about 5 MB/s of garbage at a spawn full of map frames). The offset only depends on the direction the frame faces, so the six offsets are now built once with the same arithmetic and shared. A vector cannot be changed, so every caller reads the same values.
+
 ### Breaking overlay rotation
 
 The block breaking crack overlay computes its texture coordinates per vertex and called `Direction.getRotation()` for every vertex, which allocates a new quaternion and evaluates its sines and cosines (1.3% of the render thread in a CubeCraft lobby). The six rotations are now built once by that same method and reused. The overlay only reads them, so every vertex gets the same values.

@@ -69,6 +69,7 @@
     "GuiGraphicsExtractorMapAtlasMixin",
     "GuiRendererAnimatedItemAtlasMixin",
     "HudFpsCounterMixin",
+    "ItemFrameRenderOffsetMixin",
     "ItemLayerRenderStateAccessor",
     "ItemStackRenderStateBoundsMixin",
     "LayerLightSectionStorageSnapshotMixin",
