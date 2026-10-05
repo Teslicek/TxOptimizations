@@ -97,7 +97,6 @@
     "MinecraftPresentThreadMixin",
     "MinecraftGlowSpectatorCacheMixin",
     "MinecraftRenderThreadStackMixin",
-    "ModelPartChildrenMixin",
     "ModelPartIdentityMixin",
     "ModelRenderTypeCacheMixin",
     "ModelResetPoseMixin",

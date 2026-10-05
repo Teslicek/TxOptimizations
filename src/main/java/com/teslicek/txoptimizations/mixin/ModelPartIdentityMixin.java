@@ -2,7 +2,9 @@ package com.teslicek.txoptimizations.mixin;
 
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.blaze3d.vertex.VertexConsumer;
+import com.teslicek.txoptimizations.ArrayMapValues;
 import com.teslicek.txoptimizations.SodiumCuboids;
+import it.unimi.dsi.fastutil.objects.Object2ObjectArrayMap;
 import java.util.List;
 import java.util.Map;
 import net.caffeinemc.mods.sodium.api.util.ColorARGB;
@@ -94,8 +96,16 @@ public abstract class ModelPartIdentityMixin {
         if (!this.skipDraw)
             this.compile(poseStack.last(), buffer, lightCoords, overlayCoords, color);
 
-        for (ModelPart child : this.children.values())
-            child.render(poseStack, buffer, lightCoords, overlayCoords, color);
+        if (this.children instanceof Object2ObjectArrayMap<String, ModelPart> arrayMap) {
+            Object[] parts = ArrayMapValues.values(arrayMap);
+            int      size  = ArrayMapValues.size(arrayMap);
+
+            for (int index = 0; index < size; index ++)
+                ((ModelPart) parts[index]).render(poseStack, buffer, lightCoords, overlayCoords, color);
+        } else {
+            for (ModelPart child : this.children.values())
+                child.render(poseStack, buffer, lightCoords, overlayCoords, color);
+        }
 
         if (transformed)
             poseStack.popPose();
