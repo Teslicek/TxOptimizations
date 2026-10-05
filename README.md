@@ -400,6 +400,8 @@ Every sound the game plays asks the sound thread for an audio channel and waits 
 
 For every chunk region it draws, Sodium writes the region's camera offset, age and id into 20 bytes of stack memory and pushes them to the shader. Taking those bytes from the memory stack wrapped them in a new `ByteBuffer` each time (about 20 MB/s of garbage in a singleplayer world at render distance 32). The push constants are copied into the command buffer when they are pushed, so one buffer is now reused for every region and receives the same bytes.
 
+On Java 25 and newer, LWJGL makes every native call through the Foreign Function API and wraps the function's address in a new `MemorySegment` on each call. The JIT usually removes that wrapper, but on the push constant path it did not, which left 2.8 to 4.1 MB/s of garbage in `/txprofile` on LifestealSMP. Push constants now call the same `vkCmdPushConstants` function from the device's function table with the same arguments, through a downcall that keeps one segment for that address and replaces it only if the address changes.
+
 ### Light snapshots
 
 The light engine keeps one map of light sections it updates and publishes a read-only snapshot of it for every other thread. Every time lighting changed, vanilla published a full copy of the whole map. At render distance 32 that map holds around 100,000 sections, so each copy allocated arrays of several MB on the render thread and on every server worker thread. While moving, `/txprofile` showed most garbage collections forced by these huge arrays, each pausing the game for 8 to 10 ms.
