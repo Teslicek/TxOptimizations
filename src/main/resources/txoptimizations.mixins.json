@@ -118,6 +118,8 @@
     "RenderRegionSpriteMarkMixin",
     "RenderRegionPassArrayMixin",
     "ReloadableResourceManagerProfileMixin",
+    "SimpleReloadInstanceTimelineMixin",
+    "ProfiledReloadInstanceTimelineMixin",
     "FontManagerPreparationAccessor",
     "PipelineCacheAccessor",
     "RenderSystemPipelineCacheAccessor",
