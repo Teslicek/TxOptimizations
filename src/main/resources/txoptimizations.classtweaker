@@ -63,3 +63,7 @@ accessible class com/mojang/renderpearl/backend/vulkan/VulkanQueue$Submission$Su
 
 # Render type texture list reuse
 accessible class net/minecraft/client/renderer/rendertype/RenderSetup$TextureBinding
+
+# Light snapshot overlay
+accessible class net/minecraft/world/level/lighting/SkyLightSectionStorage$SkyDataLayerStorageMap
+accessible class net/minecraft/world/level/lighting/BlockLightSectionStorage$BlockDataLayerStorageMap

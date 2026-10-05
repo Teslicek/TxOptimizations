@@ -396,6 +396,12 @@ Every sound the game plays asks the sound thread for an audio channel and waits 
 
 For every chunk region it draws, Sodium writes the region's camera offset, age and id into 20 bytes of stack memory and pushes them to the shader. Taking those bytes from the memory stack wrapped them in a new `ByteBuffer` each time (about 20 MB/s of garbage in a singleplayer world at render distance 32). The push constants are copied into the command buffer when they are pushed, so one buffer is now reused for every region and receives the same bytes.
 
+### Light snapshots
+
+The light engine keeps one map of light sections it updates and publishes a read-only snapshot of it for every other thread. Every time lighting changed, vanilla published a full copy of the whole map. At render distance 32 that map holds around 100,000 sections, so each copy allocated arrays of several MB on the render thread and on every server worker thread. While moving, `/txprofile` showed most garbage collections forced by these huge arrays, each pausing the game for 8 to 10 ms.
+
+A snapshot is now the last full copy plus a small map of the sections that changed since it, taken from the light engine's own record of changed sections. Lookups check the small map first and then the full copy, so every lookup returns exactly what a full copy would. Nothing ever modifies a published full copy or a published change map. Once the changes since the last full copy exceed an eighth of the sections (at least 512), the next snapshot is a full copy again, the same way vanilla makes it, and becomes the new base.
+
 ### Breaking overlay rotation
 
 The block breaking crack overlay computes its texture coordinates per vertex and called `Direction.getRotation()` for every vertex, which allocates a new quaternion and evaluates its sines and cosines (1.3% of the render thread in a CubeCraft lobby). The six rotations are now built once by that same method and reused. The overlay only reads them, so every vertex gets the same values.
