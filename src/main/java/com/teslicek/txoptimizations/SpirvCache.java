@@ -52,7 +52,7 @@ public final class SpirvCache {
     public static Path file(boolean zeroToOne, boolean drawParameters, String name, String source, ShaderType type, ShaderDefines defines, ShaderManager.Configs configs) {
         MessageDigest digest = sha256();
 
-        update(digest, "txoptimizations-spirv-2");
+        update(digest, "txoptimizations-spirv-3");
         update(digest, FabricLoader.getInstance().getModContainer("minecraft").orElseThrow().getMetadata().getVersion().getFriendlyString());
         update(digest, Version.getVersion());
         update(digest, Boolean.toString(zeroToOne));
@@ -72,9 +72,10 @@ public final class SpirvCache {
         for (String flag : defines.flags())
             update(digest, flag);
 
-        digest.update(includesDigest(configs));
+        String shader   = HexFormat.of().formatHex(digest.digest(), 0, 16);
+        String includes = HexFormat.of().formatHex(includesDigest(configs), 0, 16);
 
-        return Minecraft.getInstance().gameDirectory.toPath().resolve(DIRECTORY).resolve(HexFormat.of().formatHex(digest.digest()) + ".spv");
+        return Minecraft.getInstance().gameDirectory.toPath().resolve(DIRECTORY).resolve(shader + "-" + includes + ".spv");
     }
 
     public static SpvModule load(Path file, ShaderType type, Supplier<SpvModule> compile) {
