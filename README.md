@@ -336,6 +336,8 @@ Before drawing its layers, every armor stand set up its full pose and then asked
 
 Sodium transformed all six face normals of an entity cuboid every time the normal matrix changed (1% of the render thread in singleplayer). Opposite faces use exactly the negated matrix column, so their packed normals are the byte-wise negation of each other. Only the up, south and east normals are transformed now, and down, north and west are flipped from them, which gives the same bytes (checked on 40 million matrices including NaN, infinities and signed zeros).
 
+Item and block model quads transformed their face normal again for every quad, although an item model repeats the same few normals across all its quads under one pose (2.8% of the render thread with many items in view). The render thread now keeps the last 8 transformed normals for the current normal matrix, and drops them as soon as any of the matrix's nine values or its trusted-normals flag differs bit for bit, so every quad gets exactly the value Sodium's transform would compute.
+
 ### Collision cursor
 
 Block collision scans (particles moving near blocks, the player's suffocation check) walked their cells by splitting a running index with two divisions and two remainders per cell. The cursor now steps x, then y, then z with counters, which visits the same cells in the same order (checked against the division form on every box up to 12 by 12 by 12).

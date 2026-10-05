@@ -3,6 +3,7 @@ package com.teslicek.txoptimizations.mixin;
 import com.mojang.blaze3d.vertex.PoseStack.Pose;
 import com.mojang.blaze3d.vertex.QuadInstance;
 import com.teslicek.txoptimizations.DirectVertexBuffer;
+import com.teslicek.txoptimizations.NormalCache;
 import net.caffeinemc.mods.sodium.api.math.MatrixHelper;
 import net.caffeinemc.mods.sodium.api.util.ColorARGB;
 import net.caffeinemc.mods.sodium.api.util.ColorMixer;
@@ -49,10 +50,14 @@ public abstract class BakedModelEncoderNormalMixin {
         Matrix3f matNormal       = matrices.normal();
         Matrix4f matPosition     = matrices.pose();
         boolean  trustedNormals  = ((PoseAccessor) (Object) matrices).txoptimizations$trustedNormals();
+        boolean  cached          = NormalCache.usable();
         int      lastNormal      = 0;
         int      lastTransformed = 0;
         boolean  hasNormal       = false;
         long     ptr             = buffer;
+
+        if (cached)
+            NormalCache.select(matNormal, trustedNormals);
 
         for (int i = 0; i < VERTICES; i ++) {
             float x        = quad.getX(i);
@@ -68,7 +73,7 @@ public abstract class BakedModelEncoderNormalMixin {
 
             if (!hasNormal || normal != lastNormal) {
                 lastNormal      = normal;
-                lastTransformed = MatrixHelper.transformNormal(matNormal, trustedNormals, normal);
+                lastTransformed = cached ? NormalCache.transform(matNormal, normal) : MatrixHelper.transformNormal(matNormal, trustedNormals, normal);
                 hasNormal       = true;
             }
 
