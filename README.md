@@ -474,6 +474,14 @@ When a reload finished, the render thread went through every codepoint of every 
 
 Every resource reload closed the OpenAL audio device and opened it again, which took 52 ms of the 101 ms the render thread was blocked in a CubeCraft resource pack reload. The reload still stops every sound, frees every sound buffer and channel and loads the sounds again, but the device and its context stay open when the reopen would pick the same device: the sound device option, the directional audio option and the list of system audio devices are unchanged and the device is still connected. If any of them changed, the device is closed and opened as before.
 
+### Shaders compiled on first use
+
+A reload compiles every pipeline Minecraft registers while it prepares, but pipelines that mods create themselves, like Sodium's terrain pipelines, were only compiled the first time they were drawn after the reload, and the render thread waited about 18 ms for them in a CubeCraft reload. A reload now also compiles, while it prepares, every pipeline that was compiled on first use since the last reload, with the same shaders, and adds it to the new pipeline cache. A pipeline that fails to compile is left out and compiled on first use as before.
+
+### Language files on reload
+
+The language reload read and parsed every language file on the render thread, about 9 ms in a CubeCraft reload. The files are now read and parsed while the reload prepares, and the render thread uses the result when the language and its fallback are still the same; if the language was changed during the reload, it reads the files as before.
+
 ### Memory
 
 Less live memory means shorter and rarer garbage collections.
