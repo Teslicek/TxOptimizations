@@ -482,6 +482,10 @@ A reload compiles every pipeline Minecraft registers while it prepares, but pipe
 
 The language reload read and parsed every language file on the render thread, about 9 ms in a CubeCraft reload. The files are now read and parsed while the reload prepares, and the render thread uses the result when the language and its fallback are still the same; if the language was changed during the reload, it reads the files as before.
 
+### Atlas upload views
+
+To put each texture into its atlas, a reload uploads it to its own small GPU texture and draws that into the atlas once for every mipmap level. It created a new view of the whole small texture for every level, five identical views per texture with 4 mipmap levels, and creating views was the largest part of the 92 ms reload frame on CubeCraft. Each small texture now gets one view that is used for every level, which is the same view the draws sampled before.
+
 ### Memory
 
 Less live memory means shorter and rarer garbage collections.

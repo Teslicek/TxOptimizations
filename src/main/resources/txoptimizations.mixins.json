@@ -153,6 +153,7 @@
     "StagedVertexBufferDrawAccessor",
     "TextFeatureRendererLayoutCacheMixin",
     "TextureAtlasSpriteMarkMixin",
+    "TextureAtlasScratchViewMixin",
     "TextureSetupLightmapCacheMixin",
     "TranslatableTemplateCacheMixin",
     "TreeAccessor",
