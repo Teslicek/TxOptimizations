@@ -3,6 +3,7 @@ package com.teslicek.txoptimizations.mixin;
 import com.llamalad7.mixinextras.injector.ModifyReturnValue;
 import com.llamalad7.mixinextras.sugar.Local;
 import com.teslicek.txoptimizations.FontSelection;
+import com.teslicek.txoptimizations.ReloadTimeline;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executor;
@@ -26,10 +27,14 @@ public abstract class FontManagerSelectionMixin {
 
     @ModifyReturnValue(method = "prepare", at = @At("RETURN"))
     private CompletableFuture<?> txoptimizations$selectProvidersOffThread(CompletableFuture<?> preparation, @Local(argsOnly = true) Executor executor) {
-        return preparation.thenApplyAsync(prepared -> {
-            FontSelection.prepare(((FontManagerPreparationAccessor) prepared).txoptimizations$fontSets(), getFontOptions(Minecraft.getInstance().options));
+        return preparation.thenComposeAsync(prepared -> {
+            ReloadTimeline.mark("fonts: providers loaded");
 
-            return prepared;
+            return FontSelection.prepare(((FontManagerPreparationAccessor) prepared).txoptimizations$fontSets(), getFontOptions(Minecraft.getInstance().options), executor).thenApply(selected -> {
+                ReloadTimeline.mark("fonts: providers selected");
+
+                return prepared;
+            });
         }, executor);
     }
 

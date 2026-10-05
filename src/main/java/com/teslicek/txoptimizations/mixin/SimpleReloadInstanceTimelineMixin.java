@@ -3,29 +3,21 @@ package com.teslicek.txoptimizations.mixin;
 import com.llamalad7.mixinextras.injector.ModifyReturnValue;
 import com.llamalad7.mixinextras.sugar.Local;
 import com.teslicek.txoptimizations.ReloadTimeline;
-import com.teslicek.txoptimizations.ReloadTimelineHolder;
-import java.util.Map;
 import net.minecraft.server.packs.resources.PreparableReloadListener;
 import net.minecraft.server.packs.resources.ProfiledReloadInstance;
 import net.minecraft.server.packs.resources.SimpleReloadInstance;
 import org.spongepowered.asm.mixin.Mixin;
-import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 @Mixin(SimpleReloadInstance.class)
-public abstract class SimpleReloadInstanceTimelineMixin implements ReloadTimelineHolder {
-
-    @Unique
-    private long txoptimizations$startNanos;
-
-    @Unique
-    private final Map<String, Long> txoptimizations$preparedTimes = ReloadTimeline.newTimes();
+public abstract class SimpleReloadInstanceTimelineMixin {
 
     @Inject(method = "<init>", at = @At("RETURN"))
     private void txoptimizations$startTimeline(CallbackInfo ci) {
-        this.txoptimizations$startNanos = System.nanoTime();
+        if ((Object) this instanceof ProfiledReloadInstance)
+            ReloadTimeline.begin();
     }
 
     @ModifyReturnValue(method = "createBarrierForListener", at = @At("RETURN"))
@@ -33,11 +25,6 @@ public abstract class SimpleReloadInstanceTimelineMixin implements ReloadTimelin
         if (!((Object) this instanceof ProfiledReloadInstance))
             return barrier;
 
-        return new ReloadTimeline(barrier, listener.getName(), this.txoptimizations$startNanos, this.txoptimizations$preparedTimes);
-    }
-
-    @Override
-    public Map<String, Long> txoptimizations$preparedTimes() {
-        return this.txoptimizations$preparedTimes;
+        return new ReloadTimeline(barrier, listener.getName());
     }
 }

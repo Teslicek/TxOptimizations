@@ -1,7 +1,6 @@
 package com.teslicek.txoptimizations.mixin;
 
 import com.teslicek.txoptimizations.ReloadTimeline;
-import com.teslicek.txoptimizations.ReloadTimelineHolder;
 import java.util.List;
 import net.minecraft.server.packs.resources.ProfiledReloadInstance;
 import org.spongepowered.asm.mixin.Mixin;
@@ -14,6 +13,6 @@ public abstract class ProfiledReloadInstanceTimelineMixin {
 
     @Inject(method = "finish", at = @At("HEAD"))
     private void txoptimizations$logTimeline(List<ProfiledReloadInstance.State> result, CallbackInfoReturnable<List<ProfiledReloadInstance.State>> cir) {
-        ReloadTimeline.log(((ReloadTimelineHolder) (Object) this).txoptimizations$preparedTimes());
+        ReloadTimeline.finish();
     }
 }

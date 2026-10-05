@@ -12,32 +12,47 @@ public final class ReloadTimeline implements PreparableReloadListener.Preparatio
 
     private static final Logger LOGGER = LogUtils.getLogger();
 
+    private static volatile Map<String, Long> times;
+    private static volatile long              startNanos;
+
     private final PreparableReloadListener.PreparationBarrier barrier;
     private final String                                      name;
-    private final long                                        startNanos;
-    private final Map<String, Long>                           prepared;
 
-    public ReloadTimeline(PreparableReloadListener.PreparationBarrier barrier, String name, long startNanos, Map<String, Long> prepared) {
-        this.barrier    = barrier;
-        this.name       = name;
-        this.startNanos = startNanos;
-        this.prepared   = prepared;
+    public ReloadTimeline(PreparableReloadListener.PreparationBarrier barrier, String name) {
+        this.barrier = barrier;
+        this.name    = name;
     }
 
     @Override
     public <T> CompletableFuture<T> wait(T value) {
-        this.prepared.put(this.name, System.nanoTime() - this.startNanos);
+        mark(this.name);
 
         return this.barrier.wait(value);
     }
 
-    public static Map<String, Long> newTimes() {
-        return new ConcurrentHashMap<>();
+    public static void begin() {
+        startNanos = System.nanoTime();
+        times      = new ConcurrentHashMap<>();
     }
 
-    public static void log(Map<String, Long> prepared) {
+    public static void mark(String name) {
+        Map<String, Long> current = times;
+
+        if (current == null)
+            return;
+
+        current.put(name, System.nanoTime() - startNanos);
+    }
+
+    public static void finish() {
+        Map<String, Long> current = times;
+
+        if (current == null)
+            throw new IllegalStateException("A profiled reload finished without a timeline");
+
+        times = null;
         LOGGER.info("Reload preparation finished, in order:");
-        prepared.entrySet().stream()
+        current.entrySet().stream()
             .sorted(Map.Entry.comparingByValue())
             .forEach(entry -> LOGGER.info("  {} ms  {}", TimeUnit.NANOSECONDS.toMillis(entry.getValue()), entry.getKey()));
     }
