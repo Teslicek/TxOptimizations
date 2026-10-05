@@ -318,7 +318,7 @@ Sodium's cull thread rebuilds three section trees every frame the camera changes
 
 ### Entity check order
 
-Sodium wraps every entity renderer's visibility check and runs its own section test first, which reads the entity's glowing flag, builds its culling box and walks the section tree, and only then lets vanilla reject the entity by distance and frustum. On servers that cost about 2% of the render thread, mostly spent on entities behind the camera. Both checks are side-effect free, so the entity pass now asks vanilla first and runs Sodium's test only for entities vanilla would draw. Renderers that override the check (shulkers, guardians, end crystals and any modded override) keep the original order.
+Sodium wraps every entity renderer's visibility check and runs its own section test first, which reads the entity's glowing flag, builds its culling box and walks the section tree, and only then lets vanilla reject the entity by distance and frustum. On servers that cost about 2% of the render thread, mostly spent on entities behind the camera. Both checks are side-effect free, so Sodium's wrapper is turned off and the same section test now runs at the end of vanilla's check, only for entities vanilla would draw. Renderers that override the check (shulkers, guardians, end crystals and any modded override) still get it through their call to vanilla's check, so their own extra conditions see the same result as before. Sodium's wrapper also passed the camera position and partial tick through a boxed argument array on every call, three `Double`s, a `Float` and an `Object[]` per entity per frame (40 MB/s at the LifestealSMP spawn, 52 MB/s in a BedWars game). The new check takes them as plain values.
 
 ### Model pose reset
 
@@ -387,10 +387,6 @@ Every block entity in view allocated a vector for its center to check whether it
 ### Render type textures
 
 Every time an entity, item or text render type was prepared for a frame, it built a new list of its textures (overlay, lightmap and each bound texture with its sampler), allocating the list and one record per texture. Each render type now keeps the list it built last and returns it again when every entry would be the same: same name, same texture view object and same sampler object, looked up the same way and in the same order as before. Any change, such as a reloaded texture or a different lightmap, builds a new list.
-
-### Entity cull order check
-
-Deciding whether an entity's culling can be deferred to Sodium looked up the renderer's class in a class-keyed table for every entity every frame (1.3% of the render thread in a world full of entities). Each renderer now remembers the answer itself after the first lookup, since a renderer's class never changes.
 
 ### Sound channel wait
 

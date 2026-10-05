@@ -1,15 +1,12 @@
 package com.teslicek.txoptimizations.mixin;
 
 import com.teslicek.txoptimizations.ClientClock;
-import com.teslicek.txoptimizations.EntityCullOrder;
 import com.teslicek.txoptimizations.EntityVisibilityMemo;
 import com.teslicek.txoptimizations.bake.Baking;
-import net.caffeinemc.mods.sodium.client.render.SodiumWorldRenderer;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.client.renderer.LevelRenderer;
 import net.minecraft.client.renderer.culling.Frustum;
-import net.minecraft.client.renderer.entity.EntityRenderer;
 import net.minecraft.client.renderer.extract.LevelExtractor;
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.entity.Entity;
@@ -72,28 +69,12 @@ public abstract class LevelExtractorEntityVisibilityMixin {
         if (this.level == null)
             return false;
 
-        if (!txoptimizations$shouldRender(this.levelRenderer.entityRenderDispatcher().getRenderer(entity), entity, frustum, camX, camY, camZ, partialTicks) && (this.minecraft.player == null || !entity.hasIndirectPassenger(this.minecraft.player)))
+        if (!this.levelRenderer.entityRenderDispatcher().getRenderer(entity).shouldRender(entity, frustum, camX, camY, camZ, partialTicks) && (this.minecraft.player == null || !entity.hasIndirectPassenger(this.minecraft.player)))
             return false;
 
         BlockPos blockPos = entity.blockPosition();
 
         return this.level.isOutsideBuildHeight(blockPos.getY()) || this.levelRenderer.isSectionCompiledAndVisible(blockPos, chunkFadeDuration);
-    }
-
-    @Unique
-    private static <T extends Entity> boolean txoptimizations$shouldRender(EntityRenderer<? super T, ?> renderer, T entity, Frustum frustum, double camX, double camY, double camZ, float partialTicks) {
-        SodiumWorldRenderer sodium = SodiumWorldRenderer.instanceNullable();
-
-        if (sodium == null || !EntityCullOrder.canDefer(renderer))
-            return renderer.shouldRender(entity, frustum, camX, camY, camZ, partialTicks);
-
-        EntityCullOrder.setDeferring(true);
-
-        boolean shown = renderer.shouldRender(entity, frustum, camX, camY, camZ, partialTicks);
-
-        EntityCullOrder.setDeferring(false);
-
-        return shown && sodium.isEntityVisible((EntityRenderer<T, ?>) renderer, entity, partialTicks);
     }
 
     @Unique

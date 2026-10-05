@@ -27,6 +27,11 @@
     ]
   },
   "accessWidener": "txoptimizations.classtweaker",
+  "custom": {
+    "sodium:options": {
+      "mixin.features.render.entity.cull": false
+    }
+  },
   "breaks": {
     "immediatelyfast": "*",
     "obe": "*",
