@@ -12,6 +12,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.TreeMap;
 import jdk.jfr.Recording;
 import jdk.jfr.consumer.RecordedEvent;
 import jdk.jfr.consumer.RecordedFrame;
@@ -27,12 +28,19 @@ final class JfrRecorder {
     private static final String   PARK           = "jdk.ThreadPark";
     private static final String   MONITOR        = "jdk.JavaMonitorEnter";
     private static final String   VM_OPERATION   = "jdk.ExecuteVMOperation";
+    private static final String   GC_PAUSE       = "jdk.GCPhasePause";
+    private static final String   GC_PHASE       = "jdk.GCPhasePauseLevel1";
+    private static final String   GC_WORKER      = "jdk.GCPhaseParallel";
+    private static final String   GC_EVACUATION  = "jdk.EvacuationInformation";
+    private static final String   GC_HEAP        = "jdk.G1HeapSummary";
+    private static final String   BEFORE_GC      = "Before GC";
     private static final Duration WAIT_THRESHOLD = Duration.ofNanos(200_000L);
     private static final int      SITE_FRAMES    = 6;
     private static final int      WAIT_FRAMES    = 6;
     private static final int      TOP_SITES      = 60;
     private static final int      TOP_CLASSES    = 25;
     private static final int      TOP_EVENTS     = 15;
+    private static final int      TOP_WORKERS    = 8;
 
     private static Recording recording;
     private static Instant   startTime;
@@ -54,6 +62,11 @@ final class JfrRecorder {
         started.enable(PARK).withThreshold(WAIT_THRESHOLD).withStackTrace();
         started.enable(MONITOR).withThreshold(WAIT_THRESHOLD).withStackTrace();
         started.enable(VM_OPERATION).withThreshold(Duration.ZERO);
+        started.enable(GC_PAUSE).withThreshold(Duration.ZERO);
+        started.enable(GC_PHASE).withThreshold(Duration.ZERO);
+        started.enable(GC_WORKER).withThreshold(Duration.ZERO);
+        started.enable(GC_EVACUATION);
+        started.enable(GC_HEAP);
         started.start();
         recording    = started;
         startTime    = Instant.now();
@@ -77,7 +90,7 @@ final class JfrRecorder {
 
                 List<RecordedEvent> events = RecordingFile.readAllEvents(file);
 
-                return jvmReport(events) + allocationReport(events, seconds);
+                return jvmReport(events) + gcReport(events) + allocationReport(events, seconds);
             } finally {
                 Files.delete(file);
                 finished.close();
@@ -158,6 +171,62 @@ final class JfrRecorder {
             .forEach(entry -> report.append(String.format(Locale.ROOT, "  %8.3f ms  %5dx  %s%n", entry.getValue() / 1.0e6, waitCounts.get(entry.getKey()), entry.getKey())));
 
         return report.toString();
+    }
+
+    private static String gcReport(List<RecordedEvent> events) {
+        Map<Integer, RecordedEvent>       pauses      = new TreeMap<>();
+        Map<Integer, List<RecordedEvent>> phases      = new HashMap<>();
+        Map<Integer, Map<String, Long>>   workers     = new HashMap<>();
+        Map<Integer, RecordedEvent>       evacuations = new HashMap<>();
+        Map<Integer, RecordedEvent>       heapBefore  = new HashMap<>();
+        Map<Integer, RecordedEvent>       heapAfter   = new HashMap<>();
+
+        for (RecordedEvent event : events) {
+            switch (event.getEventType().getName()) {
+                case GC_PAUSE -> pauses.put(event.getInt("gcId"), event);
+                case GC_PHASE -> phases.computeIfAbsent(event.getInt("gcId"), ignored -> new ArrayList<>()).add(event);
+                case GC_WORKER -> workers.computeIfAbsent(event.getInt("gcId"), ignored -> new HashMap<>()).merge(event.getString("name"), event.getDuration().toNanos(), Math::max);
+                case GC_EVACUATION -> evacuations.put(event.getInt("gcId"), event);
+                case GC_HEAP -> (BEFORE_GC.equals(event.getString("when")) ? heapBefore : heapAfter).put(event.getInt("gcId"), event);
+                default -> {
+                }
+            }
+        }
+
+        StringBuilder report = new StringBuilder(String.format(Locale.ROOT, "%nGarbage collection pauses (G1 phases, sizes in MB)%n"));
+
+        if (pauses.isEmpty())
+            report.append(String.format(Locale.ROOT, "  none%n"));
+
+        pauses.forEach((gcId, pause) -> {
+            report.append(String.format(Locale.ROOT, "  gc %d at %.3f s: %s, %.3f ms%n", gcId, seconds(pause), pause.getString("name"), millis(pause)));
+
+            RecordedEvent before = heapBefore.get(gcId);
+            RecordedEvent after  = heapAfter.get(gcId);
+
+            if (before != null && after != null)
+                report.append(String.format(Locale.ROOT, "    eden %.1f -> %.1f, survivors %.1f -> %.1f, old %.1f -> %.1f, regions %d%n", megabytes(before, "edenUsedSize"), megabytes(after, "edenUsedSize"), megabytes(before, "survivorUsedSize"), megabytes(after, "survivorUsedSize"), megabytes(before, "oldGenUsedSize"), megabytes(after, "oldGenUsedSize"), after.getInt("numberOfRegions")));
+
+            RecordedEvent evacuation = evacuations.get(gcId);
+
+            if (evacuation != null)
+                report.append(String.format(Locale.ROOT, "    collection set %d regions, %.1f MB used, %.2f MB copied, %d regions freed%n", evacuation.getInt("cSetRegions"), megabytes(evacuation, "cSetUsedBefore"), megabytes(evacuation, "bytesCopied"), evacuation.getInt("regionsFreed")));
+
+            phases.getOrDefault(gcId, List.of()).stream()
+                .sorted(Comparator.comparing(RecordedEvent::getDuration, Comparator.reverseOrder()))
+                .forEach(phase -> report.append(String.format(Locale.ROOT, "    %8.3f ms  %s%n", millis(phase), phase.getString("name"))));
+
+            workers.getOrDefault(gcId, Map.of()).entrySet().stream()
+                .sorted(Map.Entry.<String, Long>comparingByValue().reversed())
+                .limit(TOP_WORKERS)
+                .forEach(entry -> report.append(String.format(Locale.ROOT, "    %8.3f ms  slowest worker in %s%n", entry.getValue() / 1.0e6, entry.getKey())));
+        });
+
+        return report.toString();
+    }
+
+    private static double megabytes(RecordedEvent event, String field) {
+        return event.getLong(field) / 1048576.0;
     }
 
     private static String allocationReport(List<RecordedEvent> events, double seconds) {
