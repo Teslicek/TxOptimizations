@@ -392,6 +392,10 @@ Deciding whether an entity's culling can be deferred to Sodium looked up the ren
 
 Every sound the game plays asks the sound thread for an audio channel and waits for the answer on the render thread. The wait parked the render thread, so on top of the sound thread's own wake-up it also had to be woken by the operating system again, 0.3 to 0.5 ms per sound in `/txprofile`. The render thread now spins until the channel arrives and then takes it the same way, so the same channel is used at the same point, without the second wake-up.
 
+### Terrain push constants
+
+For every chunk region it draws, Sodium writes the region's camera offset, age and id into 20 bytes of stack memory and pushes them to the shader. Taking those bytes from the memory stack wrapped them in a new `ByteBuffer` each time (about 20 MB/s of garbage in a singleplayer world at render distance 32). The push constants are copied into the command buffer when they are pushed, so one buffer is now reused for every region and receives the same bytes.
+
 ### Breaking overlay rotation
 
 The block breaking crack overlay computes its texture coordinates per vertex and called `Direction.getRotation()` for every vertex, which allocates a new quaternion and evaluates its sines and cosines (1.3% of the render thread in a CubeCraft lobby). The six rotations are now built once by that same method and reused. The overlay only reads them, so every vertex gets the same values.

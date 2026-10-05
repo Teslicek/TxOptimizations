@@ -30,6 +30,7 @@
     "CursorCounterMixin",
     "DataLayerUniformMixin",
     "DecalRotationCacheMixin",
+    "DefaultChunkRendererPushConstantMixin",
     "DrawableGizmoGroupLinesMixin",
     "DrawableGizmoPrimitivesPackedMixin",
     "DebugScreenEntryListLookupMixin",
