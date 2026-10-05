@@ -140,6 +140,7 @@
     "ShapeOutlineEdgeCacheMixin",
     "SimpleFeatureRenderPhaseEmptyMixin",
     "RenderTypeDefaultTexturingMixin",
+    "SPIRVModuleBackgroundCloseMixin",
     "RenderTypeGroupIndexMixin",
     "ShaderManagerSourcePatchMixin",
     "SkyDataLayerStorageMapSnapshotMixin",

@@ -3,20 +3,20 @@ package com.teslicek.txoptimizations;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
-public final class BackgroundLog {
+public final class BackgroundCleanup {
 
     private static final ExecutorService EXECUTOR = Executors.newSingleThreadExecutor(task -> {
-        Thread thread = new Thread(task, "TxOptimizations log writer");
+        Thread thread = new Thread(task, "TxOptimizations background cleanup");
 
         thread.setDaemon(true);
 
         return thread;
     });
 
-    private BackgroundLog() {
+    private BackgroundCleanup() {
     }
 
-    public static void write(Runnable log) {
-        EXECUTOR.execute(log);
+    public static void run(Runnable task) {
+        EXECUTOR.execute(task);
     }
 }
