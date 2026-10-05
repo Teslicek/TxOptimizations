@@ -340,6 +340,10 @@ Batching draws compares prepared render types with their generated record equali
 
 Every frame's entity, text, item, GUI and debug geometry used to be written into a CPU-side staging buffer, then copied by the GPU into the real vertex and index buffers, with a barrier around each copy. That was 5 copies per frame and 0.018 ms of GPU time in a GPU-bound world. The vertex and index buffers are now allocated mappable, and the vertices and sorted indices are written straight into them, so both copies and the staging buffer are gone. Buffers only return to the pool after the GPU has finished with them, so nothing in use is overwritten. Each slice is copied straight from the vertex builder's memory with the same validity and overflow checks, and the GPU receives identical bytes.
 
+### Uniform writes
+
+Every entity, text or item draw with its own transform wrote that transform into a ring buffer by mapping the buffer, writing the transform and unmapping it again. Each write took a VMA lock twice and allocated a pointer buffer, a byte buffer, a buffer slice, a mapped view and its close callback (over 16 MB/s of garbage in a busy server lobby). Under Vulkan each ring buffer is now mapped once, the first time it is written, and stays mapped until the ring buffer is closed. Each transform is written at the same offset with the same limit, so the GPU reads identical bytes. The memory is host-coherent, as it was before, so no flush is involved. Other backends keep mapping per write.
+
 ### Breaking overlay rotation
 
 The block breaking crack overlay computes its texture coordinates per vertex and called `Direction.getRotation()` for every vertex, which allocates a new quaternion and evaluates its sines and cosines (1.3% of the render thread in a CubeCraft lobby). The six rotations are now built once by that same method and reused. The overlay only reads them, so every vertex gets the same values.
