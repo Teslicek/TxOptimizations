@@ -26,6 +26,7 @@ import net.minecraft.world.entity.EntityTypes;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.ai.attributes.Attributes;
 import net.minecraft.world.entity.decoration.ArmorStand;
+import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.entity.projectile.FireworkRocketEntity;
 import net.minecraft.world.entity.vehicle.VehicleEntity;
 import net.minecraft.world.level.block.entity.BannerBlockEntity;
@@ -88,7 +89,7 @@ public final class EntityCulling {
         Vec3 position = minecraft.gameRenderer.mainCamera().position();
 
         if (captureTick == 0)
-            snapshot = capture(minecraft, level, player, position);
+            snapshot = capture(minecraft, level, position);
 
         captureTick = (captureTick + 1) % CAPTURE_INTERVAL;
         camera      = position;
@@ -121,7 +122,7 @@ public final class EntityCulling {
 
         Minecraft minecraft = Minecraft.getInstance();
 
-        return entity != minecraft.player
+        return !(entity instanceof Player)
             && entity != minecraft.getCameraEntity()
             && !entity.isVehicle()
             && !(entity instanceof VehicleEntity)
@@ -158,7 +159,7 @@ public final class EntityCulling {
         return state;
     }
 
-    private static Snapshot capture(Minecraft minecraft, ClientLevel level, LocalPlayer player, Vec3 position) {
+    private static Snapshot capture(Minecraft minecraft, ClientLevel level, Vec3 position) {
         EntityRenderDispatcher dispatcher = minecraft.getEntityRenderDispatcher();
         List<Cullable>         pinned     = new ArrayList<>();
         List<EntityTarget>     entities   = new ArrayList<>();
@@ -166,7 +167,7 @@ public final class EntityCulling {
         for (Entity entity : level.entitiesForRendering()) {
             EntityRendererCullAccessor renderer = (EntityRendererCullAccessor) dispatcher.getRenderer(entity);
 
-            if (entity == player || minecraft.shouldEntityAppearGlowing(entity) || !renderer.txoptimizations$affectedByCulling(entity)) {
+            if (entity instanceof Player || minecraft.shouldEntityAppearGlowing(entity) || !renderer.txoptimizations$affectedByCulling(entity)) {
                 pinned.add((Cullable) entity);
                 continue;
             }
