@@ -414,6 +414,14 @@ With Sodium, vanilla's section occlusion graph still updated every frame, althou
 
 With hitboxes shown (F3+B), every visible entity built its boxes and its view arrow from temporary vectors every frame: an offset vector, the moved bounding box computed twice for living entities, a new stroke style per box, and a scaled view vector. Each arrow then built a rotation, five vectors and an array to draw its four tips. The hitbox boxes now share one immutable stroke style per color, the moved bounding box is computed once from the offset's components, and the arrow end is computed from the view vector's components, all with the same arithmetic as before. Arrows rotate their tips with one reused rotation and vector and write the lines straight into the packed line list, so the GPU receives identical lines.
 
+### Unused region cache
+
+Every frame, vanilla's level extraction created a new region cache for rebuilding the visible sections it tracks. With Sodium that list of sections is always empty, so the cache was never used, but each one still allocated its hash map (about 4 MB/s of garbage in a server lobby). While the list is empty, one shared cache that is never touched now stands in for it. If the list ever has sections, a new cache is created as before.
+
+### GUI texture setups
+
+Every GUI glyph described its textures with a new texture setup record: its glyph texture and sampler plus the lightmap and its sampler. Text in the HUD and menus uses the same few textures over and over, so the last setup is now kept and returned again when the glyph texture, its sampler, the lightmap and the lightmap sampler are all the same objects. The record is immutable, so callers get an equal value either way.
+
 ### Breaking overlay rotation
 
 The block breaking crack overlay computes its texture coordinates per vertex and called `Direction.getRotation()` for every vertex, which allocates a new quaternion and evaluates its sines and cosines (1.3% of the render thread in a CubeCraft lobby). The six rotations are now built once by that same method and reused. The overlay only reads them, so every vertex gets the same values.
