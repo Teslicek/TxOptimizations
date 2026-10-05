@@ -368,6 +368,10 @@ Asking a GPU buffer for a slice covering all of it created a new slice object ea
 
 Each frame, the translucent pass walked every feature phase of every submit collection, and each phase with nothing to draw built an iterator over an empty list (about 8 MB/s in a BedWars game). Phases with no groups now return straight away, and the rest are walked by index in the same order.
 
+### Projection uploads
+
+The GUI, the item atlas and picture-in-picture renderers upload their projection matrix to the GPU with a buffer copy every frame, because their projection's version number changes each time it is set up, even when the matrix stays the same. Each projection buffer now remembers the matrix it last uploaded and skips the copy when the new matrix is bit-for-bit the same, so the buffer already holds exactly those bytes.
+
 ### Breaking overlay rotation
 
 The block breaking crack overlay computes its texture coordinates per vertex and called `Direction.getRotation()` for every vertex, which allocates a new quaternion and evaluates its sines and cosines (1.3% of the render thread in a CubeCraft lobby). The six rotations are now built once by that same method and reused. The overlay only reads them, so every vertex gets the same values.
