@@ -118,6 +118,7 @@
     "RenderRegionManagerListMixin",
     "RenderRegionSpriteMarkMixin",
     "RenderRegionPassArrayMixin",
+    "ReloadableResourceManagerProfileMixin",
     "RenderSectionManagerRotationMixin",
     "RenderSectionManagerSpriteMarkMixin",
     "RenderSectionManagerTreePoolMixin",

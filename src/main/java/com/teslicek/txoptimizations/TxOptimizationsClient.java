@@ -20,7 +20,12 @@ public final class TxOptimizationsClient implements ClientModInitializer {
         ClientEntityEvents.ENTITY_LOAD.register((entity, level) -> Cushions.track(entity));
         ClientEntityEvents.ENTITY_UNLOAD.register((entity, level) -> Cushions.untrack(entity));
         ClientCommandRegistrationCallback.EVENT.register((dispatcher, context) -> {
-            dispatcher.register(ClientCommands.literal("txprofile").executes(command -> {
+            dispatcher.register(ClientCommands.literal("txprofile").then(ClientCommands.literal("reload").executes(command -> {
+                ReloadProfile.arm();
+                command.getSource().sendFeedback(Component.literal("The next resource reload will log its timings to latest.log"));
+
+                return 1;
+            })).executes(command -> {
                 if (GpuPassProfiler.isRunning()) {
                     command.getSource().sendError(Component.literal("Profile is already running"));
 
