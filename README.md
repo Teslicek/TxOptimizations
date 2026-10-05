@@ -406,6 +406,10 @@ A snapshot is now the last full copy plus a small map of the sections that chang
 
 Every time Sodium collects the visible chunk sections, it looks up each section's render region (8 by 4 by 8 sections) in a hash map, 2.6% of the render thread while flying in singleplayer. Sections are visited in tree order, so consecutive sections usually share a region. Each collection now remembers the last region it looked up and its coordinates, and reuses it while the next section is in the same region. A collection only reads the region map and runs on one thread from start to end, so the region is the same one the map would return.
 
+### Vanilla section graph
+
+With Sodium, vanilla's section occlusion graph still updated every frame, although Sodium gives it a view area that contains no sections, so every result it can produce (visible sections, chunks it waits for, the culling and octree debug views) stays empty. Each time the camera entered a new section it still copied the sets of loaded chunks and empty sections (about 10 MB/s of garbage while flying at render distance 32) and ran a full graph update on a background thread. The update is now skipped while Sodium's empty view area is in use. Sodium does its own terrain culling in the same frame as before, and the frustum flag the graph would set only gated a call that Sodium already replaces with nothing.
+
 ### Breaking overlay rotation
 
 The block breaking crack overlay computes its texture coordinates per vertex and called `Direction.getRotation()` for every vertex, which allocates a new quaternion and evaluates its sines and cosines (1.3% of the render thread in a CubeCraft lobby). The six rotations are now built once by that same method and reused. The overlay only reads them, so every vertex gets the same values.

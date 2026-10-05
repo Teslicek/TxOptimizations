@@ -73,6 +73,7 @@
     "LevelRendererDeferredSkyMixin",
     "LevelExtractorEntityVisibilityMixin",
     "LevelRendererGizmoReuseMixin",
+    "LevelRendererSodiumGraphSkipMixin",
     "MapInstanceAtlasMixin",
     "MapInstanceColorTableMixin",
     "MapRenderStateAtlasMixin",
