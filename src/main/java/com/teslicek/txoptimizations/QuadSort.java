@@ -18,29 +18,42 @@ public final class QuadSort {
     private static Thread owner;
     private static long   frame = -1L;
     private static int    call;
+    private static int[]  keys    = new int[0];
     private static long[] packed  = new long[0];
     private static long[] scratch = new long[0];
 
     private QuadSort() {
     }
 
-    public static int[] sort(int[] keys) {
+    public static int[] keys(int length) {
         checkOwner();
 
-        int     length   = keys.length;
+        if (keys.length < length)
+            keys = new int[length];
+
+        return keys;
+    }
+
+    public static int[] sort(int[] keys, int length) {
+        checkOwner();
+
         boolean signed   = length <= RADIX_THRESHOLD;
         int     slot     = nextSlot();
         int[]   previous = slot < PREVIOUS.size() ? PREVIOUS.get(slot) : null;
 
         if (previous != null && previous.length == length && isStableOrder(previous, keys, signed))
-            return previous.clone();
+            return previous;
 
-        int[] order = signed ? sortSigned(keys) : sortUnsigned(keys);
+        long[] values = signed ? sortSigned(keys, length) : sortUnsigned(keys, length);
+        int[]  order  = previous != null && previous.length == length ? previous : new int[length];
+
+        for (int index = 0; index < length; index ++)
+            order[index] = (int) values[index];
 
         if (slot < PREVIOUS.size())
-            PREVIOUS.set(slot, order.clone());
+            PREVIOUS.set(slot, order);
         else
-            PREVIOUS.add(order.clone());
+            PREVIOUS.add(order);
 
         return order;
     }
@@ -58,8 +71,7 @@ public final class QuadSort {
         return true;
     }
 
-    private static int[] sortSigned(int[] keys) {
-        int    length = keys.length;
+    private static long[] sortSigned(int[] keys, int length) {
         long[] values = buffer(length);
 
         for (int index = 0; index < length; index ++)
@@ -67,11 +79,10 @@ public final class QuadSort {
 
         Arrays.sort(values, 0, length);
 
-        return indices(values, length);
+        return values;
     }
 
-    private static int[] sortUnsigned(int[] keys) {
-        int    length = keys.length;
+    private static long[] sortUnsigned(int[] keys, int length) {
         long[] values = buffer(length);
         long[] other  = scratch;
 
@@ -110,16 +121,7 @@ public final class QuadSort {
             other  = swap;
         }
 
-        return indices(values, length);
-    }
-
-    private static int[] indices(long[] values, int length) {
-        int[] order = new int[length];
-
-        for (int index = 0; index < length; index ++)
-            order[index] = (int) values[index];
-
-        return order;
+        return values;
     }
 
     private static long[] buffer(int length) {

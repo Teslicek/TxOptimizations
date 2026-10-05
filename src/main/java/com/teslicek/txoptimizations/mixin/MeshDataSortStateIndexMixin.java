@@ -4,6 +4,7 @@ import com.mojang.blaze3d.vertex.CompactVectorArray;
 import com.mojang.blaze3d.vertex.MeshData;
 import com.mojang.blaze3d.vertex.VertexSorting;
 import com.mojang.renderpearl.api.pipeline.IndexType;
+import com.teslicek.txoptimizations.SharedQuadSorter;
 import java.nio.BufferOverflowException;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
@@ -34,7 +35,7 @@ public abstract class MeshDataSortStateIndexMixin {
 
     @Inject(method = "writeSortedIndexBuffer", at = @At("HEAD"), cancellable = true)
     private void txoptimizations$writeSortedIndicesDirectly(ByteBuffer buffer, VertexSorting sorting, CallbackInfo ci) {
-        int[] quadOrder = sorting.sort(this.centroids);
+        int[] quadOrder = sorting instanceof SharedQuadSorter shared ? shared.txoptimizations$sortShared(this.centroids) : sorting.sort(this.centroids);
 
         ci.cancel();
 

@@ -286,7 +286,7 @@ Sodium only animates textures that are on screen, so every frame it marked every
 
 ### Translucent sort reuse
 
-Translucent entity, item and text quads are sorted back to front before every upload, 3.4 to 4.7% of the render thread at busy server spawns. Each sort's result is now remembered by its position among the frame's sorts, and the next frame first checks in one pass whether the remembered order is still sorted under the new distances (ties ordered by quad index). If it is, it is exactly the order a stable sort would produce, so it is used without sorting. Otherwise the quads are sorted with the same orderings Sodium uses (signed keys up to 80 quads, unsigned above), using packed key and index values, a reused buffer, and skipping radix passes where every key lands in the same bucket. A test of 26,037 random sorts against Sodium's own sort matched every result.
+Translucent entity, item and text quads are sorted back to front before every upload, 3.4 to 4.7% of the render thread at busy server spawns. Each sort's result is now remembered by its position among the frame's sorts, and the next frame first checks in one pass whether the remembered order is still sorted under the new distances (ties ordered by quad index). If it is, it is exactly the order a stable sort would produce, so it is used without sorting. Otherwise the quads are sorted with the same orderings Sodium uses (signed keys up to 80 quads, unsigned above), using packed key and index values, a reused buffer, and skipping radix passes where every key lands in the same bucket. A test of 26,037 random sorts against Sodium's own sort matched every result. None of this allocates in steady state: the quad centers are decoded into an array kept per quad count and zeroed before each use, the sort keys go into one reused array, and each remembered order is rewritten in place. The index writer reads the remembered order directly, and only callers outside the upload path get their own copy. Together these were about 66 MB/s of garbage in a BedWars game.
 
 ### Transient command buffer
 
@@ -363,6 +363,10 @@ Every GUI glyph converted its 2D pose into a new 4x4 matrix before writing its v
 ### Buffer slices
 
 Asking a GPU buffer for a slice covering all of it created a new slice object each time, and Sodium does that for every chunk region drawn each frame. The slice is now created once per buffer, since a buffer never changes size. Sodium's indirect terrain draws also created a slice of the command buffer per region per frame; each draw batch now remembers its last 8 slices and reuses one with the same buffer, offset and length.
+
+### Feature phase loop
+
+Each frame, the translucent pass walked every feature phase of every submit collection, and each phase with nothing to draw built an iterator over an empty list (about 8 MB/s in a BedWars game). Phases with no groups now return straight away, and the rest are walked by index in the same order.
 
 ### Breaking overlay rotation
 
