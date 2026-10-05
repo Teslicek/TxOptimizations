@@ -11,6 +11,7 @@ import it.unimi.dsi.fastutil.ints.IntList;
 import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
 import it.unimi.dsi.fastutil.ints.IntSet;
 import java.util.ArrayList;
+import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -27,12 +28,13 @@ public final class FontSelection {
     }
 
     public static void prepare(Map<Identifier, List<GlyphProvider.Conditional>> fontSets, Set<FontOption> options) {
-        List<Entry> entries = new ArrayList<>(fontSets.size());
+        List<Entry>                entries   = new ArrayList<>(fontSets.size());
+        Map<GlyphProvider, IntSet> supported = new IdentityHashMap<>();
 
         for (List<GlyphProvider.Conditional> providers : fontSets.values()) {
             List<GlyphProvider.Conditional> ordered = List.copyOf(Lists.reverse(providers));
 
-            entries.add(new Entry(ordered, select(ordered, options)));
+            entries.add(new Entry(ordered, select(ordered, options, supported)));
         }
 
         pending = new Pending(Set.copyOf(options), entries);
@@ -56,7 +58,7 @@ public final class FontSelection {
         pending = null;
     }
 
-    private static Selection select(List<GlyphProvider.Conditional> providers, Set<FontOption> options) {
+    private static Selection select(List<GlyphProvider.Conditional> providers, Set<FontOption> options, Map<GlyphProvider, IntSet> supported) {
         Int2ObjectMap<IntList> glyphsByWidth     = new Int2ObjectOpenHashMap<>();
         IntSet                 supportedGlyphs   = new IntOpenHashSet();
         List<GlyphProvider>    selectedProviders = new ArrayList<>();
@@ -64,7 +66,7 @@ public final class FontSelection {
         for (GlyphProvider.Conditional conditionalProvider : providers) {
             if (conditionalProvider.filter().apply(options)) {
                 selectedProviders.add(conditionalProvider.provider());
-                supportedGlyphs.addAll(conditionalProvider.provider().getSupportedGlyphs());
+                supportedGlyphs.addAll(supported.computeIfAbsent(conditionalProvider.provider(), GlyphProvider::getSupportedGlyphs));
             }
         }
 
