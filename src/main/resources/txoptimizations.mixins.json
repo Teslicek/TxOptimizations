@@ -119,6 +119,8 @@
     "RenderRegionPassArrayMixin",
     "ReloadableResourceManagerProfileMixin",
     "GlslCompilerSpirvCacheMixin",
+    "ShaderConfigsIncludesDigestMixin",
+    "ShaderManagerIncludesDigestMixin",
     "FontManagerPreparationAccessor",
     "FontManagerSelectionMixin",
     "FontSetSelectionMixin",

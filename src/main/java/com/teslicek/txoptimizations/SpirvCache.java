@@ -1,13 +1,11 @@
 package com.teslicek.txoptimizations;
 
 import com.mojang.blaze3d.systems.RenderSystem;
-import com.mojang.renderpearl.api.pipeline.ShaderSource;
 import com.mojang.renderpearl.api.pipeline.ShaderType;
 import com.mojang.renderpearl.backend.api.SpvModule;
 import com.mojang.renderpearl.frontend.shaders.SPIRVModule;
 import java.io.IOException;
 import java.io.UncheckedIOException;
-import java.lang.ref.WeakReference;
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
 import java.nio.charset.StandardCharsets;
@@ -33,7 +31,6 @@ import net.minecraft.client.renderer.ShaderManager;
 import net.minecraft.resources.Identifier;
 import org.lwjgl.Version;
 import org.lwjgl.system.MemoryUtil;
-import org.lwjgl.util.shaderc.ShadercIncludeResult;
 
 public final class SpirvCache {
 
@@ -43,8 +40,7 @@ public final class SpirvCache {
 
     private static final ConcurrentHashMap<Path, CompletableFuture<Boolean>> COMPILING = new ConcurrentHashMap<>();
 
-    private static WeakReference<ShaderManager.Configs> includesOwner = new WeakReference<>(null);
-    private static byte[]                               includesDigest;
+    private static final ThreadLocal<List<String[]>> INCLUDES = ThreadLocal.withInitial(ArrayList::new);
 
     private SpirvCache() {
     }
@@ -52,7 +48,7 @@ public final class SpirvCache {
     public static Path file(boolean zeroToOne, boolean drawParameters, String name, String source, ShaderType type, ShaderDefines defines, ShaderManager.Configs configs) {
         MessageDigest digest = sha256();
 
-        update(digest, "txoptimizations-spirv-3");
+        update(digest, "txoptimizations-spirv-4");
         update(digest, FabricLoader.getInstance().getModContainer("minecraft").orElseThrow().getMetadata().getVersion().getFriendlyString());
         update(digest, Version.getVersion());
         update(digest, Boolean.toString(zeroToOne));
@@ -174,30 +170,38 @@ public final class SpirvCache {
         }
     }
 
-    private static synchronized byte[] includesDigest(ShaderManager.Configs configs) {
-        if (includesOwner.get() == configs)
-            return includesDigest;
+    public static void startIncludes() {
+        INCLUDES.remove();
+    }
 
-        List<Map.Entry<Identifier, ShaderSource.CachedIncludeSource>> includes = new ArrayList<>(configs.includeSources().entrySet());
+    public static void collectInclude(Identifier id, String contents) {
+        INCLUDES.get().add(new String[] { id.toString(), contents });
+    }
 
-        includes.sort(Comparator.comparing(include -> include.getKey().toString()));
+    public static byte[] finishIncludes() {
+        List<String[]> includes = INCLUDES.get();
+
+        includes.sort(Comparator.comparing(include -> include[0]));
 
         MessageDigest digest = sha256();
 
-        for (Map.Entry<Identifier, ShaderSource.CachedIncludeSource> include : includes) {
-            ShadercIncludeResult result = ShadercIncludeResult.create(include.getValue().includeResultPtr());
-
-            update(digest, include.getKey().toString());
-            digest.update(longBytes(result.source_name_length()));
-            digest.update(result.source_name());
-            digest.update(longBytes(result.content_length()));
-            digest.update(result.content());
+        for (String[] include : includes) {
+            update(digest, include[0]);
+            update(digest, include[1]);
         }
 
-        includesOwner  = new WeakReference<>(configs);
-        includesDigest = digest.digest();
+        INCLUDES.remove();
 
-        return includesDigest;
+        return digest.digest();
+    }
+
+    private static byte[] includesDigest(ShaderManager.Configs configs) {
+        byte[] digest = ((ShaderIncludesDigest) (Object) configs).txoptimizations$includesDigest();
+
+        if (digest == null)
+            throw new IllegalStateException("Shader configs were created without an include digest");
+
+        return digest;
     }
 
     private static void update(MessageDigest digest, String value) {
