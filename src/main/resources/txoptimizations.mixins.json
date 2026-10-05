@@ -19,6 +19,7 @@
     "CameraFluidLookupMixin",
     "CameraNearPlaneAccessor",
     "ClientChunkCachePrecipitationMixin",
+    "ClientLevelAnimateFluidMixin",
     "ClipContextAirMixin",
     "CommandSuggestionsRenderThreadMixin",
     "CuboidGizmoSharedCornersMixin",

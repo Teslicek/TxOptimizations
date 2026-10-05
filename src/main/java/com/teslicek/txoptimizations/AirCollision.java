@@ -3,6 +3,8 @@ package com.teslicek.txoptimizations;
 import net.minecraft.core.SectionPos;
 import net.minecraft.util.Mth;
 import net.minecraft.world.level.Level;
+import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.chunk.ChunkAccess;
 import net.minecraft.world.level.chunk.LevelChunkSection;
 import net.minecraft.world.level.chunk.status.ChunkStatus;
@@ -15,7 +17,10 @@ public final class AirCollision {
     private AirCollision() {
     }
 
-    public static boolean isOnlyAir(Level level, AABB box) {
+    public static boolean hasNoBlockColliders(Level level, AABB box) {
+        if (level.isDebug())
+            return false;
+
         int minX = Mth.floor(box.minX - EPSILON) - 1;
         int maxX = Mth.floor(box.maxX + EPSILON) + 1;
         int minY = Mth.floor(box.minY - EPSILON) - 1;
@@ -27,7 +32,7 @@ public final class AirCollision {
             for (int chunkZ = SectionPos.blockToSectionCoord(minZ); chunkZ <= SectionPos.blockToSectionCoord(maxZ); chunkZ ++) {
                 ChunkAccess chunk = level.getChunk(chunkX, chunkZ, ChunkStatus.FULL, false);
 
-                if (chunk != null && !isChunkAir(chunk, Math.max(minX, chunkX << 4), Math.min(maxX, (chunkX << 4) + 15), minY, maxY, Math.max(minZ, chunkZ << 4), Math.min(maxZ, (chunkZ << 4) + 15)))
+                if (chunk != null && !hasNoChunkColliders(chunk, minX, maxX, minY, maxY, minZ, maxZ, Math.max(minX, chunkX << 4), Math.min(maxX, (chunkX << 4) + 15), Math.max(minZ, chunkZ << 4), Math.min(maxZ, (chunkZ << 4) + 15)))
                     return false;
             }
         }
@@ -35,7 +40,7 @@ public final class AirCollision {
         return true;
     }
 
-    private static boolean isChunkAir(ChunkAccess chunk, int minX, int maxX, int minY, int maxY, int minZ, int maxZ) {
+    private static boolean hasNoChunkColliders(ChunkAccess chunk, int minX, int maxX, int minY, int maxY, int minZ, int maxZ, int fromX, int toX, int fromZ, int toZ) {
         LevelChunkSection[] sections = chunk.getSections();
         int                 bottom   = Math.max(minY, chunk.getMinY());
         int                 top      = Math.min(maxY, chunk.getMaxY());
@@ -50,9 +55,15 @@ public final class AirCollision {
             int toY   = Math.min(top, (sectionY << 4) + 15);
 
             for (int y = fromY; y <= toY; y ++) {
-                for (int z = minZ; z <= maxZ; z ++) {
-                    for (int x = minX; x <= maxX; x ++) {
-                        if (!section.getBlockState(x & 15, y & 15, z & 15).isAir())
+                int faceY = y == minY || y == maxY ? 1 : 0;
+
+                for (int z = fromZ; z <= toZ; z ++) {
+                    int faceYZ = faceY + (z == minZ || z == maxZ ? 1 : 0);
+
+                    for (int x = fromX; x <= toX; x ++) {
+                        BlockState state = section.getBlockState(x & 15, y & 15, z & 15);
+
+                        if (!state.isAir() && canCollide(state, faceYZ + (x == minX || x == maxX ? 1 : 0)))
                             return false;
                     }
                 }
@@ -60,5 +71,15 @@ public final class AirCollision {
         }
 
         return true;
+    }
+
+    private static boolean canCollide(BlockState state, int faceType) {
+        return switch (faceType) {
+            case 0 -> true;
+            case 1 -> state.hasLargeCollisionShape();
+            case 2 -> state.is(Blocks.MOVING_PISTON);
+            case 3 -> false;
+            default -> throw new IllegalStateException("Unexpected cursor face type " + faceType);
+        };
     }
 }

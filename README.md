@@ -274,7 +274,11 @@ Every block a raycast passes through (the per-frame crosshair pick, the third-pe
 
 ### Particle collision
 
-Every particle with physics checked its movement against the blocks around it each tick by collecting every block collision shape in the swept box into a new list (up to 0.8% of the render thread at a server spawn full of dust particles). Particles have no entity colliders and no world border, so when every block in that box is air, vanilla returns the movement unchanged. The box is now first checked directly in the chunk sections, skipping all-air sections whole, and only boxes that contain any non-air block go through vanilla's collision.
+Every particle with physics checked its movement against the blocks around it each tick by collecting every block collision shape in the swept box into a new list (up to 0.8% of the render thread at a server spawn full of dust particles). Particles have no entity colliders and no world border, so when every block in that box is air, vanilla returns the movement unchanged. The box is now first checked directly in the chunk sections, skipping all-air sections whole. Vanilla's scan also covers a one-block ring around the box, where it only uses blocks with a collision shape larger than a full block on the faces of the ring and moving pistons on its edges, and skips its corners. The direct check applies the same rules to the ring, so smoke rising above a campfire or dust next to a wall no longer counts as touching a block. Boxes with any other non-air block inside, and the debug world, go through vanilla's collision.
+
+### Ambient block ticks
+
+Every client tick, 1334 random blocks around the player get their ambient effects (campfire smoke, dripping water, ambient particles), and each one was looked up twice, once for the block and once for its fluid. The fluid is part of the block state, so it is now read from the block state already looked up. The debug world, where block lookups do not come from the chunk sections, keeps the second lookup.
 
 ### Animated sprite marks
 
