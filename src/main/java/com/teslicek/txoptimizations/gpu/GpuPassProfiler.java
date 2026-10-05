@@ -1,6 +1,7 @@
 package com.teslicek.txoptimizations.gpu;
 
 import com.mojang.renderpearl.api.commands.GpuQueryPool;
+import com.mojang.renderpearl.api.device.GpuSurface;
 import com.mojang.renderpearl.backend.api.CommandEncoderBackend;
 import com.mojang.renderpearl.backend.vulkan.VulkanDevice;
 import com.mojang.renderpearl.backend.vulkan.VulkanQueryPool;
@@ -136,9 +137,13 @@ public final class GpuPassProfiler {
         COUNTS[slot]        = index + 1;
     }
 
-    public static void recordScreenFormats(int swapchainFormat, Object framebufferFormat) {
-        if (screenFormats == null)
-            screenFormats = String.format(Locale.ROOT, "Screen: swapchain %s, main framebuffer %s%n", swapchainFormat(swapchainFormat), framebufferFormat);
+    public static void recordScreenFormats(int swapchainFormat, int swapchainImages, Object framebufferFormat) {
+        if (screenFormats != null)
+            return;
+
+        GpuSurface.Configuration configuration = Minecraft.getInstance().windowSurface().currentConfiguration().orElseThrow(() -> new IllegalStateException("The window surface is not configured"));
+
+        screenFormats = String.format(Locale.ROOT, "Screen: swapchain %s with %d images, present mode %s, main framebuffer %s%n", swapchainFormat(swapchainFormat), swapchainImages, configuration.presentMode(), framebufferFormat);
     }
 
     private static String swapchainFormat(int format) {
