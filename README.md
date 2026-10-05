@@ -470,6 +470,10 @@ With RGSS texture filtering, Sodium's terrain shader takes four texture samples 
 
 Every resource reload, including the one when a server sends its resource pack and the one when you leave that server, compiled the shaders of all 385 render pipelines from GLSL to SPIR-V again (the shader loader took 1.7 s of worker time in a CubeCraft reload, including creating the Vulkan pipelines). Each compiled shader is now saved to `txoptimizations/spirv` under a SHA-256 of everything the compiler sees: the shader name, stage, source, defines, every shader include, the compiler flags for the GPU, and the Minecraft and LWJGL versions. The next reload with the same inputs reads the file instead of compiling, so the result is byte for byte what the compiler would produce, and any change to a shader or include compiles it again. Nothing is kept in memory.
 
+### Font provider selection
+
+When a reload finished, the render thread went through every codepoint of every font (more than 60,000 for the unifont alone) in every glyph provider to pick the providers each font uses and to list the glyphs of each width for obfuscated text. That took 72 ms of the 143 ms the render thread was blocked in a CubeCraft resource pack reload. The same work now runs on a worker thread while the reload is still preparing, with the same steps in the same order, and the render thread only takes the finished result. It is used only when the font options and every provider are still the same when the reload is applied, otherwise the render thread works it out as before.
+
 ### Memory
 
 Less live memory means shorter and rarer garbage collections.
