@@ -33,6 +33,7 @@ public final class ReloadTimeline implements PreparableReloadListener.Preparatio
     public static void begin() {
         startNanos = System.nanoTime();
         times      = new ConcurrentHashMap<>();
+        ReloadSampler.start();
     }
 
     public static void mark(String name) {
@@ -55,5 +56,6 @@ public final class ReloadTimeline implements PreparableReloadListener.Preparatio
         current.entrySet().stream()
             .sorted(Map.Entry.comparingByValue())
             .forEach(entry -> LOGGER.info("  {} ms  {}", TimeUnit.NANOSECONDS.toMillis(entry.getValue()), entry.getKey()));
+        ReloadSampler.finish();
     }
 }
