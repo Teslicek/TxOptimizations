@@ -53,6 +53,7 @@ public final class GpuPassProfiler {
     private static long[]                frameEnds  = new long[1 << 16];
     private static int                   frameTimeCount;
     private static String                context;
+    private static String                screenFormats;
 
     private GpuPassProfiler() {
     }
@@ -76,6 +77,7 @@ public final class GpuPassProfiler {
         ProfileCounters.reset();
         context        = ProfileContext.capture(Minecraft.getInstance());
         frameTimeCount = 0;
+        screenFormats  = null;
         GcPauses.start();
         JfrRecorder.start(Thread.currentThread());
         CpuSampler.start(Thread.currentThread(), DURATION);
@@ -132,6 +134,19 @@ public final class GpuPassProfiler {
         frameEncoder.writeTimestamp(POOLS[slot], index);
         LABELS[slot][index] = label;
         COUNTS[slot]        = index + 1;
+    }
+
+    public static void recordScreenFormats(int swapchainFormat, Object framebufferFormat) {
+        if (screenFormats == null)
+            screenFormats = String.format(Locale.ROOT, "Screen: swapchain %s, main framebuffer %s%n", swapchainFormat(swapchainFormat), framebufferFormat);
+    }
+
+    private static String swapchainFormat(int format) {
+        return switch (format) {
+            case VK12.VK_FORMAT_R8G8B8A8_UNORM -> "R8G8B8A8_UNORM";
+            case VK12.VK_FORMAT_B8G8R8A8_UNORM -> "B8G8R8A8_UNORM";
+            default -> "Vulkan format " + format;
+        };
     }
 
     public static String copyLabel(Object target) {
@@ -300,6 +315,11 @@ public final class GpuPassProfiler {
         report.append(String.format(Locale.ROOT, "Terrain %.0f draws and %.3f million triangles per frame%n", (double) terrainDraws / framesRead, terrainIndices / 3.0 / 1.0e6 / framesRead));
         report.append(ProfileCounters.report(framesRead));
         report.append(context);
+
+        if (screenFormats == null)
+            throw new IllegalStateException("GPU profile never copied a frame to the screen");
+
+        report.append(screenFormats);
         report.append(frameDistributionReport());
 
         PASSES.entrySet().stream()

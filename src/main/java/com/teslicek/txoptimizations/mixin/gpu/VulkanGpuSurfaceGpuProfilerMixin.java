@@ -19,9 +19,16 @@ public abstract class VulkanGpuSurfaceGpuProfilerMixin {
     @Final
     private VulkanDevice device;
 
+    @Shadow
+    @Final
+    private int swapchainImageFormat;
+
     @Inject(method = "blitFromTexture", at = @At("HEAD"))
     private void txoptimizations$profileScreenCopy(CommandEncoderBackend encoder, GpuTextureView textureView, CallbackInfo ci) {
-        if (GpuPassProfiler.isRunning())
-            GpuPassProfiler.mark(this.device, encoder, "screen copy and wait for screen image");
+        if (!GpuPassProfiler.isRunning())
+            return;
+
+        GpuPassProfiler.mark(this.device, encoder, "screen copy and wait for screen image");
+        GpuPassProfiler.recordScreenFormats(this.swapchainImageFormat, textureView.texture().getFormat());
     }
 }
