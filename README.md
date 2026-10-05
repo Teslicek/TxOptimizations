@@ -388,6 +388,10 @@ Every time an entity, item or text render type was prepared for a frame, it buil
 
 Deciding whether an entity's culling can be deferred to Sodium looked up the renderer's class in a class-keyed table for every entity every frame (1.3% of the render thread in a world full of entities). Each renderer now remembers the answer itself after the first lookup, since a renderer's class never changes.
 
+### Sound channel wait
+
+Every sound the game plays asks the sound thread for an audio channel and waits for the answer on the render thread. The wait parked the render thread, so on top of the sound thread's own wake-up it also had to be woken by the operating system again, 0.3 to 0.5 ms per sound in `/txprofile`. The render thread now spins until the channel arrives and then takes it the same way, so the same channel is used at the same point, without the second wake-up.
+
 ### Breaking overlay rotation
 
 The block breaking crack overlay computes its texture coordinates per vertex and called `Direction.getRotation()` for every vertex, which allocates a new quaternion and evaluates its sines and cosines (1.3% of the render thread in a CubeCraft lobby). The six rotations are now built once by that same method and reused. The overlay only reads them, so every vertex gets the same values.

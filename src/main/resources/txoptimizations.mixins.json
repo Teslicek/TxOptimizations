@@ -117,6 +117,7 @@
     "SodiumEntityCullOrderMixin",
     "SodiumEntityRendererDirectWriteMixin",
     "SodiumExtraFrameCounterMixin",
+    "SoundEngineChannelSpinMixin",
     "SoundEngineListenerMixin",
     "SubmitNodeStorageKeepCollectionsMixin",
     "StateDefinitionNeighborTableMixin",
