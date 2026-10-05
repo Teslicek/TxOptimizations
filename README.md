@@ -122,6 +122,10 @@ Garbage collection pauses of 6 to 8 ms were the worst frames, and their frequenc
 
 With hitboxes shown, every entity's box became 8 corner `Vec3`s and 12 `Line` records each frame, plus the list storage for them, about 35 MB/s in the BedWars prelobby. Gizmo groups now keep their lines as plain numbers (start and end coordinates, color and width), box edges are written from the box coordinates directly, and the line renderer reads those numbers. The coordinates are the same doubles the `Vec3`s held, in the same order. Anything that still reads the list as `Line` objects gets them built on access. The two gizmo collections that `LevelRenderer` rebuilt every frame are now cleared and refilled instead, since the previous frame's collections are dropped at that point and were already drawn, so the line arrays keep their capacity and stop being reallocated.
 
+### Sodium cull tree arrays
+
+Every async cull pass builds new section trees for the wide, regular and local results, and each tree allocates a 32 KB bit array (about 137 MB/s on Sodium's cull thread in BedWars and at a busy spawn). Once a pass is handed over, only the render thread holds its trees: in Sodium's map of cull results and as the tree the current render list was read from. The render thread can still read a replaced tree until the render list is finalized for the frame, so trees are only checked at the end of that step: every tree from a handed-over pass that is in neither place anymore returns its arrays to a pool, including a local result that was never taken. New trees take a zeroed array from the pool, which is what a new array would hold. Each tree is released once, trees from cancelled passes are left to the garbage collector, and the pool keeps at most 64 arrays.
+
 ### Region pass lookups
 
 Each region kept its per-pass section data and cached draw batches in hash maps keyed by render pass, looked up for every region and pass each frame. With only three passes they are now also held in arrays indexed by pass, and the lookups read the arrays.
