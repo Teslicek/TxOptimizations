@@ -372,6 +372,14 @@ Each frame, the translucent pass walked every feature phase of every submit coll
 
 The GUI, the item atlas and picture-in-picture renderers upload their projection matrix to the GPU with a buffer copy every frame, because their projection's version number changes each time it is set up, even when the matrix stays the same. Each projection buffer now remembers the matrix it last uploaded and skips the copy when the new matrix is bit-for-bit the same, so the buffer already holds exactly those bytes.
 
+### Suspicious sand and gravel
+
+Every suspicious sand and gravel block in view built a full render state each frame, including an item render state with its own matrices (about 45 MB/s of garbage on a BedWars map), although it only draws its buried item while it is being brushed. Blocks that have not been brushed at all now skip the render state, since vanilla's renderer draws nothing for them.
+
+### Block entity distance
+
+Every block entity in view allocated a vector for its center to check whether it is within the renderer's view distance (about 6 MB/s on a BedWars map). Renderers that use the default distance check now compute the same differences and squares directly from the block position, in the same order, so the result is identical. Renderers with their own check, such as beacons, still run it.
+
 ### Breaking overlay rotation
 
 The block breaking crack overlay computes its texture coordinates per vertex and called `Direction.getRotation()` for every vertex, which allocates a new quaternion and evaluates its sines and cosines (1.3% of the render thread in a CubeCraft lobby). The six rotations are now built once by that same method and reused. The overlay only reads them, so every vertex gets the same values.
