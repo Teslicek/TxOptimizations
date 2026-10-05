@@ -466,6 +466,10 @@ Vanilla draws the sky disc, sunrise glow, sun, moon and stars over the whole scr
 
 With RGSS texture filtering, Sodium's terrain shader takes four texture samples around every pixel, plus one sharp sample, and blends them by how small the texture is on screen. In a server lobby terrain is limited by pixel shading (a fifth of the pixels made solid terrain three times faster), and most nearby terrain shows texels at least a pixel wide, where that blend weight is exactly 0 and the result is exactly the sharp sample. The shader now returns the sharp sample right away in that case and skips the four RGSS samples; every other pixel is computed as before. The line is added to Sodium's shader source as it loads, and a replaced shader without the expected line is left alone.
 
+### Shader cache
+
+Every resource reload, including the one when a server sends its resource pack and the one when you leave that server, compiled all 385 shader stages from GLSL to SPIR-V again (1.7 s of worker time in a CubeCraft reload). Each compiled shader is now saved to `txoptimizations/spirv` under a SHA-256 of everything the compiler sees: the shader name, stage, source, defines, every shader include, the compiler flags for the GPU, and the Minecraft and LWJGL versions. The next reload with the same inputs reads the file instead of compiling, so the result is byte for byte what the compiler would produce, and any change to a shader or include compiles it again. Nothing is kept in memory.
+
 ### Memory
 
 Less live memory means shorter and rarer garbage collections.

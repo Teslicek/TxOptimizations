@@ -118,6 +118,7 @@
     "RenderRegionSpriteMarkMixin",
     "RenderRegionPassArrayMixin",
     "ReloadableResourceManagerProfileMixin",
+    "GlslCompilerSpirvCacheMixin",
     "RenderSectionManagerRotationMixin",
     "RenderSectionManagerSpriteMarkMixin",
     "RenderSectionManagerTreePoolMixin",
