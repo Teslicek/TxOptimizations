@@ -28,6 +28,7 @@
     "ClientChunkCachePrecipitationMixin",
     "ClientLevelAnimateFluidMixin",
     "ClipContextAirMixin",
+    "ClonedChunkSectionCacheCleanupMixin",
     "CommandSuggestionsRenderThreadMixin",
     "CompactVectorArrayAccessor",
     "CuboidGizmoSharedCornersMixin",

@@ -434,6 +434,10 @@ Every entity, item and text render type prepared for a frame asked its texture t
 
 Every item frame built a new render offset vector twice per frame, once when its entity was placed and once when the frame was drawn (about 5 MB/s of garbage at a spawn full of map frames). The offset only depends on the direction the frame faces, so the six offsets are now built once with the same arithmetic and shared. A vector cannot be changed, so every caller reads the same values.
 
+### Section copy cache cleanup
+
+Every frame, Sodium's cache of chunk section copies for meshing checked all of its up to 512 entries and dropped the ones unused for more than 5 seconds (0.9% of the render thread at a server spawn). The cache is a linked map in order of last use: every use moves an entry to the end and stamps it with the current time, which never goes back. Expired entries are therefore always at the front, so the cleanup now drops entries from the front until it reaches one that has not expired, which removes exactly the same entries.
+
 ### Breaking overlay rotation
 
 The block breaking crack overlay computes its texture coordinates per vertex and called `Direction.getRotation()` for every vertex, which allocates a new quaternion and evaluates its sines and cosines (1.3% of the render thread in a CubeCraft lobby). The six rotations are now built once by that same method and reused. The overlay only reads them, so every vertex gets the same values.
