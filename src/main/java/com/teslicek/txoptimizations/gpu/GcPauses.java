@@ -3,8 +3,11 @@ package com.teslicek.txoptimizations.gpu;
 import com.sun.management.GarbageCollectionNotificationInfo;
 import java.lang.management.GarbageCollectorMXBean;
 import java.lang.management.ManagementFactory;
+import java.lang.management.MemoryUsage;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
+import java.util.Map;
 import javax.management.Notification;
 import javax.management.NotificationEmitter;
 import javax.management.NotificationListener;
@@ -12,6 +15,7 @@ import javax.management.openmbean.CompositeData;
 
 final class GcPauses {
 
+    private static final String                       OLD_POOL   = "Old Gen";
     private static final List<Pause>                  PAUSES     = new ArrayList<>();
     private static final List<GarbageCollectorMXBean> COLLECTORS = ManagementFactory.getGarbageCollectorMXBeans();
     private static final NotificationListener         LISTENER   = GcPauses::onNotification;
@@ -51,8 +55,27 @@ final class GcPauses {
         long                              start = end - info.getGcInfo().getDuration() * 1_000_000L;
 
         synchronized (PAUSES) {
-            PAUSES.add(new Pause(info.getGcName() + " (" + info.getGcCause() + ")", start, end));
+            PAUSES.add(new Pause(info.getGcName() + " (" + info.getGcCause() + "), " + oldGeneration(info.getGcInfo().getMemoryUsageAfterGc()), start, end));
         }
+    }
+
+    private static String oldGeneration(Map<String, MemoryUsage> usage) {
+        MemoryUsage old           = null;
+        long        heapUsed      = 0L;
+        long        heapCommitted = 0L;
+
+        for (Map.Entry<String, MemoryUsage> pool : usage.entrySet()) {
+            if (pool.getKey().contains(OLD_POOL))
+                old = pool.getValue();
+
+            heapUsed      += pool.getValue().getUsed();
+            heapCommitted += pool.getValue().getCommitted();
+        }
+
+        if (old == null)
+            throw new IllegalStateException("No pool containing \"" + OLD_POOL + "\" in " + usage.keySet());
+
+        return String.format(Locale.ROOT, "old gen %d MB, all pools %d of %d MB committed", old.getUsed() >> 20, heapUsed >> 20, heapCommitted >> 20);
     }
 
     record Pause(String name, long startNanos, long endNanos) {
