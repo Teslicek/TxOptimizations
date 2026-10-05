@@ -6,9 +6,7 @@ import com.mojang.renderpearl.api.pipeline.ShaderSource;
 import com.mojang.renderpearl.api.pipeline.ShaderType;
 import com.mojang.renderpearl.backend.api.SpvModule;
 import com.mojang.renderpearl.frontend.shaders.GlslCompiler;
-import com.mojang.renderpearl.frontend.shaders.SPIRVModule;
 import com.teslicek.txoptimizations.SpirvCache;
-import java.nio.ByteBuffer;
 import java.nio.file.Path;
 import net.minecraft.client.renderer.ShaderDefines;
 import net.minecraft.client.renderer.ShaderManager;
@@ -32,16 +30,8 @@ public abstract class GlslCompilerSpirvCacheMixin {
         if (!(shaderSource instanceof ShaderManager.Configs configs))
             return original.call(name, source, type, shaderDefines, shaderSource);
 
-        Path       file   = SpirvCache.file(this.isZeroToOne, this.shaderDrawParameters, name, source, type, shaderDefines, configs);
-        ByteBuffer cached = SpirvCache.read(file);
+        Path file = SpirvCache.file(this.isZeroToOne, this.shaderDrawParameters, name, source, type, shaderDefines, configs);
 
-        if (cached != null)
-            return new SPIRVModule(cached, type);
-
-        SpvModule module = original.call(name, source, type, shaderDefines, shaderSource);
-
-        SpirvCache.write(file, module.spv());
-
-        return module;
+        return SpirvCache.load(file, type, () -> original.call(name, source, type, shaderDefines, shaderSource));
     }
 }

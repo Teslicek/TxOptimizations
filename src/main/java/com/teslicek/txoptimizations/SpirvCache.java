@@ -3,16 +3,18 @@ package com.teslicek.txoptimizations;
 import com.mojang.blaze3d.systems.RenderSystem;
 import com.mojang.renderpearl.api.pipeline.ShaderSource;
 import com.mojang.renderpearl.api.pipeline.ShaderType;
+import com.mojang.renderpearl.backend.api.SpvModule;
+import com.mojang.renderpearl.frontend.shaders.SPIRVModule;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.lang.ref.WeakReference;
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.FileAlreadyExistsException;
 import java.nio.file.Files;
 import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
-import java.nio.file.StandardCopyOption;
 import java.nio.file.StandardOpenOption;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
@@ -21,6 +23,9 @@ import java.util.Comparator;
 import java.util.HexFormat;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.Supplier;
 import net.fabricmc.loader.api.FabricLoader;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.ShaderDefines;
@@ -35,6 +40,8 @@ public final class SpirvCache {
     private static final String DIRECTORY   = "txoptimizations/spirv";
     private static final int    SPIRV_MAGIC = 0x07230203;
     private static final int    MIN_SIZE    = 20;
+
+    private static final ConcurrentHashMap<Path, CompletableFuture<Boolean>> COMPILING = new ConcurrentHashMap<>();
 
     private static WeakReference<ShaderManager.Configs> includesOwner = new WeakReference<>(null);
     private static byte[]                               includesDigest;
@@ -70,7 +77,46 @@ public final class SpirvCache {
         return Minecraft.getInstance().gameDirectory.toPath().resolve(DIRECTORY).resolve(HexFormat.of().formatHex(digest.digest()) + ".spv");
     }
 
-    public static ByteBuffer read(Path file) {
+    public static SpvModule load(Path file, ShaderType type, Supplier<SpvModule> compile) {
+        ByteBuffer cached = read(file);
+
+        if (cached != null)
+            return new SPIRVModule(cached, type);
+
+        CompletableFuture<Boolean> written = new CompletableFuture<>();
+        CompletableFuture<Boolean> other   = COMPILING.putIfAbsent(file, written);
+
+        if (other != null)
+            return awaitOther(file, type, other, compile);
+
+        try {
+            SpvModule module = compile.get();
+
+            write(file, module.spv());
+            written.complete(true);
+
+            return module;
+        } catch (Throwable exception) {
+            written.complete(false);
+            throw exception;
+        } finally {
+            COMPILING.remove(file, written);
+        }
+    }
+
+    private static SpvModule awaitOther(Path file, ShaderType type, CompletableFuture<Boolean> other, Supplier<SpvModule> compile) {
+        if (!other.join())
+            return compile.get();
+
+        ByteBuffer spirv = read(file);
+
+        if (spirv == null)
+            throw new IllegalStateException("Cached SPIR-V " + file + " is missing after another thread wrote it");
+
+        return new SPIRVModule(spirv, type);
+    }
+
+    private static ByteBuffer read(Path file) {
         try (FileChannel channel = FileChannel.open(file, StandardOpenOption.READ)) {
             long size = channel.size();
 
@@ -102,20 +148,26 @@ public final class SpirvCache {
         }
     }
 
-    public static void write(Path file, ByteBuffer spirv) {
+    private static void write(Path file, ByteBuffer spirv) {
         try {
             Files.createDirectories(file.getParent());
 
             Path temporary = Files.createTempFile(file.getParent(), file.getFileName().toString(), ".tmp");
 
-            try (FileChannel channel = FileChannel.open(temporary, StandardOpenOption.WRITE)) {
-                ByteBuffer view = spirv.duplicate();
+            try {
+                try (FileChannel channel = FileChannel.open(temporary, StandardOpenOption.WRITE)) {
+                    ByteBuffer view = spirv.duplicate();
 
-                while (view.hasRemaining())
-                    channel.write(view);
+                    while (view.hasRemaining())
+                        channel.write(view);
+                }
+
+                Files.move(temporary, file);
+            } catch (FileAlreadyExistsException exception) {
+                return;
+            } finally {
+                Files.deleteIfExists(temporary);
             }
-
-            Files.move(temporary, file, StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING);
         } catch (IOException exception) {
             throw new UncheckedIOException("Could not write cached SPIR-V " + file, exception);
         }
