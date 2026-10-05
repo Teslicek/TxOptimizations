@@ -148,7 +148,7 @@ Name tags, holograms and other text in the world were laid out again every frame
 
 ### Direct vertex writes
 
-Sodium writes every glyph, particle, entity cuboid and item quad into a small stack buffer and then copies it into the frame's vertex buffer, one native memory copy per glyph or cuboid. At a busy server spawn these copies took about 10% of the render thread. When the vertex buffer uses exactly the format being written, TxOptimizations reserves the space in the buffer first and writes the same bytes straight into it, updating the vertex count and last vertex pointer the same way Sodium's push does. Buffers with another format keep Sodium's converting push.
+Sodium writes every glyph, particle, entity cuboid and item quad into a small stack buffer and then copies it into the frame's vertex buffer, one native memory copy per glyph or cuboid. At a busy server spawn these copies took about 10% of the render thread. When the vertex buffer uses exactly the format being written, TxOptimizations reserves the space in the buffer first and writes the same bytes straight into it, updating the vertex count and last vertex pointer the same way Sodium's push does. Buffers with another format keep Sodium's converting push. Glyphs written into other buffers, such as GUI text, also skip Sodium's glyph hook: they go through the same stack buffer and converting push Sodium uses, which avoids the callback object Sodium's cancellable hook allocated for every character (about 4 MB/s at a server spawn).
 
 ### Attribute lookups
 
