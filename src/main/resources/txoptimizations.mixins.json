@@ -129,6 +129,7 @@
     "RenderSystemPipelineCacheAccessor",
     "ShaderManagerLazyPipelinesMixin",
     "FontManagerSelectionMixin",
+    "FontManagerFinalizeLookupMixin",
     "FontSetSelectionMixin",
     "RenderSectionManagerRotationMixin",
     "RenderSectionManagerSpriteMarkMixin",

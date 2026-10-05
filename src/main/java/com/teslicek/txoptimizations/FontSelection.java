@@ -17,6 +17,7 @@ import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import net.minecraft.client.gui.font.AllMissingGlyphProvider;
 import net.minecraft.client.gui.font.FontOption;
 import net.minecraft.client.gui.font.providers.BitmapProvider;
 import net.minecraft.client.gui.font.providers.UnihexProvider;
@@ -27,7 +28,8 @@ import org.jspecify.annotations.Nullable;
 
 public final class FontSelection {
 
-    private static final Set<Class<?>> SUPPORTED_SET_PROVIDERS = Set.of(BitmapProvider.class, UnihexProvider.class, SpaceProvider.class, TrueTypeGlyphProvider.class);
+    private static final Set<Class<?>> LOOKUP_PROVIDERS        = Set.of(BitmapProvider.class, UnihexProvider.class, SpaceProvider.class, AllMissingGlyphProvider.class);
+    private static final Set<Class<?>> SUPPORTED_SET_PROVIDERS = Set.of(BitmapProvider.class, UnihexProvider.class, SpaceProvider.class, AllMissingGlyphProvider.class, TrueTypeGlyphProvider.class);
 
     private static volatile Pending pending;
 
@@ -59,6 +61,15 @@ public final class FontSelection {
         }
 
         return null;
+    }
+
+    public static boolean onlyLookupProviders(List<GlyphProvider.Conditional> providers) {
+        for (GlyphProvider.Conditional provider : providers) {
+            if (!LOOKUP_PROVIDERS.contains(provider.provider().getClass()))
+                return false;
+        }
+
+        return true;
     }
 
     public static void clear() {
