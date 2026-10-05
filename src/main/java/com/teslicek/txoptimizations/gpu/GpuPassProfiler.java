@@ -6,6 +6,7 @@ import com.mojang.renderpearl.backend.api.CommandEncoderBackend;
 import com.mojang.renderpearl.backend.vulkan.VulkanDevice;
 import com.mojang.renderpearl.backend.vulkan.VulkanQueryPool;
 import com.mojang.renderpearl.frontend.FrontendRenderPipeline;
+import com.teslicek.txoptimizations.FramePath;
 import com.teslicek.txoptimizations.mixin.gpu.VulkanQueryPoolAccessor;
 import org.lwjgl.vulkan.VK12;
 import java.nio.file.Path;
@@ -45,7 +46,6 @@ public final class GpuPassProfiler {
     private static int                   framesRead;
     private static long                  gpuNanos;
     private static long                  startNanos;
-    private static long                  lastSubmit;
     private static long                  measuredFrom;
     private static double                nanosPerTick;
     private static long                  terrainDraws;
@@ -74,6 +74,7 @@ public final class GpuPassProfiler {
         startNanos     = System.nanoTime();
         Arrays.fill(SLOW_NANOS, 0L);
         Arrays.fill(SLOW_TEXTS, null);
+        FramePath.resetCounts();
         ProfileCounters.reset();
         context        = ProfileContext.capture(Minecraft.getInstance());
         frameTimeCount = 0;
@@ -92,17 +93,7 @@ public final class GpuPassProfiler {
         return recording;
     }
 
-    public static void frameSubmitted() {
-        long now      = System.nanoTime();
-        long previous = lastSubmit;
-
-        lastSubmit = now;
-
-        if (previous != 0L)
-            recordFrameTime(now - previous);
-    }
-
-    private static void recordFrameTime(long frameNanos) {
+    public static void recordFrameTime(long frameNanos) {
         if (!recording)
             return;
 
@@ -324,6 +315,7 @@ public final class GpuPassProfiler {
         StringBuilder report  = new StringBuilder();
 
         report.append(String.format(Locale.ROOT, "%d frames in %.1f s (%.0f fps), GPU %.3f ms per frame, GPU busy %.0f%% of the time%n", framesRead, seconds, framesRead / seconds, frameMs, gpuNanos / 1.0e7 / seconds));
+        report.append(String.format(Locale.ROOT, "Present thread used for %.0f%% of frames%n", FramePath.workerShare() * 100.0));
         report.append(frameTimeReport());
         report.append(String.format(Locale.ROOT, "Terrain %.0f draws and %.3f million triangles per frame%n", (double) terrainDraws / framesRead, terrainIndices / 3.0 / 1.0e6 / framesRead));
         report.append(ProfileCounters.report(framesRead));
