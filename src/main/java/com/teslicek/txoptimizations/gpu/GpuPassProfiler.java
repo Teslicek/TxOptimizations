@@ -45,6 +45,7 @@ public final class GpuPassProfiler {
     private static int                   framesRead;
     private static long                  gpuNanos;
     private static long                  startNanos;
+    private static long                  measuredFrom;
     private static double                nanosPerTick;
     private static long                  terrainDraws;
     private static long                  terrainIndices;
@@ -78,6 +79,7 @@ public final class GpuPassProfiler {
         GcPauses.start();
         JfrRecorder.start(Thread.currentThread());
         CpuSampler.start(Thread.currentThread(), DURATION);
+        measuredFrom   = System.nanoTime();
     }
 
     public static boolean isRunning() {
@@ -92,13 +94,18 @@ public final class GpuPassProfiler {
         if (!recording)
             return;
 
+        long now = System.nanoTime();
+
+        if (now - frameNanos < measuredFrom)
+            return;
+
         if (frameTimeCount == frameTimes.length) {
             frameTimes = Arrays.copyOf(frameTimes, frameTimes.length * 2);
             frameEnds  = Arrays.copyOf(frameEnds, frameEnds.length * 2);
         }
 
         frameTimes[frameTimeCount] = frameNanos;
-        frameEnds[frameTimeCount]  = System.nanoTime();
+        frameEnds[frameTimeCount]  = now;
         frameTimeCount ++;
     }
 
