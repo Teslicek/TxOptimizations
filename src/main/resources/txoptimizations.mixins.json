@@ -142,6 +142,8 @@
     "SodiumExtraFrameCounterMixin",
     "SoundEngineChannelSpinMixin",
     "SoundEngineListenerMixin",
+    "SoundEngineDeviceReuseMixin",
+    "LibraryDeviceReuseMixin",
     "SubmitNodeStorageKeepCollectionsMixin",
     "StateDefinitionNeighborTableMixin",
     "StateHolderNeighborTableMixin",

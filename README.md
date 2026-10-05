@@ -474,6 +474,10 @@ Every resource reload, including the one when a server sends its resource pack a
 
 When a reload finished, the render thread went through every codepoint of every font (more than 60,000 for the unifont alone) in every glyph provider to pick the providers each font uses and to list the glyphs of each width for obfuscated text. That took 72 ms of the 143 ms the render thread was blocked in a CubeCraft resource pack reload. The same work now runs on a worker thread while the reload is still preparing, with the same steps in the same order, and the render thread only takes the finished result. It is used only when the font options and every provider are still the same when the reload is applied, otherwise the render thread works it out as before.
 
+### Audio device on reload
+
+Every resource reload closed the OpenAL audio device and opened it again, which took 52 ms of the 101 ms the render thread was blocked in a CubeCraft resource pack reload. The reload still stops every sound, frees every sound buffer and channel and loads the sounds again, but the device and its context stay open when the reopen would pick the same device: the sound device option, the directional audio option and the list of system audio devices are unchanged and the device is still connected. If any of them changed, the device is closed and opened as before.
+
 ### Memory
 
 Less live memory means shorter and rarer garbage collections.
