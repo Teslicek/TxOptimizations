@@ -26,6 +26,7 @@ final class JfrRecorder {
     private static final String   DEOPTIMIZATION = "jdk.Deoptimization";
     private static final String   PARK           = "jdk.ThreadPark";
     private static final String   MONITOR        = "jdk.JavaMonitorEnter";
+    private static final String   VM_OPERATION   = "jdk.ExecuteVMOperation";
     private static final Duration WAIT_THRESHOLD = Duration.ofNanos(200_000L);
     private static final int      SITE_FRAMES    = 6;
     private static final int      WAIT_FRAMES    = 6;
@@ -52,6 +53,7 @@ final class JfrRecorder {
         started.enable(DEOPTIMIZATION).withStackTrace();
         started.enable(PARK).withThreshold(WAIT_THRESHOLD).withStackTrace();
         started.enable(MONITOR).withThreshold(WAIT_THRESHOLD).withStackTrace();
+        started.enable(VM_OPERATION).withThreshold(Duration.ZERO);
         started.start();
         recording    = started;
         startTime    = Instant.now();
@@ -89,6 +91,9 @@ final class JfrRecorder {
         List<RecordedEvent> safepoints      = new ArrayList<>();
         List<RecordedEvent> compilations    = new ArrayList<>();
         List<RecordedEvent> waits           = new ArrayList<>();
+        List<RecordedEvent> operations      = new ArrayList<>();
+        Map<String, Long>   operationNanos  = new HashMap<>();
+        Map<String, Long>   operationCounts = new HashMap<>();
         Map<String, Long>   deoptimizations = new HashMap<>();
         Map<String, Long>   waitNanos       = new HashMap<>();
         Map<String, Long>   waitCounts      = new HashMap<>();
@@ -99,6 +104,13 @@ final class JfrRecorder {
             switch (type) {
                 case SAFEPOINT -> safepoints.add(event);
                 case COMPILATION -> compilations.add(event);
+                case VM_OPERATION -> {
+                    String name = event.getString("operation") + (event.getBoolean("safepoint") ? " (safepoint)" : "");
+
+                    operations.add(event);
+                    operationNanos.merge(name, event.getDuration().toNanos(), Long::sum);
+                    operationCounts.merge(name, 1L, Long::sum);
+                }
                 case DEOPTIMIZATION -> deoptimizations.merge(method(event.getValue("method")) + " (" + event.getString("reason") + ", " + event.getString("action") + ")", 1L, Long::sum);
                 case PARK, MONITOR -> {
                     if (event.getThread() == null || !renderThread.equals(event.getThread().getJavaName()))
@@ -119,6 +131,14 @@ final class JfrRecorder {
 
         report.append(String.format(Locale.ROOT, "Safepoints: %d, %.2f ms in total%n", safepoints.size(), totalMillis(safepoints)));
         longest(safepoints).forEach(event -> report.append(String.format(Locale.ROOT, "  %8.3f ms  at %.3f s%n", millis(event), seconds(event))));
+
+        report.append(String.format(Locale.ROOT, "VM operations: %d, %.2f ms in total%n", operations.size(), totalMillis(operations)));
+        longest(operations).forEach(event -> report.append(String.format(Locale.ROOT, "  %8.3f ms  at %.3f s  %s%s%n", millis(event), seconds(event), event.getString("operation"), event.getBoolean("safepoint") ? " (safepoint)" : "")));
+        report.append(String.format(Locale.ROOT, "  by operation%n"));
+        operationNanos.entrySet().stream()
+            .sorted(Map.Entry.<String, Long>comparingByValue().reversed())
+            .limit(TOP_EVENTS)
+            .forEach(entry -> report.append(String.format(Locale.ROOT, "  %8.3f ms  %5dx  %s%n", entry.getValue() / 1.0e6, operationCounts.get(entry.getKey()), entry.getKey())));
 
         report.append(String.format(Locale.ROOT, "JIT compilations: %d, %.1f ms of compiler time in total%n", compilations.size(), totalMillis(compilations)));
         longest(compilations).forEach(event -> report.append(String.format(Locale.ROOT, "  %8.3f ms  at %.3f s  tier %d  %s%n", millis(event), seconds(event), event.getInt("compileLevel"), method(event.getValue("method")))));
