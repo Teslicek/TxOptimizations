@@ -4,6 +4,7 @@ import com.llamalad7.mixinextras.injector.ModifyReturnValue;
 import com.llamalad7.mixinextras.sugar.Local;
 import com.teslicek.txoptimizations.FontSelection;
 import com.teslicek.txoptimizations.ReloadTimeline;
+import com.teslicek.txoptimizations.UnifontCache;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executor;
@@ -16,6 +17,7 @@ import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
+import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 @Mixin(FontManager.class)
 public abstract class FontManagerSelectionMixin {
@@ -23,6 +25,11 @@ public abstract class FontManagerSelectionMixin {
     @Shadow
     private static Set<FontOption> getFontOptions(Options options) {
         throw new AssertionError();
+    }
+
+    @Inject(method = "prepare", at = @At("HEAD"))
+    private void txoptimizations$startFontReload(CallbackInfoReturnable<CompletableFuture<?>> cir) {
+        UnifontCache.begin();
     }
 
     @ModifyReturnValue(method = "prepare", at = @At("RETURN"))
@@ -37,7 +44,8 @@ public abstract class FontManagerSelectionMixin {
     }
 
     @Inject(method = "apply", at = @At("TAIL"))
-    private void txoptimizations$dropSelections(CallbackInfo ci) {
+    private void txoptimizations$finishFontReload(CallbackInfo ci) {
         FontSelection.clear();
+        UnifontCache.finish();
     }
 }

@@ -486,6 +486,10 @@ The language reload read and parsed every language file on the render thread, ab
 
 To put each texture into its atlas, a reload created a GPU texture for every sprite, uploaded every mipmap level of it, created five views of it and drew it into the atlas once per mipmap level, thousands of textures, uploads and draws that made up most of the reload frame on CubeCraft and 22 ms of GPU work the next frame waited for. That draw has no blending and samples the sprite with nearest filtering at texel centres, with the quad covering the sprite and its padding on whole texels (every sprite and its padding are a multiple of the mipmap step), so each atlas texel is the sprite texel at the same position, with the padding repeating the nearest edge texel. Each mipmap level of the atlas is now written that way into one staging buffer and copied to the atlas in one copy. Animated sprites are drawn as before.
 
+### Unifont reuse
+
+Every reload unzipped and parsed the three Unifont files, more than 60,000 glyph lines read byte by byte, and font loading finished last in a CubeCraft reload because of it. The parsed font is never changed after loading and closing it does nothing, so a reload now reuses the one from the previous reload when the file's bytes have the same SHA-256 and the size overrides are equal; any other file is parsed as before. Only the fonts loaded by the latest reload are kept, and they are the ones the game is already using.
+
 ### Missing texture warnings
 
 Model loading is the last part of a reload to finish, and its final step wrote a warning for every model with a missing texture, one after another on one thread, to the console and to latest.log. CubeCraft's resource pack has about 1,360 such models, so that step held up the end of every reload with its pack. The same warnings are now written by a background thread after the models are done, in the same order and with the same text.

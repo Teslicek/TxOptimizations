@@ -162,6 +162,7 @@
     "TextureSetupLightmapCacheMixin",
     "TranslatableTemplateCacheMixin",
     "TreeAccessor",
+    "UnihexDefinitionCacheMixin",
     "TreeArrayPoolMixin",
     "UnmodifiableObject2IntMapAccessor",
     "VKIndirectDrawBatchSliceCacheMixin",
