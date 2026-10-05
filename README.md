@@ -12,6 +12,8 @@ Every frame, `AtmosphericFogEnvironment.updateRainFogState` looks up the biome a
 
 Every frame, each visible particle looks up the light level at its position again (`Particle.getLightCoords`). Particles only move once per tick, so at high frame rates the same lookup repeats many times per tick. TxOptimizations caches the result per particle for the current client tick and position. A light change reaches particles at most one tick (50 ms) later. Particle types that compute their own light without calling the base method are unaffected.
 
+When a particle does look its light up again, the block position is now written into one reused mutable position instead of a new `BlockPos` (3.7 MB/s with 13,000 particles). The light lookup only reads the position, so it sees the same block.
+
 ### Vertex buffer recycling
 
 At the end of every frame, `StagedVertexBuffer$GpuBufferPool.tryRecycleBuffers` checks every pending batch of vertex buffers to see whether the GPU is done with it. Each check is a native Vulkan call (`vkWaitSemaphores` with a zero timeout), and a spark profile showed these checks taking about 2.8% of the render thread. The batches are added in submission order and the GPU finishes submissions in that order, so TxOptimizations checks them from the oldest and stops at the first one that is still in use. Several pools (staging, vertex and index buffers for the world and the GUI) run this check every frame, and the oldest batch is usually still in use, so each pool would still make one native call per frame. While this recycle pass runs, TxOptimizations also remembers the lowest submit index the GPU reported as unfinished in the current frame and answers "not yet" for that index and every later one without asking the GPU again. It never answers "done" from memory, and vanilla's own fast path for already completed submits still runs first.
@@ -81,6 +83,8 @@ When the GPU supports `VK_AMD_buffer_marker` or `VK_NV_device_diagnostic_checkpo
 ### Particle rotation
 
 Every camera-facing particle allocated a new rotation quaternion each frame. The quaternion is now reused, reset to identity first as the new one was.
+
+Each particle then rolls that quaternion by its roll angle, which computed a sine and cosine for every particle every frame even though almost every particle has a roll of zero. With 13,000 particles on screen, `SingleQuadParticle.extract` took 21% of the render thread. For a roll of exactly zero, JOML's sine of half the angle is that same zero and its cosine is exactly 1, so the rotation is now computed with those two values directly, the same multiplications and additions in the same order, giving identical bits including signed zeros. Any other roll, and JOML's fast math mode, still go through `rotateZ`.
 
 ### Main target clear
 
@@ -351,6 +355,8 @@ Every entity, text or item draw with its own transform wrote that transform into
 ### Model cube writes
 
 Sodium writes entity model cubes through a cancellable hook on every cube, which allocated a callback object per cube per frame (about 5 MB/s in a world with mobs). Model parts now hand their cubes straight to Sodium's cuboid writer, with the same color conversion, light and overlay, so every vertex is identical. Vertex consumers Sodium cannot write to still go through the cube's own method.
+
+Every model part drew its children by iterating its child map, which created an iterator object per model part per frame (5.2 MB/s in a world with many slimes). Child maps are fastutil array maps, so the children are now read in the same order straight from the map's value array. Any other kind of map keeps the iterator.
 
 ### Entity culling boxes
 

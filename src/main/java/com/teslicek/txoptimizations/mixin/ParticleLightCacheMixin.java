@@ -31,6 +31,9 @@ public abstract class ParticleLightCacheMixin {
     protected double z;
 
     @Unique
+    private static final BlockPos.MutableBlockPos LIGHT_POS = new BlockPos.MutableBlockPos();
+
+    @Unique
     private long txoptimizations$lightTick = -1L;
 
     @Unique
@@ -52,7 +55,7 @@ public abstract class ParticleLightCacheMixin {
         if (this.txoptimizations$lightTick == tick && this.txoptimizations$lightX == this.x && this.txoptimizations$lightY == this.y && this.txoptimizations$lightZ == this.z)
             return this.txoptimizations$light;
 
-        BlockPos pos = BlockPos.containing(this.x, this.y, this.z);
+        BlockPos pos = LIGHT_POS.set(this.x, this.y, this.z);
 
         this.txoptimizations$lightTick = tick;
         this.txoptimizations$lightX    = this.x;
