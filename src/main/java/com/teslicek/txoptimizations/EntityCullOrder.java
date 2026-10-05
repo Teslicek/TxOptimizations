@@ -12,24 +12,21 @@ public final class EntityCullOrder {
     private static final Class<?>[] PARAMETERS = {Entity.class, Frustum.class, double.class, double.class, double.class, float.class};
     private static final String     METHOD     = findShouldRender();
 
-    private static final ClassValue<Boolean> INHERITED = new ClassValue<>() {
-        @Override
-        protected Boolean computeValue(Class<?> type) {
-            try {
-                return type.getMethod(METHOD, PARAMETERS).getDeclaringClass() == EntityRenderer.class;
-            } catch (NoSuchMethodException exception) {
-                throw new IllegalStateException("Entity renderer " + type.getName() + " has no shouldRender method", exception);
-            }
-        }
-    };
-
     private static boolean deferring;
 
     private EntityCullOrder() {
     }
 
     public static boolean canDefer(EntityRenderer<?, ?> renderer) {
-        return INHERITED.get(renderer.getClass());
+        return ((DeferrableRenderer) renderer).txoptimizations$canDefer();
+    }
+
+    public static boolean inheritsShouldRender(Class<?> type) {
+        try {
+            return type.getMethod(METHOD, PARAMETERS).getDeclaringClass() == EntityRenderer.class;
+        } catch (NoSuchMethodException exception) {
+            throw new IllegalStateException("Entity renderer " + type.getName() + " has no shouldRender method", exception);
+        }
     }
 
     public static boolean isDeferring() {

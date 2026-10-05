@@ -380,6 +380,14 @@ Every suspicious sand and gravel block in view built a full render state each fr
 
 Every block entity in view allocated a vector for its center to check whether it is within the renderer's view distance (about 6 MB/s on a BedWars map). Renderers that use the default distance check now compute the same differences and squares directly from the block position, in the same order, so the result is identical. Renderers with their own check, such as beacons, still run it.
 
+### Render type textures
+
+Every time an entity, item or text render type was prepared for a frame, it built a new list of its textures (overlay, lightmap and each bound texture with its sampler), allocating the list and one record per texture. Each render type now keeps the list it built last and returns it again when every entry would be the same: same name, same texture view object and same sampler object, looked up the same way and in the same order as before. Any change, such as a reloaded texture or a different lightmap, builds a new list.
+
+### Entity cull order check
+
+Deciding whether an entity's culling can be deferred to Sodium looked up the renderer's class in a class-keyed table for every entity every frame (1.3% of the render thread in a world full of entities). Each renderer now remembers the answer itself after the first lookup, since a renderer's class never changes.
+
 ### Breaking overlay rotation
 
 The block breaking crack overlay computes its texture coordinates per vertex and called `Direction.getRotation()` for every vertex, which allocates a new quaternion and evaluates its sines and cosines (1.3% of the render thread in a CubeCraft lobby). The six rotations are now built once by that same method and reused. The overlay only reads them, so every vertex gets the same values.

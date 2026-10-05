@@ -60,3 +60,6 @@ mutable field com/mojang/renderpearl/api/pipeline/RenderPipeline colorTargetStat
 
 # Lazy transient command buffer
 accessible class com/mojang/renderpearl/backend/vulkan/VulkanQueue$Submission$SubmitStage
+
+# Render type texture list reuse
+accessible class net/minecraft/client/renderer/rendertype/RenderSetup$TextureBinding
