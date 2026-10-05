@@ -4,7 +4,6 @@ import com.teslicek.txoptimizations.LayeredSectionMap;
 import com.teslicek.txoptimizations.LightSnapshotMap;
 import it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap;
 import it.unimi.dsi.fastutil.longs.LongIterator;
-import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
 import it.unimi.dsi.fastutil.longs.LongSet;
 import net.minecraft.world.level.chunk.DataLayer;
 import net.minecraft.world.level.lighting.DataLayerStorageMap;
@@ -23,7 +22,7 @@ public abstract class LayerLightSectionStorageSnapshotMixin {
     private static final int MIN_CHANGES = 512;
 
     @Unique
-    private static final int CHANGES_SHIFT = 3;
+    private static final int CHANGES_SHIFT = 4;
 
     @Shadow
     @Final
@@ -33,37 +32,33 @@ public abstract class LayerLightSectionStorageSnapshotMixin {
     private Long2ObjectOpenHashMap<DataLayer> txoptimizations$base;
 
     @Unique
-    private LongOpenHashSet txoptimizations$changedSinceBase;
+    private Long2ObjectOpenHashMap<DataLayer> txoptimizations$changes;
 
     @Redirect(method = "swapSectionMap", at = @At(value = "INVOKE", target = "Lnet/minecraft/world/level/lighting/DataLayerStorageMap;copy()Lnet/minecraft/world/level/lighting/DataLayerStorageMap;"))
     private DataLayerStorageMap<?> txoptimizations$snapshot(DataLayerStorageMap<?> updating) {
         LightSnapshotMap                  source   = (LightSnapshotMap) updating;
         Long2ObjectOpenHashMap<DataLayer> sections = source.txoptimizations$sections();
+        Long2ObjectOpenHashMap<DataLayer> previous = this.txoptimizations$changes;
 
-        if (this.txoptimizations$changedSinceBase == null)
-            this.txoptimizations$changedSinceBase = new LongOpenHashSet();
-
-        LongOpenHashSet changed = this.txoptimizations$changedSinceBase;
-
-        changed.addAll(this.changedSections);
-
-        if (this.txoptimizations$base == null || changed.size() > Math.max(MIN_CHANGES, sections.size() >> CHANGES_SHIFT)) {
+        if (this.txoptimizations$base == null || previous.size() + this.changedSections.size() > Math.max(MIN_CHANGES, sections.size() >> CHANGES_SHIFT)) {
             DataLayerStorageMap<?> copy = updating.copy();
 
-            this.txoptimizations$base = ((LightSnapshotMap) copy).txoptimizations$sections();
-            changed.clear();
+            this.txoptimizations$base    = ((LightSnapshotMap) copy).txoptimizations$sections();
+            this.txoptimizations$changes = new Long2ObjectOpenHashMap<>();
 
             return copy;
         }
 
-        Long2ObjectOpenHashMap<DataLayer> changes  = new Long2ObjectOpenHashMap<>(changed.size());
-        LongIterator                      iterator = changed.iterator();
+        Long2ObjectOpenHashMap<DataLayer> changes  = previous.clone();
+        LongIterator                      iterator = this.changedSections.iterator();
 
         while (iterator.hasNext()) {
             long section = iterator.nextLong();
 
             changes.put(section, sections.get(section));
         }
+
+        this.txoptimizations$changes = changes;
 
         return source.txoptimizations$snapshotWith(new LayeredSectionMap(this.txoptimizations$base, changes));
     }

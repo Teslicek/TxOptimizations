@@ -400,7 +400,7 @@ For every chunk region it draws, Sodium writes the region's camera offset, age a
 
 The light engine keeps one map of light sections it updates and publishes a read-only snapshot of it for every other thread. Every time lighting changed, vanilla published a full copy of the whole map. At render distance 32 that map holds around 100,000 sections, so each copy allocated arrays of several MB on the render thread and on every server worker thread. While moving, `/txprofile` showed most garbage collections forced by these huge arrays, each pausing the game for 8 to 10 ms.
 
-A snapshot is now the last full copy plus a small map of the sections that changed since it, taken from the light engine's own record of changed sections. Lookups check the small map first and then the full copy, so every lookup returns exactly what a full copy would. Nothing ever modifies a published full copy or a published change map. Once the changes since the last full copy exceed an eighth of the sections (at least 512), the next snapshot is a full copy again, the same way vanilla makes it, and becomes the new base.
+A snapshot is now the last full copy plus a small map of the sections that changed since it. Each new snapshot copies the previous small map and adds the sections the light engine recorded as changed since the previous snapshot, with their current data. Lookups check the small map first and then the full copy, so every lookup returns exactly what a full copy would. Nothing ever modifies a published full copy or a published change map. Once the changes since the last full copy would exceed a sixteenth of the sections (at least 512), the next snapshot is a full copy again, the same way vanilla makes it, and becomes the new base.
 
 ### Breaking overlay rotation
 
