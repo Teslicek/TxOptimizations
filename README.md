@@ -342,7 +342,27 @@ Every frame's entity, text, item, GUI and debug geometry used to be written into
 
 ### Uniform writes
 
-Every entity, text or item draw with its own transform wrote that transform into a ring buffer by mapping the buffer, writing the transform and unmapping it again. Each write took a VMA lock twice and allocated a pointer buffer, a byte buffer, a buffer slice, a mapped view and its close callback (over 16 MB/s of garbage in a busy server lobby). Under Vulkan each ring buffer is now mapped once, the first time it is written, and stays mapped until the ring buffer is closed. Each transform is written at the same offset with the same limit, so the GPU reads identical bytes. The memory is host-coherent, as it was before, so no flush is involved. Other backends keep mapping per write.
+Every entity, text or item draw with its own transform wrote that transform into a ring buffer through a fresh mapped view of the buffer. Each write allocated a pointer buffer, a byte buffer, a buffer slice, a mapped view and its close callback (over 16 MB/s of garbage in a busy server lobby). Under Vulkan each ring buffer now keeps one mapped view, opened the first time it is written and closed with the ring buffer, and every transform is written through it. Each transform is written at the same offset with the same limit, so the GPU reads identical bytes. The memory is host-coherent, as it was before, so no flush is involved. Other backends keep mapping per write.
+
+### Model cube writes
+
+Sodium writes entity model cubes through a cancellable hook on every cube, which allocated a callback object per cube per frame (about 5 MB/s in a world with mobs). Model parts now hand their cubes straight to Sodium's cuboid writer, with the same color conversion, light and overlay, so every vertex is identical. Vertex consumers Sodium cannot write to still go through the cube's own method.
+
+### Entity culling boxes
+
+Every entity checked against the view frustum got a new bounding box, grown by half a block, every frame (about 11 MB/s in singleplayer). An entity that has not moved keeps the same bounding box object, so the grown box is now kept per entity and reused while the box it came from is the same object. A moving entity gets a new box as before.
+
+### Particle draw maps
+
+Every particle group built two new identity maps per frame to collect its draws and textures per layer. The maps are now cleared and reused once the frame's particles are drawn. A cleared map keeps its table size, so it lists its layers in the same order a new one would; a map that ever held enough layers to grow is dropped instead of reused.
+
+### GUI glyph matrix
+
+Every GUI glyph converted its 2D pose into a new 4x4 matrix before writing its vertices. One matrix is now reset to identity and reused for each glyph, and the glyph writes its vertices before the next one starts.
+
+### Buffer slices
+
+Asking a GPU buffer for a slice covering all of it created a new slice object each time, and Sodium does that for every chunk region drawn each frame. The slice is now created once per buffer, since a buffer never changes size. Sodium's indirect terrain draws also created a slice of the command buffer per region per frame; each draw batch now remembers its last 8 slices and reuses one with the same buffer, offset and length.
 
 ### Breaking overlay rotation
 

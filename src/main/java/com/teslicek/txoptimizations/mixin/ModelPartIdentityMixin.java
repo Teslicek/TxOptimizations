@@ -2,8 +2,12 @@ package com.teslicek.txoptimizations.mixin;
 
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.blaze3d.vertex.VertexConsumer;
+import com.teslicek.txoptimizations.SodiumCuboids;
 import java.util.List;
 import java.util.Map;
+import net.caffeinemc.mods.sodium.api.util.ColorARGB;
+import net.caffeinemc.mods.sodium.api.vertex.buffer.VertexBufferWriter;
+import net.caffeinemc.mods.sodium.client.render.immediate.model.EntityRenderer;
 import net.minecraft.client.model.geom.ModelPart;
 import org.spongepowered.asm.mixin.Final;
 import org.spongepowered.asm.mixin.Mixin;
@@ -58,9 +62,21 @@ public abstract class ModelPartIdentityMixin {
     @Shadow
     public abstract void translateAndRotate(PoseStack poseStack);
 
-    @Shadow
+    @Overwrite
     private void compile(PoseStack.Pose pose, VertexConsumer builder, int lightCoords, int overlayCoords, int color) {
-        throw new AssertionError();
+        VertexBufferWriter writer = VertexBufferWriter.tryOf(builder);
+
+        if (writer == null) {
+            for (int index = 0; index < this.cubes.size(); index ++)
+                this.cubes.get(index).compile(pose, builder, lightCoords, overlayCoords, color);
+
+            return;
+        }
+
+        int abgr = ColorARGB.toABGR(color);
+
+        for (int index = 0; index < this.cubes.size(); index ++)
+            EntityRenderer.renderCuboid(pose, writer, SodiumCuboids.of(this.cubes.get(index)), lightCoords, overlayCoords, abgr);
     }
 
     @Overwrite
