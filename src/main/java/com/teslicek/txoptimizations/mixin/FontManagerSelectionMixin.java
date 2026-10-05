@@ -27,14 +27,12 @@ public abstract class FontManagerSelectionMixin {
 
     @ModifyReturnValue(method = "prepare", at = @At("RETURN"))
     private CompletableFuture<?> txoptimizations$selectProvidersOffThread(CompletableFuture<?> preparation, @Local(argsOnly = true) Executor executor) {
-        return preparation.thenComposeAsync(prepared -> {
+        return preparation.thenApplyAsync(prepared -> {
             ReloadTimeline.mark("fonts: providers loaded");
+            FontSelection.prepare(((FontManagerPreparationAccessor) prepared).txoptimizations$fontSets(), getFontOptions(Minecraft.getInstance().options));
+            ReloadTimeline.mark("fonts: providers selected");
 
-            return FontSelection.prepare(((FontManagerPreparationAccessor) prepared).txoptimizations$fontSets(), getFontOptions(Minecraft.getInstance().options), executor).thenApply(selected -> {
-                ReloadTimeline.mark("fonts: providers selected");
-
-                return prepared;
-            });
+            return prepared;
         }, executor);
     }
 

@@ -468,7 +468,7 @@ With RGSS texture filtering, Sodium's terrain shader takes four texture samples 
 
 ### Font provider selection
 
-When a reload finished, the render thread went through every codepoint of every font (more than 60,000 for the unifont alone) in every glyph provider to pick the providers each font uses and to list the glyphs of each width for obfuscated text. That took 72 ms of the 143 ms the render thread was blocked in a CubeCraft resource pack reload. The same work now runs on the worker threads while the reload is still preparing, split into runs of 4,096 codepoints that are joined back in the original order, and the render thread only takes the finished result. It is used only when the font options and every provider are still the same when the reload is applied, otherwise the render thread works it out as before.
+When a reload finished, the render thread went through every codepoint of every font (more than 60,000 for the unifont alone) in every glyph provider to pick the providers each font uses and to list the glyphs of each width for obfuscated text. That took 72 ms of the 143 ms the render thread was blocked in a CubeCraft resource pack reload. The same work now runs on a worker thread while the reload is still preparing, with the same steps in the same order, and the render thread only takes the finished result. It is used only when the font options and every provider are still the same when the reload is applied, otherwise the render thread works it out as before.
 
 ### Audio device on reload
 
