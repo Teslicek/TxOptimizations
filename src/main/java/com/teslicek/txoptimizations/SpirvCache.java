@@ -52,7 +52,7 @@ public final class SpirvCache {
     public static Path file(boolean zeroToOne, boolean drawParameters, String name, String source, ShaderType type, ShaderDefines defines, ShaderManager.Configs configs) {
         MessageDigest digest = sha256();
 
-        update(digest, "txoptimizations-spirv-1");
+        update(digest, "txoptimizations-spirv-2");
         update(digest, FabricLoader.getInstance().getModContainer("minecraft").orElseThrow().getMetadata().getVersion().getFriendlyString());
         update(digest, Version.getVersion());
         update(digest, Boolean.toString(zeroToOne));
@@ -187,7 +187,8 @@ public final class SpirvCache {
             ShadercIncludeResult result = ShadercIncludeResult.create(include.getValue().includeResultPtr());
 
             update(digest, include.getKey().toString());
-            update(digest, result.source_nameString());
+            digest.update(longBytes(result.source_name_length()));
+            digest.update(result.source_name());
             digest.update(longBytes(result.content_length()));
             digest.update(result.content());
         }
