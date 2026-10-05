@@ -11,15 +11,22 @@ import net.minecraft.server.packs.resources.SimpleReloadInstance;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;
+import org.spongepowered.asm.mixin.injection.Inject;
+import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 @Mixin(SimpleReloadInstance.class)
 public abstract class SimpleReloadInstanceTimelineMixin implements ReloadTimelineHolder {
 
     @Unique
-    private final long txoptimizations$startNanos = System.nanoTime();
+    private long txoptimizations$startNanos;
 
     @Unique
     private final Map<String, Long> txoptimizations$preparedTimes = ReloadTimeline.newTimes();
+
+    @Inject(method = "<init>", at = @At("RETURN"))
+    private void txoptimizations$startTimeline(CallbackInfo ci) {
+        this.txoptimizations$startNanos = System.nanoTime();
+    }
 
     @ModifyReturnValue(method = "createBarrierForListener", at = @At("RETURN"))
     private PreparableReloadListener.PreparationBarrier txoptimizations$timePreparation(PreparableReloadListener.PreparationBarrier barrier, @Local(argsOnly = true) PreparableReloadListener listener) {
