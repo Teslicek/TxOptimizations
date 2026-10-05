@@ -486,6 +486,10 @@ The language reload read and parsed every language file on the render thread, ab
 
 To put each texture into its atlas, a reload created a GPU texture for every sprite, uploaded every mipmap level of it, created five views of it and drew it into the atlas once per mipmap level, thousands of textures, uploads and draws that made up most of the reload frame on CubeCraft and 22 ms of GPU work the next frame waited for. That draw has no blending and samples the sprite with nearest filtering at texel centres, with the quad covering the sprite and its padding on whole texels (every sprite and its padding are a multiple of the mipmap step), so each atlas texel is the sprite texel at the same position, with the padding repeating the nearest edge texel. Each mipmap level of the atlas is now written that way into one staging buffer and copied to the atlas in one copy. Animated sprites are drawn as before.
 
+### GPU memory freed in the background
+
+Vulkan resources that are closed are destroyed two frames later, once the GPU is done with them, and that destruction ran on the render thread. After a resource reload Sodium closes the buffers of every loaded chunk, and destroying them all in one frame took 17 ms of a 33 ms frame on CubeCraft. Buffers, textures and texture views are now destroyed on a single background thread in the same order, at the same point after the GPU finished with them; the GPU memory allocator is internally synchronized, so this is safe. Other resources are destroyed on the render thread as before, and the game waits for the background thread before it shuts the GPU device down.
+
 ### Memory
 
 Less live memory means shorter and rarer garbage collections.
