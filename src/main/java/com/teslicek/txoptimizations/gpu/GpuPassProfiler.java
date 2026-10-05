@@ -19,20 +19,21 @@ import net.minecraft.network.chat.MutableComponent;
 
 public final class GpuPassProfiler {
 
-    private static final int                 SLOTS       = 3;
-    private static final int                 CAPACITY    = 4096;
-    private static final long                DURATION    = 10_000_000_000L;
-    private static final int                 CHAT_LINES  = 8;
-    private static final int                 SLOW_FRAMES = 10;
-    private static final int                 SLOW_PASSES = 4;
-    private static final String              FRAME_END   = "frame end";
-    private static final GpuQueryPool[]      POOLS       = new GpuQueryPool[SLOTS];
-    private static final String[][]          LABELS      = new String[SLOTS][CAPACITY];
-    private static final int[]               COUNTS      = new int[SLOTS];
-    private static final Map<String, Pass>   PASSES      = new HashMap<>();
-    private static final Map<Object, String> COPY_LABELS = new IdentityHashMap<>();
-    private static final long[]              SLOW_NANOS  = new long[SLOW_FRAMES];
-    private static final String[]            SLOW_TEXTS  = new String[SLOW_FRAMES];
+    private static final int                 SLOTS        = 3;
+    private static final int                 CAPACITY     = 4096;
+    private static final long                DURATION     = 10_000_000_000L;
+    private static final int                 CHAT_LINES   = 8;
+    private static final int                 SLOW_FRAMES  = 10;
+    private static final int                 SLOW_PASSES  = 4;
+    private static final long[]              FRAME_LIMITS = {1_000_000L, 2_000_000L, 4_000_000L, 8_000_000L, 16_000_000L};
+    private static final String              FRAME_END    = "frame end";
+    private static final GpuQueryPool[]      POOLS        = new GpuQueryPool[SLOTS];
+    private static final String[][]          LABELS       = new String[SLOTS][CAPACITY];
+    private static final int[]               COUNTS       = new int[SLOTS];
+    private static final Map<String, Pass>   PASSES       = new HashMap<>();
+    private static final Map<Object, String> COPY_LABELS  = new IdentityHashMap<>();
+    private static final long[]              SLOW_NANOS   = new long[SLOW_FRAMES];
+    private static final String[]            SLOW_TEXTS   = new String[SLOW_FRAMES];
 
     private static VulkanDevice          device;
     private static CommandEncoderBackend encoder;
@@ -48,6 +49,7 @@ public final class GpuPassProfiler {
     private static long[]                frameTimes = new long[1 << 16];
     private static long[]                frameEnds  = new long[1 << 16];
     private static int                   frameTimeCount;
+    private static String                context;
 
     private GpuPassProfiler() {
     }
@@ -67,9 +69,11 @@ public final class GpuPassProfiler {
         Arrays.fill(SLOW_NANOS, 0L);
         Arrays.fill(SLOW_TEXTS, null);
         FramePath.resetCounts();
+        ProfileCounters.reset();
+        context        = ProfileContext.capture(Minecraft.getInstance());
         frameTimeCount = 0;
         GcPauses.start();
-        AllocationSampler.start();
+        JfrRecorder.start(Thread.currentThread());
         CpuSampler.start(Thread.currentThread(), DURATION);
     }
 
@@ -266,7 +270,7 @@ public final class GpuPassProfiler {
 
         double           seconds = (System.nanoTime() - startNanos) / 1.0e9;
         String           gpu     = report(seconds);
-        Path             file    = ReportFiles.write("txprofile", gpu + CpuSampler.finish(frameEnds, frameTimes, frameTimeCount, GcPauses.finish()) + AllocationSampler.finish(seconds));
+        Path             file    = ReportFiles.write("txprofile", gpu + CpuSampler.finish(frameEnds, frameTimes, frameTimeCount, GcPauses.finish()) + JfrRecorder.finish(seconds));
         String[]         lines   = gpu.split("\n");
         MutableComponent chat    = ReportFiles.savedMessage("Profile", file);
 
@@ -284,6 +288,9 @@ public final class GpuPassProfiler {
         report.append(String.format(Locale.ROOT, "Present thread used for %.0f%% of frames%n", FramePath.workerShare() * 100.0));
         report.append(frameTimeReport());
         report.append(String.format(Locale.ROOT, "Terrain %.0f draws and %.3f million triangles per frame%n", (double) terrainDraws / framesRead, terrainIndices / 3.0 / 1.0e6 / framesRead));
+        report.append(ProfileCounters.report(framesRead));
+        report.append(context);
+        report.append(frameDistributionReport());
 
         PASSES.entrySet().stream()
             .sorted((first, second) -> Long.compare(second.getValue().nanos, first.getValue().nanos))
@@ -307,6 +314,50 @@ public final class GpuPassProfiler {
             total += frame;
 
         return String.format(Locale.ROOT, "Frame times: average %.0f fps, 1%% low %.0f fps, 0.1%% low %.0f fps, worst frame %.2f ms%n", frameTimeCount / (total / 1.0e9), 1.0e9 / percentile(sorted, 0.99), 1.0e9 / percentile(sorted, 0.999), sorted[sorted.length - 1] / 1.0e6);
+    }
+
+    private static String frameDistributionReport() {
+        long[] sorted = Arrays.copyOf(frameTimes, frameTimeCount);
+
+        Arrays.sort(sorted);
+
+        StringBuilder report = new StringBuilder(String.format(Locale.ROOT, "Frame time percentiles: p50 %.3f ms, p90 %.3f ms, p99 %.3f ms, p99.9 %.3f ms, max %.3f ms%nFrames over", percentile(sorted, 0.5) / 1.0e6, percentile(sorted, 0.9) / 1.0e6, percentile(sorted, 0.99) / 1.0e6, percentile(sorted, 0.999) / 1.0e6, sorted[sorted.length - 1] / 1.0e6));
+
+        for (long limit : FRAME_LIMITS) {
+            int over = 0;
+
+            for (long frame : sorted) {
+                if (frame > limit)
+                    over ++;
+            }
+
+            report.append(String.format(Locale.ROOT, " %d ms: %d,", limit / 1_000_000L, over));
+        }
+
+        report.setLength(report.length() - 1);
+        report.append(String.format(Locale.ROOT, "%nPer second (frames, average fps, worst frame):"));
+
+        int  frame  = 0;
+        long origin = frameEnds[0] - frameTimes[0];
+
+        for (int second = 0; frame < frameTimeCount; second ++) {
+            long end    = origin + (second + 1) * 1_000_000_000L;
+            long total  = 0L;
+            long worst  = 0L;
+            int  frames = 0;
+
+            while (frame < frameTimeCount && frameEnds[frame] <= end) {
+                total += frameTimes[frame];
+                worst  = Math.max(worst, frameTimes[frame]);
+                frames ++;
+                frame ++;
+            }
+
+            if (frames > 0)
+                report.append(String.format(Locale.ROOT, "%n  %2d s  %6d  %7.0f fps  %7.3f ms", second, frames, frames / (total / 1.0e9), worst / 1.0e6));
+        }
+
+        return report.append(String.format(Locale.ROOT, "%n%n")).toString();
     }
 
     private static long percentile(long[] sorted, double fraction) {

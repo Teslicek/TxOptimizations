@@ -10,6 +10,7 @@ import com.mojang.renderpearl.backend.vulkan.VulkanCommandEncoder;
 import com.mojang.renderpearl.backend.vulkan.VulkanDevice;
 import com.mojang.renderpearl.backend.vulkan.VulkanRenderPass;
 import com.teslicek.txoptimizations.gpu.GpuPassProfiler;
+import com.teslicek.txoptimizations.gpu.ProfileCounters;
 import org.lwjgl.vulkan.VkDevice;
 import org.spongepowered.asm.mixin.Final;
 import org.spongepowered.asm.mixin.Mixin;
@@ -33,6 +34,8 @@ public abstract class VulkanCommandEncoderGpuProfilerMixin {
 
     @Inject(method = "createRenderPass", at = @At("HEAD"))
     private void txoptimizations$profileRenderPass(RenderPassDescriptor descriptor, CallbackInfoReturnable<?> cir) {
+        ProfileCounters.countRenderPass();
+
         if (GpuPassProfiler.isRunning())
             this.txoptimizations$mark(descriptor.label().get());
     }

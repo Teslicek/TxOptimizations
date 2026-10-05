@@ -16,8 +16,11 @@ import java.util.concurrent.locks.LockSupport;
 
 final class CpuSampler {
 
-    private static final long         INTERVAL_NANOS    = 2_000_000L;
+    private static final long         INTERVAL_NANOS    = 1_000_000L;
     private static final int          TOP_CALLERS       = 3;
+    private static final int          STACK_DEPTH       = 12;
+    private static final int          TOP_STACKS        = 30;
+    private static final int          TOP_SLOW_STACKS   = 15;
     private static final String       NATIVE_TRAMPOLINE = "org.lwjgl.system.JNI";
     private static final ThreadMXBean THREADS           = (ThreadMXBean) ManagementFactory.getThreadMXBean();
     private static final double       SLOW_FRACTION     = 0.99;
@@ -122,6 +125,7 @@ final class CpuSampler {
         private final Map<String, Integer>              self      = new HashMap<>();
         private final Map<String, Map<String, Integer>> callers   = new HashMap<>();
         private final Map<String, Integer>              inclusive = new HashMap<>();
+        private final Map<String, Integer>              stacks    = new HashMap<>();
         private final Set<String>                       seen      = new HashSet<>();
         private Map<Long, Long>                         cpuAfter;
         private double                                  seconds;
@@ -149,6 +153,7 @@ final class CpuSampler {
 
             this.self.merge(leaf, 1, Integer::sum);
             this.callers.computeIfAbsent(leaf, ignored -> new HashMap<>()).merge(this.caller(stack, leafIndex), 1, Integer::sum);
+            this.stacks.merge(stackKey(stack, leafIndex), 1, Integer::sum);
             this.seen.clear();
 
             for (StackTraceElement frame : stack) {
@@ -166,6 +171,28 @@ final class CpuSampler {
                 index ++;
 
             return index;
+        }
+
+        private static String stackKey(StackTraceElement[] stack, int leafIndex) {
+            StringBuilder key    = new StringBuilder(frameName(stack[leafIndex]));
+            int           frames = 1;
+
+            for (int index = leafIndex + 1; index < stack.length && frames < STACK_DEPTH; index ++) {
+                if (isPlumbing(stack[index]))
+                    continue;
+
+                key.append(System.lineSeparator()).append("              <- ").append(frameName(stack[index]));
+                frames ++;
+            }
+
+            return key.toString();
+        }
+
+        private static void appendStacks(StringBuilder report, Map<String, Integer> stacks, int total, int limit) {
+            stacks.entrySet().stream()
+                .sorted(Map.Entry.<String, Integer>comparingByValue().reversed())
+                .limit(limit)
+                .forEach(entry -> report.append(String.format(Locale.ROOT, "%6.2f%%  %s%n", entry.getValue() * 100.0 / total, entry.getKey())));
         }
 
         private String caller(StackTraceElement[] stack, int leafIndex) {
@@ -197,6 +224,9 @@ final class CpuSampler {
                         .forEach(caller -> report.append(String.format(Locale.ROOT, "          %6.2f%%  <- %s%n", this.share(caller.getValue()), caller.getKey())));
                 });
 
+            report.append(String.format(Locale.ROOT, "%nRender thread hottest call stacks (leaf first, up to %d frames)%n", STACK_DEPTH));
+            appendStacks(report, this.stacks, this.samples, TOP_STACKS);
+
             report.append(String.format(Locale.ROOT, "%nRender thread total time including callees%n"));
             this.inclusive.entrySet().stream()
                 .sorted(Map.Entry.<String, Integer>comparingByValue().reversed())
@@ -224,6 +254,7 @@ final class CpuSampler {
             Map<String, Integer>              slowSelf   = new HashMap<>();
             Map<String, Map<String, Integer>> slowCalls  = new HashMap<>();
             Map<String, Integer>              slowTotal  = new HashMap<>();
+            Map<String, Integer>              slowStacks = new HashMap<>();
             Map<Integer, List<String>>        worstLeafs = new HashMap<>();
             Integer[]                         order      = new Integer[frameCount];
             int                               slowCount  = 0;
@@ -257,6 +288,7 @@ final class CpuSampler {
                 slowCount ++;
                 slowSelf.merge(leaf, 1, Integer::sum);
                 slowCalls.computeIfAbsent(leaf, ignored -> new HashMap<>()).merge(caller, 1, Integer::sum);
+                slowStacks.merge(stackKey(stack, leafIndex), 1, Integer::sum);
                 this.seen.clear();
 
                 for (StackTraceElement element : stack) {
@@ -294,6 +326,9 @@ final class CpuSampler {
                         .limit(TOP_CALLERS)
                         .forEach(call -> report.append(String.format(Locale.ROOT, "          %6.2f%%  <- %s%n", call.getValue() * 100.0 / total, call.getKey())));
                 });
+
+            report.append(String.format(Locale.ROOT, "%nSlow frame hottest call stacks%n"));
+            appendStacks(report, slowStacks, total, TOP_SLOW_STACKS);
 
             report.append(String.format(Locale.ROOT, "%nSlow frame total time including callees%n"));
             slowTotal.entrySet().stream()
