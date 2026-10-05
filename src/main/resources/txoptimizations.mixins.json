@@ -4,6 +4,7 @@
   "compatibilityLevel": "JAVA_25",
   "client": [
     "ArmorStandBareLayersMixin",
+    "ArrowGizmoPackedMixin",
     "AtmosphericFogTickCacheMixin",
     "AttributeMapLookupMixin",
     "AvatarSkinCacheMixin",
@@ -40,6 +41,7 @@
     "DynamicAtlasAllocatorDiscardMixin",
     "DynamicGpuDataStoragePersistentWriteMixin",
     "DynamicTransformEqualsMixin",
+    "EntityHitboxDebugRendererMixin",
     "EntityRenderDispatcherCacheMixin",
     "EntityCullBoxCacheMixin",
     "EntityRenderDispatcherSkinCacheMixin",
