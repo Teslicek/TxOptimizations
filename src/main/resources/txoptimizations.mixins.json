@@ -119,6 +119,7 @@
     "ScissorStateEqualityMixin",
     "ShapeOutlineEdgeCacheMixin",
     "SimpleFeatureRenderPhaseEmptyMixin",
+    "RenderTypeDefaultTexturingMixin",
     "RenderTypeGroupIndexMixin",
     "ShaderManagerSourcePatchMixin",
     "SkyDataLayerStorageMapSnapshotMixin",

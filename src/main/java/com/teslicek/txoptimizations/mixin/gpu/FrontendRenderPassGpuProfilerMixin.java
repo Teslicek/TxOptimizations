@@ -17,7 +17,7 @@ public abstract class FrontendRenderPassGpuProfilerMixin {
     @ModifyVariable(method = "setPipeline", at = @At("HEAD"), argsOnly = true)
     private CompiledRenderPipeline txoptimizations$profilePipeline(CompiledRenderPipeline pipeline) {
         if (GpuPassProfiler.isRunning())
-            GpuPassProfiler.markPipeline(((FrontendRenderPipeline) pipeline).name());
+            GpuPassProfiler.markPipeline((FrontendRenderPipeline) pipeline);
 
         ProfileCounters.countPipelineSet();
 

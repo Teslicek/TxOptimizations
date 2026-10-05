@@ -4,6 +4,7 @@ import com.mojang.renderpearl.api.commands.GpuQueryPool;
 import com.mojang.renderpearl.backend.api.CommandEncoderBackend;
 import com.mojang.renderpearl.backend.vulkan.VulkanDevice;
 import com.mojang.renderpearl.backend.vulkan.VulkanQueryPool;
+import com.mojang.renderpearl.frontend.FrontendRenderPipeline;
 import com.teslicek.txoptimizations.FramePath;
 import com.teslicek.txoptimizations.mixin.gpu.VulkanQueryPoolAccessor;
 import org.lwjgl.vulkan.VK12;
@@ -19,21 +20,22 @@ import net.minecraft.network.chat.MutableComponent;
 
 public final class GpuPassProfiler {
 
-    private static final int                 SLOTS        = 3;
-    private static final int                 CAPACITY     = 4096;
-    private static final long                DURATION     = 10_000_000_000L;
-    private static final int                 CHAT_LINES   = 8;
-    private static final int                 SLOW_FRAMES  = 10;
-    private static final int                 SLOW_PASSES  = 4;
-    private static final long[]              FRAME_LIMITS = {1_000_000L, 2_000_000L, 4_000_000L, 8_000_000L, 16_000_000L};
-    private static final String              FRAME_END    = "frame end";
-    private static final GpuQueryPool[]      POOLS        = new GpuQueryPool[SLOTS];
-    private static final String[][]          LABELS       = new String[SLOTS][CAPACITY];
-    private static final int[]               COUNTS       = new int[SLOTS];
-    private static final Map<String, Pass>   PASSES       = new HashMap<>();
-    private static final Map<Object, String> COPY_LABELS  = new IdentityHashMap<>();
-    private static final long[]              SLOW_NANOS   = new long[SLOW_FRAMES];
-    private static final String[]            SLOW_TEXTS   = new String[SLOW_FRAMES];
+    private static final int                                 SLOTS           = 3;
+    private static final int                                 CAPACITY        = 4096;
+    private static final long                                DURATION        = 10_000_000_000L;
+    private static final int                                 CHAT_LINES      = 8;
+    private static final int                                 SLOW_FRAMES     = 10;
+    private static final int                                 SLOW_PASSES     = 4;
+    private static final long[]                              FRAME_LIMITS    = {1_000_000L, 2_000_000L, 4_000_000L, 8_000_000L, 16_000_000L};
+    private static final String                              FRAME_END       = "frame end";
+    private static final GpuQueryPool[]                      POOLS           = new GpuQueryPool[SLOTS];
+    private static final String[][]                          LABELS          = new String[SLOTS][CAPACITY];
+    private static final int[]                               COUNTS          = new int[SLOTS];
+    private static final Map<String, Pass>                   PASSES          = new HashMap<>();
+    private static final Map<Object, String>                 COPY_LABELS     = new IdentityHashMap<>();
+    private static final Map<FrontendRenderPipeline, String> PIPELINE_LABELS = new IdentityHashMap<>();
+    private static final long[]                              SLOW_NANOS      = new long[SLOW_FRAMES];
+    private static final String[]                            SLOW_TEXTS      = new String[SLOW_FRAMES];
 
     private static VulkanDevice          device;
     private static CommandEncoderBackend encoder;
@@ -60,6 +62,7 @@ public final class GpuPassProfiler {
 
         PASSES.clear();
         COPY_LABELS.clear();
+        PIPELINE_LABELS.clear();
         recording      = true;
         framesRead     = 0;
         gpuNanos       = 0L;
@@ -145,11 +148,11 @@ public final class GpuPassProfiler {
             .orElseThrow(() -> new IllegalStateException("A GPU copy has no caller outside the renderer")));
     }
 
-    public static void markPipeline(String pipeline) {
+    public static void markPipeline(FrontendRenderPipeline pipeline) {
         if (!recording || encoder == null)
             return;
 
-        String label = "pipeline " + pipeline;
+        String label = PIPELINE_LABELS.computeIfAbsent(pipeline, key -> "pipeline " + key.name());
         int    count = COUNTS[slot];
 
         if (count > 0 && LABELS[slot][count - 1].equals(label))
