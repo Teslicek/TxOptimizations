@@ -18,7 +18,7 @@ public abstract class ParticleAirCollisionMixin {
 
     @WrapOperation(method = "move", at = @At(value = "INVOKE", target = "Lnet/minecraft/world/entity/Entity;collideBoundingBox(Lnet/minecraft/world/phys/shapes/CollisionContext;Lnet/minecraft/world/phys/Vec3;Lnet/minecraft/world/phys/AABB;Lnet/minecraft/world/level/Level;Ljava/util/List;)Lnet/minecraft/world/phys/Vec3;"))
     private Vec3 txoptimizations$skipAirCollision(CollisionContext context, Vec3 movement, AABB box, Level level, List<VoxelShape> colliders, Operation<Vec3> original) {
-        if (colliders.isEmpty() && AirCollision.hasNoBlockColliders(level, box.expandTowards(movement)))
+        if (colliders.isEmpty() && AirCollision.isOnlyAir(level, box.expandTowards(movement)))
             return movement;
 
         return original.call(context, movement, box, level, colliders);

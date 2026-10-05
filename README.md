@@ -274,7 +274,7 @@ Every block a raycast passes through (the per-frame crosshair pick, the third-pe
 
 ### Particle collision
 
-Every particle with physics checked its movement against the blocks around it each tick by collecting every block collision shape in the swept box into a new list (up to 0.8% of the render thread at a server spawn full of dust particles). Particles have no entity colliders and no world border, so when every block in that box is air, vanilla returns the movement unchanged. The box is now first checked directly in the chunk sections, skipping all-air sections whole. Vanilla's scan also covers a one-block ring around the box, where it only uses blocks with a collision shape larger than a full block on the faces of the ring and moving pistons on its edges, and skips its corners. The direct check looks at the blocks inside the box first and stops at the first non-air one, then applies the same rules to the ring, so smoke rising above a campfire or dust next to a wall no longer counts as touching a block. Boxes with any other non-air block inside, and the debug world, go through vanilla's collision.
+Every particle with physics checked its movement against the blocks around it each tick by collecting every block collision shape in the swept box into a new list (up to 0.8% of the render thread at a server spawn full of dust particles). Particles have no entity colliders and no world border, so when every block in that box is air, vanilla returns the movement unchanged. The box is now first checked directly in the chunk sections, skipping all-air sections whole, and only boxes that contain any non-air block go through vanilla's collision.
 
 ### Ambient block ticks
 
