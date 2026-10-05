@@ -362,7 +362,7 @@ Every GUI glyph converted its 2D pose into a new 4x4 matrix before writing its v
 
 ### Buffer slices
 
-Asking a GPU buffer for a slice covering all of it created a new slice object each time, and Sodium does that for every chunk region drawn each frame. The slice is now created once per buffer, since a buffer never changes size. Sodium's indirect terrain draws also created a slice of the command buffer per region per frame; each draw batch now remembers its last 8 slices and reuses one with the same buffer, offset and length.
+Asking a GPU buffer for a slice covering all of it created a new slice object each time, and Sodium does that for every chunk region drawn each frame. The slice is now created once per buffer, since a buffer never changes size. Sodium's indirect terrain draws also created a slice of the command buffer per region per frame; each draw batch now remembers its last 8 slices, with their buffer, offset and length kept in flat arrays so a miss while moving costs only a few comparisons, and reuses one with the same buffer, offset and length.
 
 ### Feature phase loop
 
@@ -401,6 +401,10 @@ For every chunk region it draws, Sodium writes the region's camera offset, age a
 The light engine keeps one map of light sections it updates and publishes a read-only snapshot of it for every other thread. Every time lighting changed, vanilla published a full copy of the whole map. At render distance 32 that map holds around 100,000 sections, so each copy allocated arrays of several MB on the render thread and on every server worker thread. While moving, `/txprofile` showed most garbage collections forced by these huge arrays, each pausing the game for 8 to 10 ms.
 
 A snapshot is now the last full copy plus a small map of the sections that changed since it. Each new snapshot copies the previous small map and adds the sections the light engine recorded as changed since the previous snapshot, with their current data. Lookups check the small map first and then the full copy, so every lookup returns exactly what a full copy would. Nothing ever modifies a published full copy or a published change map. Once the changes since the last full copy would exceed a sixteenth of the sections (at least 512), the next snapshot is a full copy again, the same way vanilla makes it, and becomes the new base.
+
+### Visible region lookup
+
+Every time Sodium collects the visible chunk sections, it looks up each section's render region (8 by 4 by 8 sections) in a hash map, 2.6% of the render thread while flying in singleplayer. Sections are visited in tree order, so consecutive sections usually share a region. Each collection now remembers the last region it looked up and its coordinates, and reuses it while the next section is in the same region. A collection only reads the region map and runs on one thread from start to end, so the region is the same one the map would return.
 
 ### Breaking overlay rotation
 

@@ -137,6 +137,7 @@
     "VKIndirectDrawBatchSliceCacheMixin",
     "VertexFormatElementCacheMixin",
     "VertexSorterReuseMixin",
+    "VisibleChunkCollectorRegionCacheMixin",
     "VulkanBackendCheckpointMixin",
     "VulkanCommandEncoderDeferralMixin",
     "VulkanCommandEncoderDynamicStateMixin",

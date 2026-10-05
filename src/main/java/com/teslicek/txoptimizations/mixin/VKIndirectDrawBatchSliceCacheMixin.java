@@ -1,5 +1,6 @@
 package com.teslicek.txoptimizations.mixin;
 
+import com.mojang.renderpearl.api.buffers.GpuBuffer;
 import com.mojang.renderpearl.api.buffers.GpuBufferSlice;
 import net.caffeinemc.mods.sodium.client.gpu.device.batch.VKIndirectDrawBatch;
 import org.spongepowered.asm.mixin.Mixin;
@@ -14,6 +15,15 @@ public abstract class VKIndirectDrawBatchSliceCacheMixin {
     private static final int CACHED_SLICES = 8;
 
     @Unique
+    private GpuBuffer[] txoptimizations$buffers;
+
+    @Unique
+    private long[] txoptimizations$offsets;
+
+    @Unique
+    private long[] txoptimizations$lengths;
+
+    @Unique
     private GpuBufferSlice[] txoptimizations$slices;
 
     @Unique
@@ -24,20 +34,29 @@ public abstract class VKIndirectDrawBatchSliceCacheMixin {
         if (offset < 0L || length < 0L || offset + length > parent.length())
             return parent.slice(offset, length);
 
-        if (this.txoptimizations$slices == null)
-            this.txoptimizations$slices = new GpuBufferSlice[CACHED_SLICES];
+        if (this.txoptimizations$slices == null) {
+            this.txoptimizations$buffers = new GpuBuffer[CACHED_SLICES];
+            this.txoptimizations$offsets = new long[CACHED_SLICES];
+            this.txoptimizations$lengths = new long[CACHED_SLICES];
+            this.txoptimizations$slices  = new GpuBufferSlice[CACHED_SLICES];
+        }
 
-        long absolute = parent.offset() + offset;
+        GpuBuffer buffer   = parent.buffer();
+        long      absolute = parent.offset() + offset;
 
-        for (GpuBufferSlice slice : this.txoptimizations$slices) {
-            if (slice != null && slice.buffer() == parent.buffer() && slice.offset() == absolute && slice.length() == length)
-                return slice;
+        for (int index = 0; index < CACHED_SLICES; index ++) {
+            if (this.txoptimizations$buffers[index] == buffer && this.txoptimizations$offsets[index] == absolute && this.txoptimizations$lengths[index] == length)
+                return this.txoptimizations$slices[index];
         }
 
         GpuBufferSlice slice = parent.slice(offset, length);
+        int            next  = this.txoptimizations$nextSlice;
 
-        this.txoptimizations$slices[this.txoptimizations$nextSlice] = slice;
-        this.txoptimizations$nextSlice                              = (this.txoptimizations$nextSlice + 1) % CACHED_SLICES;
+        this.txoptimizations$buffers[next] = buffer;
+        this.txoptimizations$offsets[next] = absolute;
+        this.txoptimizations$lengths[next] = length;
+        this.txoptimizations$slices[next]  = slice;
+        this.txoptimizations$nextSlice     = (next + 1) % CACHED_SLICES;
 
         return slice;
     }
