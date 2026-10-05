@@ -9,8 +9,7 @@ import com.mojang.renderpearl.api.pipeline.IndexType;
 import com.mojang.renderpearl.backend.api.RenderPassBackend;
 import com.mojang.renderpearl.frontend.FrontendRenderPass;
 import com.mojang.renderpearl.frontend.FrontendRenderPipeline;
-import it.unimi.dsi.fastutil.objects.Object2IntMap;
-import it.unimi.dsi.fastutil.objects.Object2IntMaps;
+import com.teslicek.txoptimizations.PipelineUniforms;
 import it.unimi.dsi.fastutil.objects.ReferenceOpenHashSet;
 import java.util.HashMap;
 import java.util.List;
@@ -79,11 +78,15 @@ public abstract class FrontendRenderPassBindingMixin {
         this.boundPipeline = frontendPipeline;
         this.backend.setPipeline(frontendPipeline.backendRenderPipeline());
 
-        for (Object2IntMap.Entry<String> uniform : Object2IntMaps.fastIterable(((UnmodifiableObject2IntMapAccessor) frontendPipeline.uniformIndices()).txoptimizations$map())) {
-            Object value = this.uniforms.get(uniform.getKey());
+        PipelineUniforms layout = (PipelineUniforms) (Object) frontendPipeline;
+        String[]         names  = layout.txoptimizations$uniformNames();
+        int[]            slots  = layout.txoptimizations$uniformSlots();
+
+        for (int index = 0; index < names.length; index ++) {
+            Object value = this.uniforms.get(names[index]);
 
             if (value != null)
-                this.backend.setUniform(uniform.getIntValue(), value);
+                this.backend.setUniform(slots[index], value);
         }
 
         this.constantsPushed = false;

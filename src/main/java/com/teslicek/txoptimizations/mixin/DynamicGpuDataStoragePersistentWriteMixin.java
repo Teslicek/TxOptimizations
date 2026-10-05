@@ -14,6 +14,7 @@ import org.spongepowered.asm.mixin.Final;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Overwrite;
 import org.spongepowered.asm.mixin.Shadow;
+import org.spongepowered.asm.mixin.Unique;
 
 @Mixin(DynamicGpuDataStorageMapped.class)
 public abstract class DynamicGpuDataStoragePersistentWriteMixin<T extends DynamicGpuDataStorage.DynamicGpuData> {
@@ -42,13 +43,25 @@ public abstract class DynamicGpuDataStoragePersistentWriteMixin<T extends Dynami
     @Final
     private String label;
 
+    @Unique
+    private GpuBufferSlice txoptimizations$lastSlice;
+
+    @Unique
+    private int txoptimizations$lastSliceBlock;
+
     @Shadow
     protected abstract void resizeBuffers(int newCapacity);
 
     @Overwrite
     public GpuBufferSlice writeData(T gpuData) {
-        if (this.lastData != null && this.lastData.equals(gpuData))
-            return this.ringBuffer.currentBuffer().slice((this.nextBlock - 1) * this.blockSize, this.blockSize);
+        if (this.lastData != null && this.lastData.equals(gpuData)) {
+            GpuBuffer current = this.ringBuffer.currentBuffer();
+
+            if (this.txoptimizations$lastSlice != null && this.txoptimizations$lastSliceBlock == this.nextBlock - 1 && this.txoptimizations$lastSlice.buffer() == current)
+                return this.txoptimizations$lastSlice;
+
+            return current.slice((this.nextBlock - 1) * this.blockSize, this.blockSize);
+        }
 
         if (this.nextBlock >= this.capacity) {
             int newCapacity = this.capacity * 2;
@@ -71,9 +84,13 @@ public abstract class DynamicGpuDataStoragePersistentWriteMixin<T extends Dynami
             }
         }
 
+        GpuBufferSlice slice = buffer.slice(offset, this.blockSize);
+
+        this.txoptimizations$lastSlice      = slice;
+        this.txoptimizations$lastSliceBlock = this.nextBlock;
         this.nextBlock ++;
         this.lastData = gpuData;
 
-        return buffer.slice(offset, this.blockSize);
+        return slice;
     }
 }
