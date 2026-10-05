@@ -3,6 +3,8 @@ package com.teslicek.txoptimizations;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
 import com.mojang.blaze3d.font.GlyphProvider;
+import com.mojang.blaze3d.font.SpaceProvider;
+import com.mojang.blaze3d.font.TrueTypeGlyphProvider;
 import com.mojang.blaze3d.font.UnbakedGlyph;
 import it.unimi.dsi.fastutil.ints.Int2ObjectMap;
 import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
@@ -16,11 +18,16 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import net.minecraft.client.gui.font.FontOption;
+import net.minecraft.client.gui.font.providers.BitmapProvider;
+import net.minecraft.client.gui.font.providers.UnihexProvider;
 import net.minecraft.client.gui.font.glyphs.SpecialGlyphs;
 import net.minecraft.resources.Identifier;
 import net.minecraft.util.Mth;
+import org.jspecify.annotations.Nullable;
 
 public final class FontSelection {
+
+    private static final Set<Class<?>> SUPPORTED_SET_PROVIDERS = Set.of(BitmapProvider.class, UnihexProvider.class, SpaceProvider.class, TrueTypeGlyphProvider.class);
 
     private static volatile Pending pending;
 
@@ -70,17 +77,23 @@ public final class FontSelection {
             }
         }
 
-        Set<GlyphProvider> usedProviders = Sets.newHashSet();
+        Set<GlyphProvider>           usedProviders = Sets.newHashSet();
+        Int2ObjectMap<GlyphProvider> owners        = ownersBySupportedGlyphs(selectedProviders, supported);
 
         supportedGlyphs.forEach(codepoint -> {
+            if (owners != null) {
+                GlyphProvider provider = owners.get(codepoint);
+
+                record(provider, provider.getGlyph(codepoint), codepoint, usedProviders, glyphsByWidth);
+
+                return;
+            }
+
             for (GlyphProvider provider : selectedProviders) {
                 UnbakedGlyph glyph = provider.getGlyph(codepoint);
 
                 if (glyph != null) {
-                    usedProviders.add(provider);
-
-                    if (glyph.info() != SpecialGlyphs.MISSING)
-                        glyphsByWidth.computeIfAbsent(Mth.ceil(glyph.info().getAdvance(false)), width -> new IntArrayList()).add(codepoint);
+                    record(provider, glyph, codepoint, usedProviders, glyphsByWidth);
 
                     break;
                 }
@@ -88,6 +101,31 @@ public final class FontSelection {
         });
 
         return new Selection(selectedProviders.stream().filter(usedProviders::contains).toList(), glyphsByWidth);
+    }
+
+    private static void record(GlyphProvider provider, UnbakedGlyph glyph, int codepoint, Set<GlyphProvider> usedProviders, Int2ObjectMap<IntList> glyphsByWidth) {
+        if (glyph == null)
+            throw new IllegalStateException(provider + " lists codepoint " + codepoint + " as supported but has no glyph for it");
+
+        usedProviders.add(provider);
+
+        if (glyph.info() != SpecialGlyphs.MISSING)
+            glyphsByWidth.computeIfAbsent(Mth.ceil(glyph.info().getAdvance(false)), width -> new IntArrayList()).add(codepoint);
+    }
+
+    private static @Nullable Int2ObjectMap<GlyphProvider> ownersBySupportedGlyphs(List<GlyphProvider> selectedProviders, Map<GlyphProvider, IntSet> supported) {
+        for (GlyphProvider provider : selectedProviders) {
+            if (!SUPPORTED_SET_PROVIDERS.contains(provider.getClass()))
+                return null;
+        }
+
+        Int2ObjectMap<GlyphProvider> owners = new Int2ObjectOpenHashMap<>();
+
+        for (GlyphProvider provider : selectedProviders) {
+            supported.get(provider).forEach(codepoint -> owners.putIfAbsent(codepoint, provider));
+        }
+
+        return owners;
     }
 
     private static boolean sameProviders(List<GlyphProvider.Conditional> expected, List<GlyphProvider.Conditional> actual) {
