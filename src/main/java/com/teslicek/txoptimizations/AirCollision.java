@@ -28,11 +28,20 @@ public final class AirCollision {
         int minZ = Mth.floor(box.minZ - EPSILON) - 1;
         int maxZ = Mth.floor(box.maxZ + EPSILON) + 1;
 
-        for (int chunkX = SectionPos.blockToSectionCoord(minX); chunkX <= SectionPos.blockToSectionCoord(maxX); chunkX ++) {
-            for (int chunkZ = SectionPos.blockToSectionCoord(minZ); chunkZ <= SectionPos.blockToSectionCoord(maxZ); chunkZ ++) {
+        return hasNoColliders(level, minX, maxX, minY, maxY, minZ, maxZ, false) && hasNoColliders(level, minX, maxX, minY, maxY, minZ, maxZ, true);
+    }
+
+    private static boolean hasNoColliders(Level level, int minX, int maxX, int minY, int maxY, int minZ, int maxZ, boolean ring) {
+        int fromX = ring ? minX : minX + 1;
+        int toX   = ring ? maxX : maxX - 1;
+        int fromZ = ring ? minZ : minZ + 1;
+        int toZ   = ring ? maxZ : maxZ - 1;
+
+        for (int chunkX = SectionPos.blockToSectionCoord(fromX); chunkX <= SectionPos.blockToSectionCoord(toX); chunkX ++) {
+            for (int chunkZ = SectionPos.blockToSectionCoord(fromZ); chunkZ <= SectionPos.blockToSectionCoord(toZ); chunkZ ++) {
                 ChunkAccess chunk = level.getChunk(chunkX, chunkZ, ChunkStatus.FULL, false);
 
-                if (chunk != null && !hasNoChunkColliders(chunk, minX, maxX, minY, maxY, minZ, maxZ, Math.max(minX, chunkX << 4), Math.min(maxX, (chunkX << 4) + 15), Math.max(minZ, chunkZ << 4), Math.min(maxZ, (chunkZ << 4) + 15)))
+                if (chunk != null && !hasNoChunkColliders(chunk, minX, maxX, minY, maxY, minZ, maxZ, Math.max(fromX, chunkX << 4), Math.min(toX, (chunkX << 4) + 15), Math.max(fromZ, chunkZ << 4), Math.min(toZ, (chunkZ << 4) + 15), ring))
                     return false;
             }
         }
@@ -40,10 +49,10 @@ public final class AirCollision {
         return true;
     }
 
-    private static boolean hasNoChunkColliders(ChunkAccess chunk, int minX, int maxX, int minY, int maxY, int minZ, int maxZ, int fromX, int toX, int fromZ, int toZ) {
+    private static boolean hasNoChunkColliders(ChunkAccess chunk, int minX, int maxX, int minY, int maxY, int minZ, int maxZ, int fromX, int toX, int fromZ, int toZ, boolean ring) {
         LevelChunkSection[] sections = chunk.getSections();
-        int                 bottom   = Math.max(minY, chunk.getMinY());
-        int                 top      = Math.min(maxY, chunk.getMaxY());
+        int                 bottom   = Math.max(ring ? minY : minY + 1, chunk.getMinY());
+        int                 top      = Math.min(ring ? maxY : maxY - 1, chunk.getMaxY());
 
         for (int sectionY = SectionPos.blockToSectionCoord(bottom); sectionY <= SectionPos.blockToSectionCoord(top); sectionY ++) {
             LevelChunkSection section = sections[chunk.getSectionIndexFromSectionY(sectionY)];
@@ -61,9 +70,14 @@ public final class AirCollision {
                     int faceYZ = faceY + (z == minZ || z == maxZ ? 1 : 0);
 
                     for (int x = fromX; x <= toX; x ++) {
+                        int faceType = faceYZ + (x == minX || x == maxX ? 1 : 0);
+
+                        if (ring && faceType == 0)
+                            continue;
+
                         BlockState state = section.getBlockState(x & 15, y & 15, z & 15);
 
-                        if (!state.isAir() && canCollide(state, faceYZ + (x == minX || x == maxX ? 1 : 0)))
+                        if (!state.isAir() && canCollide(state, faceType))
                             return false;
                     }
                 }
