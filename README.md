@@ -266,7 +266,7 @@ Particles were turned into vertices one at a time: a callback per particle, Sodi
 
 ### Model part rotation
 
-Every rotated model part (entity limbs, heads, armor) rotated both its pose matrix and its normal matrix with JOML's `rotateZYX`, and each call computed the same three sines and cosines again. The angles are now turned into sines and cosines once and both matrices are rotated with JOML's own formulas, including its separate paths for identity, translation-only and affine matrices and the matrix property flags it sets. A test of 2,000,000 random matrices and angles against JOML 1.10.9 matched every bit.
+Every rotated model part (entity limbs, heads, armor) rotated both its pose matrix and its normal matrix with JOML's `rotateZYX`, and each call computed the same three sines and cosines again. The angles are now turned into sines and cosines once and both matrices are rotated with JOML's own formulas, including its separate paths for identity, translation-only and affine matrices and the matrix property flags it sets. A test of 2,000,000 random matrices and angles against JOML 1.10.9 matched every bit. Most rotated parts turn around only one or two axes, so an angle of exactly zero now skips its sine and cosine: JOML returns that same zero and exactly 1 for it (checked against JOML 1.10.9 for both signed zeros), so the matrices are identical. JOML's fast math mode still computes them.
 
 ### Item model bounds
 

@@ -4,6 +4,7 @@ import org.joml.Math;
 import org.joml.Matrix3f;
 import org.joml.Matrix4f;
 import org.joml.Matrix4fc;
+import org.joml.Options;
 
 public final class ZyxRotation {
 
@@ -14,15 +15,29 @@ public final class ZyxRotation {
     }
 
     public static void rotate(Matrix4f pose, Matrix3f normal, float angleZ, float angleY, float angleX) {
-        float sinX = Math.sin(angleX);
-        float cosX = Math.cosFromSin(sinX, angleX);
-        float sinY = Math.sin(angleY);
-        float cosY = Math.cosFromSin(sinY, angleY);
-        float sinZ = Math.sin(angleZ);
-        float cosZ = Math.cosFromSin(sinZ, angleZ);
+        float sinX = sin(angleX);
+        float cosX = cos(sinX, angleX);
+        float sinY = sin(angleY);
+        float cosY = cos(sinY, angleY);
+        float sinZ = sin(angleZ);
+        float cosZ = cos(sinZ, angleZ);
 
         rotate(pose, sinX, cosX, sinY, cosY, sinZ, cosZ);
         rotate(normal, sinX, cosX, sinY, cosY, sinZ, cosZ);
+    }
+
+    private static float sin(float angle) {
+        if (angle == 0.0F && !Options.FASTMATH)
+            return angle;
+
+        return Math.sin(angle);
+    }
+
+    private static float cos(float sin, float angle) {
+        if (angle == 0.0F && !Options.FASTMATH)
+            return 1.0F;
+
+        return Math.cosFromSin(sin, angle);
     }
 
     private static void rotate(Matrix4f matrix, float sinX, float cosX, float sinY, float cosY, float sinZ, float cosZ) {
