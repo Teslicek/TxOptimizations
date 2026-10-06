@@ -59,7 +59,7 @@ public abstract class GpuBufferPoolRecycleMixin {
 
     @Inject(method = "endFrame", at = @At("HEAD"))
     private void txoptimizations$forgetReusedSpares(CallbackInfo ci) {
-        if (this.available.isEmpty())
+        if (this.available.isEmpty() && !this.txoptimizations$idleFrames.isEmpty())
             this.txoptimizations$idleFrames.clear();
     }
 
@@ -88,7 +88,9 @@ public abstract class GpuBufferPoolRecycleMixin {
 
         this.txoptimizations$nextIdleFrames = this.txoptimizations$idleFrames;
         this.txoptimizations$idleFrames     = idleFrames;
-        this.txoptimizations$nextIdleFrames.clear();
+
+        if (!this.txoptimizations$nextIdleFrames.isEmpty())
+            this.txoptimizations$nextIdleFrames.clear();
 
         if (expired != null)
             original.call(expired, close);

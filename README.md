@@ -42,7 +42,7 @@ Every piece of text drawn on screen goes through `FormattedBidiReorder.reorder`,
 
 ### Spare vertex buffers
 
-At the end of every frame, the vertex buffer pools close every spare buffer that was not used in that frame, so a buffer that is needed again a frame later has to be created again. TxOptimizations keeps a spare buffer for up to 3 idle frames before closing it. Spares that get reused never reach that limit, and buffers the GPU is still using are never touched. Gnetum's HUD flushing still skips the cleanup the same way it does in vanilla.
+At the end of every frame, the vertex buffer pools close every spare buffer that was not used in that frame, so a buffer that is needed again a frame later has to be created again. TxOptimizations keeps a spare buffer for up to 3 idle frames before closing it, and only clears its idle-frame counts when there are any to clear. Spares that get reused never reach that limit, and buffers the GPU is still using are never touched. Gnetum's HUD flushing still skips the cleanup the same way it does in vanilla.
 
 ### Translation templates
 
@@ -58,7 +58,7 @@ Every frame, each particle quad is added to `QuadParticleRenderState`, which loo
 
 ### Buffer builder elements
 
-Every new `BufferBuilder` looks up up to eight vertex elements (position, color, UVs, normal, line width) by name in its vertex format, and the format's element map compares the names one by one. Vertex formats never change, so TxOptimizations resolves those eight elements once per vertex format with the vanilla lookup and reuses the result for every later `BufferBuilder` of that format, including the constructor's check that the format has a position element.
+Every new `BufferBuilder` looks up up to eight vertex elements (position, color, UVs, normal, line width) by name in its vertex format, and the format's element map compares the names one by one. Vertex formats never change, so TxOptimizations resolves those eight elements once per vertex format with the vanilla lookup and reuses the result for every later `BufferBuilder` of that format, including the constructor's check that the format has a position element. The constructor asks for the elements in the order of its name table, so each is taken straight from the cached array at that index instead of being searched for by name.
 
 ### Player skin model lookup
 
@@ -344,7 +344,7 @@ Block collision scans (particles moving near blocks, the player's suffocation ch
 
 ### Render type equality
 
-Batching draws compares prepared render types with their generated record equality, which went through method-handle dispatch and compared the name string before anything else. It now compares the same six components with `Objects.equals`, cheapest first (pipeline, transform slice, scissor, OIT set, name, textures), which returns the same answer.
+Batching draws compares prepared render types with their generated record equality, which went through method-handle dispatch and compared the name string before anything else. It now compares the same six components with `Objects.equals`, cheapest first (pipeline, transform slice, scissor, OIT set, name, textures), which returns the same answer. Their hash code, which hashed the whole texture list on every map lookup, is worked out once per prepared render type and kept: every component is immutable or hashes by identity, so it never changes.
 
 ### Vertex upload copy
 
@@ -368,7 +368,7 @@ Every entity checked against the view frustum got a new bounding box, grown by h
 
 ### Particle draw maps
 
-Every particle group built two new identity maps per frame to collect its draws and textures per layer. The maps are now cleared and reused once the frame's particles are drawn. A cleared map keeps its table size, so it lists its layers in the same order a new one would; a map that ever held enough layers to grow is dropped instead of reused.
+Every particle group built two new identity maps per frame to collect its draws and textures per layer. The maps are now cleared, when they hold anything, and reused once the frame's particles are drawn. A cleared map keeps its table size, so it lists its layers in the same order a new one would; a map that ever held enough layers to grow is dropped instead of reused.
 
 ### GUI glyph matrix
 
@@ -489,6 +489,10 @@ A reload compiles every pipeline Minecraft registers while it prepares, but pipe
 ### Language files on reload
 
 The language reload read and parsed every language file on the render thread, about 9 ms in a CubeCraft reload. The files are now read and parsed while the reload prepares, and the render thread uses the result when the language and its fallback are still the same; if the language was changed during the reload, it reads the files as before.
+
+### Uniform slots on pipeline changes
+
+When a render pass switches pipeline, the Vulkan backend empties its uniform slot list and then sizes it for the new pipeline, writing every old slot to empty and then every new slot to empty again. It now empties the slots both pipelines share once and lets the resize empty the rest, which leaves the same list of empty slots.
 
 ### Atlas upload views
 

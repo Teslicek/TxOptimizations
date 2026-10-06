@@ -190,6 +190,7 @@
     "VulkanRenderPassDynamicStateMixin",
     "VulkanRenderPassPushConstantMixin",
     "VulkanRenderPassTexelViewMixin",
+    "VulkanRenderPassUniformResetMixin",
     "VulkanRenderPassVertexBindMixin",
     "VulkanSubmissionDrainMixin",
     "VulkanSubmissionFrontMixin",

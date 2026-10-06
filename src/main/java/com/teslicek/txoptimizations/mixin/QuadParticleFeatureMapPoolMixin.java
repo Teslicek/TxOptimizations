@@ -49,7 +49,9 @@ public abstract class QuadParticleFeatureMapPoolMixin {
             if (map.size() > UNRESIZED_ENTRIES)
                 continue;
 
-            map.clear();
+            if (!map.isEmpty())
+                map.clear();
+
             this.txoptimizations$freeMaps.add(map);
         }
 

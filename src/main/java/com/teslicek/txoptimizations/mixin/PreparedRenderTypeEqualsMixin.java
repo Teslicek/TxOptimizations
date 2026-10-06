@@ -1,5 +1,7 @@
 package com.teslicek.txoptimizations.mixin;
 
+import com.llamalad7.mixinextras.injector.wrapmethod.WrapMethod;
+import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
 import com.mojang.blaze3d.systems.ScissorState;
 import com.mojang.renderpearl.api.buffers.GpuBufferSlice;
 import com.mojang.renderpearl.api.pipeline.RenderPipeline;
@@ -11,6 +13,7 @@ import org.spongepowered.asm.mixin.Final;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Overwrite;
 import org.spongepowered.asm.mixin.Shadow;
+import org.spongepowered.asm.mixin.Unique;
 
 @Mixin(PreparedRenderType.class)
 public abstract class PreparedRenderTypeEqualsMixin {
@@ -38,6 +41,22 @@ public abstract class PreparedRenderTypeEqualsMixin {
     @Shadow
     @Final
     private List<PreparedRenderType.Texture> textures;
+
+    @Unique
+    private int txoptimizations$hash;
+
+    @Unique
+    private boolean txoptimizations$hashed;
+
+    @WrapMethod(method = "hashCode")
+    private int txoptimizations$hashOnce(Operation<Integer> original) {
+        if (!this.txoptimizations$hashed) {
+            this.txoptimizations$hash   = original.call();
+            this.txoptimizations$hashed = true;
+        }
+
+        return this.txoptimizations$hash;
+    }
 
     @Overwrite
     public final boolean equals(Object other) {
