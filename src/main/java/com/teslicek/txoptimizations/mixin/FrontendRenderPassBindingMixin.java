@@ -92,6 +92,12 @@ public abstract class FrontendRenderPassBindingMixin {
         this.constantsPushed = false;
     }
 
+    @Inject(method = "setUniform(Ljava/lang/String;Ljava/lang/Object;)V", at = @At("HEAD"), cancellable = true)
+    private void txoptimizations$keepBoundUniform(String name, Object value, CallbackInfo ci) {
+        if (value != null && value.equals(this.uniforms.get(name)))
+            ci.cancel();
+    }
+
     @Inject(method = "setVertexBuffer", at = @At("HEAD"), cancellable = true)
     private void txoptimizations$keepBoundVertexBuffer(int slot, GpuBufferSlice vertexBuffer, CallbackInfo ci) {
         if (vertexBuffer != null && slot >= 0 && slot < this.vertexBuffers.length && vertexBuffer.equals(this.vertexBuffers[slot]) && !vertexBuffer.buffer().isClosed())
