@@ -109,6 +109,7 @@
     "PatchedDataComponentMapEmptyPatchMixin",
     "PoseAccessor",
     "PreparedRenderTypeEqualsMixin",
+    "PreparedRenderTypeDrawMixin",
     "ProjectionMatrixBufferSkipMixin",
     "QuadParticleCornerCacheMixin",
     "QuadParticleFeatureMapPoolMixin",

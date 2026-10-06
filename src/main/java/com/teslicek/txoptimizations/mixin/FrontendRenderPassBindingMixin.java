@@ -6,9 +6,12 @@ import com.mojang.renderpearl.api.commands.RenderPassDescriptor;
 import com.mojang.renderpearl.api.pipeline.ColorTargetState;
 import com.mojang.renderpearl.api.pipeline.CompiledRenderPipeline;
 import com.mojang.renderpearl.api.pipeline.IndexType;
+import com.mojang.renderpearl.api.textures.GpuSampler;
+import com.mojang.renderpearl.api.textures.GpuTextureView;
 import com.mojang.renderpearl.backend.api.RenderPassBackend;
 import com.mojang.renderpearl.frontend.FrontendRenderPass;
 import com.mojang.renderpearl.frontend.FrontendRenderPipeline;
+import com.mojang.renderpearl.util.TextureViewAndSampler;
 import com.teslicek.txoptimizations.PipelineUniforms;
 import it.unimi.dsi.fastutil.objects.ReferenceOpenHashSet;
 import java.util.HashMap;
@@ -95,6 +98,12 @@ public abstract class FrontendRenderPassBindingMixin {
     @Inject(method = "setUniform(Ljava/lang/String;Ljava/lang/Object;)V", at = @At("HEAD"), cancellable = true)
     private void txoptimizations$keepBoundUniform(String name, Object value, CallbackInfo ci) {
         if (value != null && value.equals(this.uniforms.get(name)))
+            ci.cancel();
+    }
+
+    @Inject(method = "setUniform(Ljava/lang/String;Lcom/mojang/renderpearl/api/textures/GpuTextureView;Lcom/mojang/renderpearl/api/textures/GpuSampler;)V", at = @At("HEAD"), cancellable = true)
+    private void txoptimizations$keepBoundTexture(String name, GpuTextureView textureView, GpuSampler sampler, CallbackInfo ci) {
+        if (textureView != null && sampler != null && this.uniforms.get(name) instanceof TextureViewAndSampler bound && bound.view() == textureView && bound.sampler() == sampler)
             ci.cancel();
     }
 
