@@ -24,7 +24,7 @@ public abstract class ArrowGizmoPackedMixin {
     private static final Vector3f DIRECTION = new Vector3f();
 
     @Unique
-    private static final Vector3f TIP = new Vector3f();
+    private static final float[] ROTATION_MATRIX = new float[9];
 
     @Shadow
     @Final
@@ -55,6 +55,8 @@ public abstract class ArrowGizmoPackedMixin {
 
         float len = (float) Mth.clamp(this.end.distanceTo(this.start) * 0.1F, 0.1F, 1.0);
 
+        txoptimizations$prepareRotationMatrix();
+
         txoptimizations$tip(packed, -len, len, 0.0F, color);
         txoptimizations$tip(packed, -len, 0.0F, len, color);
         txoptimizations$tip(packed, -len, -len, 0.0F, color);
@@ -62,8 +64,37 @@ public abstract class ArrowGizmoPackedMixin {
     }
 
     @Unique
+    private static void txoptimizations$prepareRotationMatrix() {
+        float xx = ROTATION.x * ROTATION.x;
+        float yy = ROTATION.y * ROTATION.y;
+        float zz = ROTATION.z * ROTATION.z;
+        float ww = ROTATION.w * ROTATION.w;
+        float xy = ROTATION.x * ROTATION.y;
+        float xz = ROTATION.x * ROTATION.z;
+        float yz = ROTATION.y * ROTATION.z;
+        float xw = ROTATION.x * ROTATION.w;
+        float zw = ROTATION.z * ROTATION.w;
+        float yw = ROTATION.y * ROTATION.w;
+        float k  = 1.0F / (xx + yy + zz + ww);
+
+        ROTATION_MATRIX[0] = (xx - yy - zz + ww) * k;
+        ROTATION_MATRIX[1] = 2.0F * (xy - zw) * k;
+        ROTATION_MATRIX[2] = 2.0F * (xz + yw) * k;
+        ROTATION_MATRIX[3] = 2.0F * (xy + zw) * k;
+        ROTATION_MATRIX[4] = (yy - xx - zz + ww) * k;
+        ROTATION_MATRIX[5] = 2.0F * (yz - xw) * k;
+        ROTATION_MATRIX[6] = 2.0F * (xz - yw) * k;
+        ROTATION_MATRIX[7] = 2.0F * (yz + xw) * k;
+        ROTATION_MATRIX[8] = (zz - xx - yy + ww) * k;
+    }
+
+    @Unique
     private void txoptimizations$tip(PackedGizmoLines packed, float x, float y, float z, int color) {
-        ROTATION.transform(x, y, z, TIP);
-        packed.txoptimizations$addLine(this.end.x + TIP.x, this.end.y + TIP.y, this.end.z + TIP.z, this.end.x, this.end.y, this.end.z, color, this.width);
+        float[] m    = ROTATION_MATRIX;
+        float   tipX = org.joml.Math.fma(m[0], x, org.joml.Math.fma(m[1], y, m[2] * z));
+        float   tipY = org.joml.Math.fma(m[3], x, org.joml.Math.fma(m[4], y, m[5] * z));
+        float   tipZ = org.joml.Math.fma(m[6], x, org.joml.Math.fma(m[7], y, m[8] * z));
+
+        packed.txoptimizations$addLine(this.end.x + tipX, this.end.y + tipY, this.end.z + tipZ, this.end.x, this.end.y, this.end.z, color, this.width);
     }
 }

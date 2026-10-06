@@ -424,7 +424,7 @@ With Sodium, vanilla's section occlusion graph still updated every frame, althou
 
 ### Entity hitboxes
 
-With hitboxes shown (F3+B), every visible entity built its boxes and its view arrow from temporary vectors every frame: an offset vector, the moved bounding box computed twice for living entities, a new stroke style per box, and a scaled view vector. Each arrow then built a rotation, five vectors and an array to draw its four tips. The hitbox boxes now share one immutable stroke style per color, the moved bounding box is computed once from the offset's components, and the arrow end is computed from the view vector's components, all with the same arithmetic as before. Arrows rotate their tips with one reused rotation and vector and write the lines straight into the packed line list, so the GPU receives identical lines.
+With hitboxes shown (F3+B), every visible entity built its boxes and its view arrow from temporary vectors every frame: an offset vector, the moved bounding box computed twice for living entities, a new stroke style per box, and a scaled view vector. Each arrow then built a rotation, five vectors and an array to draw its four tips. The hitbox boxes now share one immutable stroke style per color, the moved bounding box is computed once from the offset's components, and the arrow end is computed from the view vector's components, all with the same arithmetic as before. Arrows rotate their tips with one reused rotation and write the lines straight into the packed line list. The rotation's terms and its one division are worked out once per arrow instead of once per tip, and each tip is rotated with the same fused multiply-adds JOML uses, so the GPU receives identical lines.
 
 ### Unused region cache
 
