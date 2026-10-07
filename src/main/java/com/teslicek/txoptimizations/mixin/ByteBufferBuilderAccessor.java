@@ -11,6 +11,12 @@ public interface ByteBufferBuilderAccessor {
     @Accessor("pointer")
     long txoptimizations$pointer();
 
+    @Accessor("writeOffset")
+    long txoptimizations$writeOffset();
+
+    @Accessor("capacity")
+    long txoptimizations$capacity();
+
     @Invoker("isValid")
     boolean txoptimizations$isValid(int generation);
 }
