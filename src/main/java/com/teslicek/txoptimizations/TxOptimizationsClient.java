@@ -15,6 +15,8 @@ public final class TxOptimizationsClient implements ClientModInitializer {
 
     @Override
     public void onInitializeClient() {
+        TxOptimizationsConfig.load();
+        FpsCounter.register();
         EntityCulling.start();
         ClientTickEvents.START_CLIENT_TICK.register(EntityCulling::tick);
         ClientEntityEvents.ENTITY_LOAD.register((entity, level) -> Cushions.track(entity));

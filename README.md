@@ -186,9 +186,21 @@ With entity hitboxes shown (F3+B), the hitbox renderer runs the same visibility 
 
 The outline around the targeted block walks the block shape's voxel grid every frame to find its edges, which took about 2% of the render thread on complex shapes. The edges of the last 8 shapes are kept and replayed in the same order, so the outline is identical. Block shapes are immutable and shared, so a new shape object is simply recomputed.
 
+### Resource pack zips
+
+Zip resource packs, including the ones servers send, are read through an index of the zip's entry names built once per pack and kept sorted, so listing a folder (all textures, all models) is a binary search for its range instead of a scan of every entry in the zip, and looking up a single file asks the zip for that entry directly. Overlay folders are searched in the same order as vanilla, and a pack whose zip cannot be opened is logged and treated as empty, as vanilla does.
+
+### Server switches
+
+While a server reconfigures the connection (the screen shown when a network moves you between servers), frames are not rendered for up to 5 seconds, so the game does not spend the GPU and CPU on that screen. Rendering resumes as soon as the world loads, an overlay such as a resource reload appears, or the 5 seconds run out.
+
+### Frame limiter
+
+With a frame limit set, the limiter waits until the next frame is due by parking the thread until 0.5 ms before it and then spinning, so frames are paced to the exact interval instead of whatever the OS sleep granularity allows. Frames that fall more than one interval behind restart the schedule instead of catching up. At the unlimited setting the limiter is not used.
+
 ### FPS counter
 
-TxOptimizations draws its own FPS counter in the top left corner (`123 FPS`, white, no shadow, at 2,2), hidden while the F3 screen is open or the HUD is hidden. The number is the average frame rate over the last 0.5 seconds and updates every 0.5 seconds, the same as Sodium Extra's FPS overlay. It only counts frames, and the text is rebuilt only when the number changes, so drawing it skips the per-frame translation and text-direction work that Sodium Extra's overlay goes through.
+TxOptimizations draws its own FPS counter in the top left corner (`123 FPS`, white, no shadow, at 2,2), hidden while the F3 screen is open or the HUD is hidden. `K` toggles it (rebindable under Options > Controls > TxOptimizations), and the choice is saved in `config/txoptimizations.json`. The number is the average frame rate over the last 0.5 seconds and updates every 0.5 seconds, the same as Sodium Extra's FPS overlay. It only counts frames, and the text is rebuilt only when the number changes, so drawing it skips the per-frame translation and text-direction work that Sodium Extra's overlay goes through.
 
 Sodium Extra records every frame and sorts the last 5 seconds of frame times twice every 0.5 seconds for its 1% and 0.1% low values, even when its overlay is off, which took about 0.8% of the render thread at high frame rates. When Sodium Extra is installed, TxOptimizations skips that recording, so Sodium Extra's own FPS overlay (its Show FPS option, `show_fps` in `config/sodium-extra-options.json`) should be switched off.
 
