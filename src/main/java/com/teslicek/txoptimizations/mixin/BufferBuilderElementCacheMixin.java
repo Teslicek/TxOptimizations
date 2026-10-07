@@ -1,6 +1,5 @@
 package com.teslicek.txoptimizations.mixin;
 
-import com.llamalad7.mixinextras.sugar.Local;
 import com.mojang.blaze3d.vertex.BufferBuilder;
 import com.mojang.renderpearl.api.vertex.VertexFormat;
 import com.mojang.renderpearl.api.vertex.VertexFormatElement;
@@ -28,8 +27,13 @@ public abstract class BufferBuilderElementCacheMixin {
     }
 
     @Redirect(method = "<init>", at = @At(value = "INVOKE", target = "Lcom/mojang/renderpearl/api/vertex/VertexFormat;getElement(Ljava/lang/String;)Lcom/mojang/renderpearl/api/vertex/VertexFormatElement;"))
-    private VertexFormatElement txoptimizations$cachedElement(VertexFormat format, String name, @Local(ordinal = 1) int index) {
-        return txoptimizations$element(format, name, index);
+    private VertexFormatElement txoptimizations$cachedElement(VertexFormat format, String name) {
+        for (int index = 0; index < elementNames.length; index ++) {
+            if (elementNames[index] == name)
+                return txoptimizations$element(format, name, index);
+        }
+
+        throw new IllegalStateException("BufferBuilder asked for vertex element " + name + ", which is not in its name table");
     }
 
     @Unique

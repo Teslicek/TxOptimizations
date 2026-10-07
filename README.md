@@ -58,7 +58,7 @@ Every frame, each particle quad is added to `QuadParticleRenderState`, which loo
 
 ### Buffer builder elements
 
-Every new `BufferBuilder` looks up up to eight vertex elements (position, color, UVs, normal, line width) by name in its vertex format, and the format's element map compares the names one by one. Vertex formats never change, so TxOptimizations resolves those eight elements once per vertex format with the vanilla lookup and reuses the result for every later `BufferBuilder` of that format, including the constructor's check that the format has a position element. The constructor asks for the elements in the order of its name table, so each is taken straight from the cached array at that index instead of being searched for by name.
+Every new `BufferBuilder` looks up up to eight vertex elements (position, color, UVs, normal, line width) by name in its vertex format, and the format's element map compares the names one by one. Vertex formats never change, so TxOptimizations resolves those eight elements once per vertex format with the vanilla lookup and reuses the result for every later `BufferBuilder` of that format, including the constructor's check that the format has a position element. The constructor passes the name straight from its name table, so the index is found by comparing that exact string object against the eight table entries, and the element is taken from the cached array at that index instead of being searched for by name. Reading the constructor's loop index directly made MixinExtras allocate an int holder for every new `BufferBuilder` (13 MB/s on minemen).
 
 ### Player skin model lookup
 
