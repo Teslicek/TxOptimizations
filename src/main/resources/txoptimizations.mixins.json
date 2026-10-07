@@ -70,6 +70,7 @@
     "GlyphRenderStateMatrixMixin",
     "GlyphRendererVertexBuilderMixin",
     "ItemFeatureVertexBuilderMixin",
+    "EnchantmentHelperEmptyIterationMixin",
     "GpuBufferPoolRecycleMixin",
     "GpuLimitsPlatformMixin",
     "GuiGraphicsExtractorMapAtlasMixin",
