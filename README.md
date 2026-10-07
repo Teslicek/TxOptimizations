@@ -194,6 +194,10 @@ Zip resource packs, including the ones servers send, are read through an index o
 
 While a server reconfigures the connection (the screen shown when a network moves you between servers), frames are not rendered for up to 5 seconds, so the game does not spend the GPU and CPU on that screen. Rendering resumes as soon as the world loads, an overlay such as a resource reload appears, or the 5 seconds run out.
 
+### Loading screens
+
+The resource reload overlay is not drawn: while a reload runs you keep seeing the screen behind it (the title screen or the current menu, or the world in game), and as soon as the reload finishes it is completed and the overlay removed, without the fade-out. The world loading screen is not drawn once a world exists, and the title screen skips its fade-in. These change what is shown while loading, not how long the loading itself takes.
+
 ### Frame limiter
 
 With a frame limit set, the limiter waits until the next frame is due by parking the thread until 0.5 ms before it and then spinning, so frames are paced to the exact interval instead of whatever the OS sleep granularity allows. Frames that fall more than one interval behind restart the schedule instead of catching up. At the unlimited setting the limiter is not used.
