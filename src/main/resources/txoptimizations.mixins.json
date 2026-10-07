@@ -81,6 +81,7 @@
     "GpuLimitsPlatformMixin",
     "GuiGraphicsExtractorMapAtlasMixin",
     "GuiRendererAnimatedItemAtlasMixin",
+    "HideLevelLoadingScreenMixin",
     "HideReloadOverlayMixin",
     "HideTitleScreenFadeMixin",
     "HudFpsCounterMixin",
