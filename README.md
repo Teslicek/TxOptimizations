@@ -460,7 +460,7 @@ Every model asked its render type function for the render type of its texture on
 
 ### Draw group lookup
 
-When an entity asks for a vertex builder, its prepared render type is searched in the current draw group with `List.indexOf`, comparing it with every draw so far (1.5% of the render thread with many different mob textures). Each group now keeps a hash index from prepared render type to its first position, filled when vanilla adds it, so the lookup finds the same draw directly. The index is a primitive int map created on the group's first draw, and the calls are redirected without a wrapper, so adding a draw no longer allocates a boxed position, a map node and an argument array.
+When an entity asks for a vertex builder, its prepared render type is searched in the current draw group with `List.indexOf`, comparing it with every draw so far (1.5% of the render thread with many different mob textures). Each group now keeps a hash index from prepared render type to its first position, filled when vanilla adds it, so the lookup finds the same draw directly. Groups with up to 8 draws keep vanilla's `indexOf`, which is a few cheap comparisons; a group that grows past that gets a primitive int map built from its list in order, so the first position still wins. The calls are redirected without a wrapper, so adding a draw no longer allocates a boxed position, a map node, an argument array or, for the many small groups, any index at all (an index made for every group was 8.4 MB/s at the LifestealSMP spawn).
 
 ### Sky behind terrain
 
