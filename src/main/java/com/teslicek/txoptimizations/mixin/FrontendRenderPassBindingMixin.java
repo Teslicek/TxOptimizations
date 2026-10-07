@@ -158,7 +158,7 @@ public abstract class FrontendRenderPassBindingMixin {
 
     @Overwrite
     public void setIndexBuffer(GpuBuffer indexBuffer, IndexType indexType) {
-        if (indexBuffer == this.indexBuffer && indexType == this.txoptimizations$indexType && !indexBuffer.isClosed())
+        if (indexBuffer != null && indexBuffer == this.indexBuffer && indexType == this.txoptimizations$indexType && !indexBuffer.isClosed())
             return;
 
         this.txoptimizations$indexType = indexType;
