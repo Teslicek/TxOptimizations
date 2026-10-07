@@ -12,12 +12,11 @@ import com.mojang.renderpearl.backend.api.RenderPassBackend;
 import com.mojang.renderpearl.frontend.FrontendRenderPass;
 import com.mojang.renderpearl.frontend.FrontendRenderPipeline;
 import com.mojang.renderpearl.util.TextureViewAndSampler;
+import com.teslicek.txoptimizations.PipelinePassStamp;
 import com.teslicek.txoptimizations.PipelineUniforms;
-import it.unimi.dsi.fastutil.objects.ReferenceOpenHashSet;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Optional;
-import java.util.Set;
 import org.joml.Vector4fc;
 import org.spongepowered.asm.mixin.Final;
 import org.spongepowered.asm.mixin.Mixin;
@@ -57,7 +56,7 @@ public abstract class FrontendRenderPassBindingMixin {
     private boolean constantsPushed;
 
     @Unique
-    private static final Set<FrontendRenderPipeline> VALIDATED_PIPELINES = new ReferenceOpenHashSet<>();
+    private static long txoptimizations$passes;
 
     @Unique
     private static final int VERTEX_BUFFER_SLOTS = 16;
@@ -65,9 +64,13 @@ public abstract class FrontendRenderPassBindingMixin {
     @Unique
     private IndexType txoptimizations$indexType;
 
+    @Unique
+    private long txoptimizations$pass;
+
     @Inject(method = "<init>", at = @At("RETURN"))
-    private void txoptimizations$forgetValidatedPipelines(CallbackInfo ci) {
-        VALIDATED_PIPELINES.clear();
+    private void txoptimizations$numberPass(CallbackInfo ci) {
+        txoptimizations$passes ++;
+        this.txoptimizations$pass = txoptimizations$passes;
     }
 
     @Overwrite
@@ -78,8 +81,12 @@ public abstract class FrontendRenderPassBindingMixin {
         if (!(pipeline instanceof FrontendRenderPipeline frontendPipeline))
             throw new IllegalArgumentException("Pipeline must be instance of FrontendCompiledRenderPipeline");
 
-        if (VALIDATED_PIPELINES.add(frontendPipeline))
+        PipelinePassStamp stamp = (PipelinePassStamp) (Object) frontendPipeline;
+
+        if (stamp.txoptimizations$getValidatedPass() != this.txoptimizations$pass) {
+            stamp.txoptimizations$setValidatedPass(this.txoptimizations$pass);
             this.txoptimizations$validateColorTargets(frontendPipeline);
+        }
 
         this.boundPipeline = frontendPipeline;
         this.backend.setPipeline(frontendPipeline.backendRenderPipeline());
@@ -117,18 +124,15 @@ public abstract class FrontendRenderPassBindingMixin {
 
     @Overwrite
     private void setUniform(String name, Object value) {
-        if (value != null && value.equals(this.uniforms.get(name)))
-            return;
+        Object previous = value == null ? this.uniforms.remove(name) : this.uniforms.put(name, value);
 
-        if (value == null)
-            this.uniforms.remove(name);
-        else
-            this.uniforms.put(name, value);
+        if (value != null && value.equals(previous))
+            return;
 
         if (this.boundPipeline == null)
             return;
 
-        int uniformIndex = this.boundPipeline.uniformIndices().getOrDefault(name, -1);
+        int uniformIndex = ((PipelineUniforms) (Object) this.boundPipeline).txoptimizations$uniformSlot(name);
 
         if (uniformIndex != -1)
             this.backend.setUniform(uniformIndex, value);

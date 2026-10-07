@@ -29,6 +29,15 @@ public abstract class RenderSectionManagerTreePoolMixin {
     private SectionTree renderTree;
 
     @Unique
+    private static final CullType[] CULL_TYPES = CullType.values();
+
+    @Unique
+    private final SectionTree[] txoptimizations$lastLive = new SectionTree[CULL_TYPES.length + 1];
+
+    @Unique
+    private boolean txoptimizations$trackedChanged;
+
+    @Unique
     private Set<SectionTree> txoptimizations$trackedTrees;
 
     @Unique
@@ -46,6 +55,7 @@ public abstract class RenderSectionManagerTreePoolMixin {
         this.txoptimizations$trackedTrees.add(cullResult.getCullTreeWide());
         this.txoptimizations$trackedTrees.add(cullResult.getCullTreeRegular());
         this.txoptimizations$trackedTrees.add(cullResult.getCullTreeLocal());
+        this.txoptimizations$trackedChanged = true;
 
         return result;
     }
@@ -56,6 +66,13 @@ public abstract class RenderSectionManagerTreePoolMixin {
 
         if (tracked == null)
             return;
+
+        boolean liveChanged = this.txoptimizations$liveChanged();
+
+        if (!this.txoptimizations$trackedChanged && !liveChanged)
+            return;
+
+        this.txoptimizations$trackedChanged = false;
 
         Set<SectionTree> live = this.txoptimizations$liveTrees;
 
@@ -73,5 +90,27 @@ public abstract class RenderSectionManagerTreePoolMixin {
 
             return true;
         });
+    }
+
+    @Unique
+    private boolean txoptimizations$liveChanged() {
+        SectionTree[] last    = this.txoptimizations$lastLive;
+        boolean       changed = false;
+
+        for (int index = 0; index < CULL_TYPES.length; index ++) {
+            SectionTree tree = this.cullResults.get(CULL_TYPES[index]);
+
+            if (last[index] != tree) {
+                last[index] = tree;
+                changed     = true;
+            }
+        }
+
+        if (last[CULL_TYPES.length] != this.renderTree) {
+            last[CULL_TYPES.length] = this.renderTree;
+            changed                 = true;
+        }
+
+        return changed;
     }
 }

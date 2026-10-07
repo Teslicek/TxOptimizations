@@ -12,6 +12,9 @@ import org.spongepowered.asm.mixin.Unique;
 @Mixin(FrontendRenderPipeline.class)
 public abstract class FrontendRenderPipelineUniformsMixin implements PipelineUniforms {
 
+    @Unique
+    private static final int NO_SLOT = -1;
+
     @Shadow
     @Final
     private Object2IntMap<String> uniformIndices;
@@ -21,6 +24,9 @@ public abstract class FrontendRenderPipelineUniformsMixin implements PipelineUni
 
     @Unique
     private int[] txoptimizations$slots;
+
+    @Unique
+    private Object2IntMap<String> txoptimizations$slotsByName;
 
     @Override
     public String[] txoptimizations$uniformNames() {
@@ -36,6 +42,18 @@ public abstract class FrontendRenderPipelineUniformsMixin implements PipelineUni
             this.txoptimizations$flatten();
 
         return this.txoptimizations$slots;
+    }
+
+    @Override
+    public int txoptimizations$uniformSlot(String name) {
+        Object2IntMap<String> slots = this.txoptimizations$slotsByName;
+
+        if (slots == null) {
+            slots                            = ((UnmodifiableObject2IntMapAccessor) this.uniformIndices).txoptimizations$map();
+            this.txoptimizations$slotsByName = slots;
+        }
+
+        return slots.getOrDefault(name, NO_SLOT);
     }
 
     @Unique
