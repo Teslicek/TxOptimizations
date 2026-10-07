@@ -196,7 +196,7 @@ While a server reconfigures the connection (the screen shown when a network move
 
 ### Loading screens
 
-The resource reload overlay is not drawn: while a reload runs you keep seeing the screen behind it (the title screen or the current menu, or the world in game), and as soon as the reload finishes it is completed and the overlay removed, without the fade-out. The world loading screen is not drawn once a world exists, and the title screen skips its fade-in. These change what is shown while loading, not how long the loading itself takes.
+The resource reload overlay is not drawn: while a reload runs you keep seeing the screen behind it (the title screen or the current menu, or the world in game), and as soon as the reload finishes it is completed and the overlay removed, without the fade-out. The world loading screen is not drawn once a world exists, and while it is up the window keeps showing the last frame instead of new ones: frames are still rendered, so the chunks around you keep building and the screen closes when vanilla's would, but they are not copied to the window or presented. Without that, the first join after starting the game showed black frames, because the world had nothing to draw before your position and chunks arrived. The title screen skips its fade-in. These change what is shown while loading, not how long the loading itself takes.
 
 ### Frame limiter
 

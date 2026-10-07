@@ -10,6 +10,9 @@ import com.mojang.renderpearl.api.device.SurfaceException;
 import com.teslicek.txoptimizations.FramePath;
 import com.teslicek.txoptimizations.PresentThread;
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.Gui;
+import net.minecraft.client.gui.screens.LevelLoadingScreen;
+import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.client.Options;
 import org.objectweb.asm.Opcodes;
 import org.slf4j.Logger;
@@ -44,14 +47,25 @@ public abstract class MinecraftPresentThreadMixin {
     @Shadow
     private boolean surfaceIsInvalid;
 
+    @Shadow
+    public ClientLevel level;
+
+    @Shadow
+    @Final
+    public Gui gui;
+
     @Unique
     private boolean txoptimizations$acquireDeferred;
+
+    @Unique
+    private boolean txoptimizations$holdFrame;
 
     @ModifyExpressionValue(method = "renderFrame", at = @At(value = "FIELD", target = "Lnet/minecraft/client/Minecraft;windowSurfaceNeedsReconfiguring:Z", opcode = Opcodes.GETFIELD))
     private boolean txoptimizations$deferAcquire(boolean needsReconfiguring) {
         boolean worker = FramePath.beginFrame(PresentThread.canDeferAcquire(this.windowSurface));
 
         this.txoptimizations$acquireDeferred = !needsReconfiguring && worker;
+        this.txoptimizations$holdFrame       = this.level != null && this.gui.screen() instanceof LevelLoadingScreen;
 
         return needsReconfiguring;
     }
@@ -66,14 +80,16 @@ public abstract class MinecraftPresentThreadMixin {
 
     @ModifyExpressionValue(method = "renderFrame", at = @At(value = "FIELD", target = "Lnet/minecraft/client/Minecraft;surfaceIsInvalid:Z", opcode = Opcodes.GETFIELD))
     private boolean txoptimizations$skipDeferredAcquire(boolean invalid) {
-        return invalid || this.txoptimizations$acquireDeferred;
+        return invalid || this.txoptimizations$acquireDeferred || this.txoptimizations$holdFrame;
     }
 
     @WrapOperation(method = "renderFrame", at = @At(value = "INVOKE", target = "Lcom/mojang/renderpearl/api/device/GpuSurface;isAcquired()Z", ordinal = 1))
     private boolean txoptimizations$acquireBeforeBlit(GpuSurface surface, Operation<Boolean> original) {
         if (this.txoptimizations$acquireDeferred) {
             this.txoptimizations$acquireDeferred = false;
-            this.txoptimizations$configureAndAcquire();
+
+            if (!this.txoptimizations$holdFrame)
+                this.txoptimizations$configureAndAcquire();
         }
 
         return original.call(surface);
