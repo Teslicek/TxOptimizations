@@ -69,6 +69,7 @@
     "GizmoLineIdentityPoseMixin",
     "GlyphRenderStateMatrixMixin",
     "GlyphRendererVertexBuilderMixin",
+    "ItemFeatureVertexBuilderMixin",
     "GpuBufferPoolRecycleMixin",
     "GpuLimitsPlatformMixin",
     "GuiGraphicsExtractorMapAtlasMixin",

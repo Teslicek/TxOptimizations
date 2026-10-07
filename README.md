@@ -203,6 +203,7 @@ Block entities with nothing to draw are skipped: signs without text, beacons wit
 - Font atlas: font glyph textures are 1024x1024 instead of 256x256, so text spans far fewer textures and needs fewer texture switches and draw calls.
 - Map atlas: map images are packed into shared 2048x2048 textures, so walls of maps in item frames draw in a few calls instead of one per map.
 - Glyph vertex builder: consecutive glyphs of the same render type reuse the same vertex builder instead of looking it up for every glyph.
+- Item vertex builder: within one item, consecutive quads of the same render type reuse the vertex builder the previous quad got, when that render type merges consecutive geometry, which is exactly the builder vanilla's lookup returns again (the item quad loop was 3% of the render thread with 334 armor stands at a CubeCraft lobby).
 - Animated item atlas: animated item icons in the GUI share one atlas that is cleared once per frame instead of slot by slot.
 - Scissor state equality: vanilla merges draws of the same prepared render type inside groups it marks as reorderable, but `RenderType.prepare` copies the scissor state every time and `ScissorState` has no value equality, so two prepared render types never compare equal and the merge almost never happens. Comparing scissor states by value lets that vanilla merge work, which cuts draw calls. Strictly ordered groups are untouched.
 
