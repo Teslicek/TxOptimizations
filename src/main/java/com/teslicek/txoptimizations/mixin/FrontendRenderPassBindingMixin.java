@@ -60,6 +60,9 @@ public abstract class FrontendRenderPassBindingMixin {
     private static final Set<FrontendRenderPipeline> VALIDATED_PIPELINES = new ReferenceOpenHashSet<>();
 
     @Unique
+    private static final int VERTEX_BUFFER_SLOTS = 16;
+
+    @Unique
     private IndexType txoptimizations$indexType;
 
     @Inject(method = "<init>", at = @At("RETURN"))
@@ -95,32 +98,68 @@ public abstract class FrontendRenderPassBindingMixin {
         this.constantsPushed = false;
     }
 
-    @Inject(method = "setUniform(Ljava/lang/String;Ljava/lang/Object;)V", at = @At("HEAD"), cancellable = true)
-    private void txoptimizations$keepBoundUniform(String name, Object value, CallbackInfo ci) {
-        if (value != null && value.equals(this.uniforms.get(name)))
-            ci.cancel();
-    }
+    @Overwrite
+    public void setUniform(String name, GpuTextureView textureView, GpuSampler sampler) {
+        if (textureView != null && sampler != null) {
+            if (this.uniforms.get(name) instanceof TextureViewAndSampler bound && bound.view() == textureView && bound.sampler() == sampler)
+                return;
 
-    @Inject(method = "setUniform(Ljava/lang/String;Lcom/mojang/renderpearl/api/textures/GpuTextureView;Lcom/mojang/renderpearl/api/textures/GpuSampler;)V", at = @At("HEAD"), cancellable = true)
-    private void txoptimizations$keepBoundTexture(String name, GpuTextureView textureView, GpuSampler sampler, CallbackInfo ci) {
-        if (textureView != null && sampler != null && this.uniforms.get(name) instanceof TextureViewAndSampler bound && bound.view() == textureView && bound.sampler() == sampler)
-            ci.cancel();
-    }
+            this.setUniform(name, new TextureViewAndSampler(textureView, sampler));
 
-    @Inject(method = "setVertexBuffer", at = @At("HEAD"), cancellable = true)
-    private void txoptimizations$keepBoundVertexBuffer(int slot, GpuBufferSlice vertexBuffer, CallbackInfo ci) {
-        if (vertexBuffer != null && slot >= 0 && slot < this.vertexBuffers.length && vertexBuffer.equals(this.vertexBuffers[slot]) && !vertexBuffer.buffer().isClosed())
-            ci.cancel();
-    }
-
-    @Inject(method = "setIndexBuffer", at = @At("HEAD"), cancellable = true)
-    private void txoptimizations$keepBoundIndexBuffer(GpuBuffer indexBuffer, IndexType indexType, CallbackInfo ci) {
-        if (indexBuffer == this.indexBuffer && indexType == this.txoptimizations$indexType && !indexBuffer.isClosed()) {
-            ci.cancel();
             return;
         }
 
+        if (textureView != null || sampler != null)
+            throw new IllegalArgumentException("textureView and sampler must both or neither be null");
+
+        this.setUniform(name, (Object) null);
+    }
+
+    @Overwrite
+    private void setUniform(String name, Object value) {
+        if (value != null && value.equals(this.uniforms.get(name)))
+            return;
+
+        if (value == null)
+            this.uniforms.remove(name);
+        else
+            this.uniforms.put(name, value);
+
+        if (this.boundPipeline == null)
+            return;
+
+        int uniformIndex = this.boundPipeline.uniformIndices().getOrDefault(name, -1);
+
+        if (uniformIndex != -1)
+            this.backend.setUniform(uniformIndex, value);
+    }
+
+    @Overwrite
+    public void setVertexBuffer(int slot, GpuBufferSlice vertexBuffer) {
+        if (vertexBuffer != null && slot >= 0 && slot < this.vertexBuffers.length && vertexBuffer.equals(this.vertexBuffers[slot]) && !vertexBuffer.buffer().isClosed())
+            return;
+
+        if (slot < 0 || slot >= VERTEX_BUFFER_SLOTS)
+            throw new IllegalArgumentException("Vertex buffer slot is out of range: " + slot);
+
+        if (vertexBuffer != null && vertexBuffer.buffer().isClosed())
+            throw new IllegalStateException("Vertex buffer at slot " + slot + " has been closed!");
+
+        if (vertexBuffer != null && (vertexBuffer.buffer().usage() & GpuBuffer.USAGE_VERTEX) == 0)
+            throw new IllegalStateException("Vertex buffer at slot " + slot + " doesn't have GpuBuffer.USAGE_VERTEX flag!");
+
+        this.vertexBuffers[slot] = vertexBuffer;
+        this.backend.setVertexBuffer(slot, vertexBuffer);
+    }
+
+    @Overwrite
+    public void setIndexBuffer(GpuBuffer indexBuffer, IndexType indexType) {
+        if (indexBuffer == this.indexBuffer && indexType == this.txoptimizations$indexType && !indexBuffer.isClosed())
+            return;
+
         this.txoptimizations$indexType = indexType;
+        this.indexBuffer               = indexBuffer;
+        this.backend.setIndexBuffer(indexBuffer, indexType);
     }
 
     @Unique
