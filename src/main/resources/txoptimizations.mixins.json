@@ -138,6 +138,7 @@
     "RenderSectionManagerTreePoolMixin",
     "RenderSectionPendingCountMixin",
     "RenderSetupTextureCacheMixin",
+    "TextureManagerVersionMixin",
     "RendererCacheMixin",
     "ScissorStateEqualityMixin",
     "ShapeOutlineEdgeCacheMixin",

@@ -5,6 +5,7 @@ import com.mojang.renderpearl.api.textures.FilterMode;
 import com.mojang.renderpearl.api.textures.GpuSampler;
 import com.mojang.renderpearl.api.textures.GpuTextureView;
 import com.teslicek.txoptimizations.TextureList;
+import com.teslicek.txoptimizations.TextureManagerVersion;
 import java.util.List;
 import java.util.Map;
 import net.minecraft.client.renderer.rendertype.PreparedRenderType;
@@ -41,6 +42,15 @@ public abstract class RenderSetupTextureCacheMixin {
     @Unique
     private RenderSetup.TextureBinding[] txoptimizations$bindings;
 
+    @Unique
+    private AbstractTexture[] txoptimizations$textures;
+
+    @Unique
+    private TextureManager txoptimizations$texturesOwner;
+
+    @Unique
+    private int txoptimizations$texturesVersion;
+
     @Overwrite
     public List<PreparedRenderType.Texture> prepareTextures(TextureManager textureManager, SamplerCache samplerCache, GpuTextureView overlayTexture, GpuTextureView lightmapTexture) {
         if (this.textures.isEmpty() && !this.useOverlay && !this.useLightmap)
@@ -63,8 +73,10 @@ public abstract class RenderSetupTextureCacheMixin {
         if (this.useLightmap)
             built[index ++] = new PreparedRenderType.Texture("Sampler2", lightmapTexture, samplerCache.getClampToEdge(FilterMode.LINEAR));
 
+        AbstractTexture[] textures = this.txoptimizations$resolve(textureManager);
+
         for (int binding = 0; binding < this.txoptimizations$names.length; binding ++) {
-            AbstractTexture texture         = textureManager.getTexture(this.txoptimizations$bindings[binding].location());
+            AbstractTexture texture         = textures[binding];
             GpuSampler      samplerOverride = this.txoptimizations$bindings[binding].sampler().get();
 
             built[index ++] = new PreparedRenderType.Texture(this.txoptimizations$names[binding], texture.getTextureView(), samplerOverride != null ? samplerOverride : texture.getSampler());
@@ -93,6 +105,26 @@ public abstract class RenderSetupTextureCacheMixin {
     }
 
     @Unique
+    private AbstractTexture[] txoptimizations$resolve(TextureManager textureManager) {
+        TextureManagerVersion version  = (TextureManagerVersion) textureManager;
+        AbstractTexture[]     textures = this.txoptimizations$textures;
+
+        if (textures != null && this.txoptimizations$texturesOwner == textureManager && this.txoptimizations$texturesVersion == version.txoptimizations$getVersion())
+            return textures;
+
+        textures = new AbstractTexture[this.txoptimizations$names.length];
+
+        for (int binding = 0; binding < textures.length; binding ++)
+            textures[binding] = textureManager.getTexture(this.txoptimizations$bindings[binding].location());
+
+        this.txoptimizations$textures        = textures;
+        this.txoptimizations$texturesOwner   = textureManager;
+        this.txoptimizations$texturesVersion = version.txoptimizations$getVersion();
+
+        return textures;
+    }
+
+    @Unique
     private boolean txoptimizations$matches(TextureList prepared, TextureManager textureManager, SamplerCache samplerCache, GpuTextureView overlayTexture, GpuTextureView lightmapTexture) {
         int index = 0;
 
@@ -102,8 +134,10 @@ public abstract class RenderSetupTextureCacheMixin {
         if (this.useLightmap && !txoptimizations$same(prepared.get(index ++), "Sampler2", lightmapTexture, samplerCache.getClampToEdge(FilterMode.LINEAR)))
             return false;
 
+        AbstractTexture[] textures = this.txoptimizations$resolve(textureManager);
+
         for (int binding = 0; binding < this.txoptimizations$names.length; binding ++) {
-            AbstractTexture texture         = textureManager.getTexture(this.txoptimizations$bindings[binding].location());
+            AbstractTexture texture         = textures[binding];
             GpuSampler      samplerOverride = this.txoptimizations$bindings[binding].sampler().get();
 
             if (!txoptimizations$same(prepared.get(index ++), this.txoptimizations$names[binding], texture.getTextureView(), samplerOverride != null ? samplerOverride : texture.getSampler()))

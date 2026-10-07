@@ -155,7 +155,6 @@ public abstract class QuadParticleCornerCacheMixin {
 
     @Unique
     private static void txoptimizations$putVertex(long pointer, int corner, float x, float y, float z, float size, float u, float v, int color, int light) {
-        VERTEX.set(ROTATED[corner * 3], ROTATED[corner * 3 + 1], ROTATED[corner * 3 + 2]).mul(size).add(x, y, z);
-        ParticleVertex.put(pointer, VERTEX.x, VERTEX.y, VERTEX.z, u, v, color, light);
+        ParticleVertex.put(pointer, ROTATED[corner * 3] * size + x, ROTATED[corner * 3 + 1] * size + y, ROTATED[corner * 3 + 2] * size + z, u, v, color, light);
     }
 }
