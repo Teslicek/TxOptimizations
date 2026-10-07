@@ -60,12 +60,18 @@ public abstract class MinecraftPresentThreadMixin {
     @Unique
     private boolean txoptimizations$holdFrame;
 
+    @Unique
+    private boolean txoptimizations$worldShown;
+
     @ModifyExpressionValue(method = "renderFrame", at = @At(value = "FIELD", target = "Lnet/minecraft/client/Minecraft;windowSurfaceNeedsReconfiguring:Z", opcode = Opcodes.GETFIELD))
     private boolean txoptimizations$deferAcquire(boolean needsReconfiguring) {
         boolean worker = FramePath.beginFrame(PresentThread.canDeferAcquire(this.windowSurface));
 
         this.txoptimizations$acquireDeferred = !needsReconfiguring && worker;
-        this.txoptimizations$holdFrame       = this.level != null && this.gui.screen() instanceof LevelLoadingScreen;
+        this.txoptimizations$holdFrame       = !this.txoptimizations$worldShown && this.level != null && this.gui.screen() instanceof LevelLoadingScreen;
+
+        if (this.level != null && !this.txoptimizations$holdFrame)
+            this.txoptimizations$worldShown = true;
 
         return needsReconfiguring;
     }
