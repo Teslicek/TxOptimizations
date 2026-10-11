@@ -324,6 +324,10 @@ Every frame started a command buffer for copies into transient GPU memory and su
 
 Ending a render pass recorded the end of the rendering instance and a full barrier right away, and the next pass began a new instance, even when it drew into exactly the same color and depth textures. The end of a pass is now held back. If the next pass uses the same attachments and render area, clears nothing and nothing else was recorded in between, it keeps drawing in the same rendering instance, as happens from the sky pass into the main world pass in clear weather. Draws inside one rendering instance keep their order for color, depth and blending, and a pass cannot sample its own attachments, so the image is the same. Anything else that records a command, ends the command buffer, or begins a different pass ends the held pass first, exactly as before. The GPU pass profiler disables this while it records.
 
+### Long selection lists
+
+Filling a scrolling list (server list, world list, resource packs) placed each new row by summing the heights of every row already in the list, so filling n rows took n² steps: about 7.3 million for a 3,817-entry server list, an 88 ms freeze when the multiplayer screen opened. While a list is being refilled, each row's position is now carried over from the previous row by adding that row's height, the same value vanilla's sum gives.
+
 ### Frustum box test
 
 Every entity, block entity and rain column visibility check asked JOML for a full box/frustum classification (outside, inside or intersecting), which tests each plane twice, and then only used whether the box was outside. The check now uses JOML's plain box test, which runs exactly the first of those two tests per plane in the same order, so the answer is identical with half the plane math.

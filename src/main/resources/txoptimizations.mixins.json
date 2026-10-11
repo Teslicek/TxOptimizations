@@ -3,6 +3,7 @@
   "package": "com.teslicek.txoptimizations.mixin",
   "compatibilityLevel": "JAVA_25",
   "client": [
+    "AbstractSelectionListAppendMixin",
     "ArmorStandBareLayersMixin",
     "AtlasManagerOwnDuplicatesMixin",
     "ArrowGizmoPackedMixin",
