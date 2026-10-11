@@ -328,6 +328,11 @@ Ending a render pass recorded the end of the rendering instance and a full barri
 
 Filling a scrolling list (server list, world list, resource packs) placed each new row by summing the heights of every row already in the list, so filling n rows took n² steps: about 7.3 million for a 3,817-entry server list, an 88 ms freeze when the multiplayer screen opened. While a list is being refilled, each row's position is now carried over from the previous row by adding that row's height, the same value vanilla's sum gives.
 
+### Server icons
+
+Every server list ping decoded the server's icon after removing newlines from its base64 text with `String.replaceAll("
+", "")`, which compiles and runs a regular expression over text that is often tens of thousands of characters long. Pinging the 4,109 servers of a large list spent 12.5% of all CPU time there. The newlines are now removed with a plain character replacement, and text without a newline is used as it is, which gives the same string.
+
 ### Frustum box test
 
 Every entity, block entity and rain column visibility check asked JOML for a full box/frustum classification (outside, inside or intersecting), which tests each plane twice, and then only used whether the box was outside. The check now uses JOML's plain box test, which runs exactly the first of those two tests per plane in the same order, so the answer is identical with half the plane math.
