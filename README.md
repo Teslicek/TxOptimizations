@@ -547,6 +547,10 @@ Model loading is the last part of a reload to finish, and its final step wrote a
 
 Vulkan resources that are closed are destroyed two frames later, once the GPU is done with them, and that destruction ran on the render thread. After a resource reload Sodium closes the buffers of every loaded chunk, and destroying them all in one frame took 17 ms of a 33 ms frame on CubeCraft. Buffers, textures and texture views are now destroyed on a single background thread in the same order, at the same point after the GPU finished with them; the GPU memory allocator is internally synchronized, so this is safe. Other resources are destroyed on the render thread as before, and the game waits for the background thread before it shuts the GPU device down.
 
+### Block state cache at startup
+
+Every launch, vanilla builds the shape and lighting cache of all 35,723 block states one after another on the main thread, which took 840 ms in a test run. The states are still registered in the same order, but their caches are now built on all cores right after the block classes finish loading, before anything reads them; in the same test it took 517 ms. Building them inside the block class setup deadlocks, because copper and flower pot blocks read other blocks while their cache is built, so the build waits until that setup is done. A check that rebuilt all 35,723 caches one at a time afterwards found no difference in any cached value.
+
 ### Memory
 
 Less live memory means shorter and rarer garbage collections.
