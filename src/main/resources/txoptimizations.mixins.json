@@ -6,6 +6,7 @@
     "AbstractSelectionListAppendMixin",
     "BlocksParallelCacheMixin",
     "BootstrapParallelCacheMixin",
+    "compat.XaeroMinimapCoreHudCacheMixin",
     "MainStartupBackgroundMixin",
     "MinecraftInventoryPreloadMixin",
     "ServerStatusFaviconNewlineMixin",

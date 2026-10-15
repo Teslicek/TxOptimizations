@@ -25,7 +25,14 @@ public abstract class GuiRenderStateHudCacheMixin {
 
     @Inject(method = "addPicturesInPictureState", at = @At("HEAD"), cancellable = true)
     private void txoptimizations$deferPicture(PictureInPictureRenderState picture, CallbackInfo ci) {
-        this.txoptimizations$deferUncached(picture, ci);
+        if (!HudCache.isRendering())
+            return;
+
+        if (!HudCache.isCurrentUncached())
+            HudCache.uncacheCurrent();
+
+        HudCache.defer(picture);
+        ci.cancel();
     }
 
     @Inject(method = "addItem", at = @At("HEAD"), cancellable = true)

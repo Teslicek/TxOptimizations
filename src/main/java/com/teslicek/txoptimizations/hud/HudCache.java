@@ -160,7 +160,7 @@ public final class HudCache {
         framebuffers().markForCatchUp();
     }
 
-    private static void uncacheCurrent() {
+    public static void uncacheCurrent() {
         if (current == null)
             throw new IllegalStateException("No HUD layer is being rendered");
 
