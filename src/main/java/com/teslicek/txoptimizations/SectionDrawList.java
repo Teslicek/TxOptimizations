@@ -236,9 +236,11 @@ public final class SectionDrawList {
             throw new IllegalStateException("No section draw groups were made");
 
         int group = this.order[this.groups - 1];
-        int draw  = this.reversed[this.groupLayers[group]] ? this.firstDraws[group] : this.lastDraws[group];
 
-        return this.indexedDraw(draw);
+        if (this.drawCounts[group] == 0)
+            throw new IllegalStateException("The last section draw group holds no draws");
+
+        return this.indexedDraw(this.reversed[this.groupLayers[group]] ? this.firstDraws[group] : this.lastDraws[group]);
     }
 
     public void writeSectionInfos(long address) {
