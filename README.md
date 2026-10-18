@@ -565,6 +565,10 @@ Every launch, vanilla builds the shape and lighting cache of all 35,723 block st
 
 While ticking is frozen (`/tick freeze`), every frame and every tick asks each entity how many players ride it, to decide whether it still moves smoothly, and the answer always came from a new stream over all of its passengers and their passengers. An entity without passengers now answers 0 straight away, which is the count the empty stream returned. An entity that carries passengers counts them through the same stream as before.
 
+### Section update lookups
+
+Every frame, level extraction looks up the update state of each visible chunk section to find the sections that need a rebuild, and each lookup worked out the section's slot in the update grid with two modulo operations before reading it. The grid of render sections is laid out the same way, so the slot number every render section already carries is now tried first. When the update state in that slot belongs to the same section and the section lies inside the grid, it is exactly the state the full lookup returns; in any other case the full lookup runs as before.
+
 ### Memory
 
 Less live memory means shorter and rarer garbage collections.

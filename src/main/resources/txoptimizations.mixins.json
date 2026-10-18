@@ -98,6 +98,7 @@
     "ItemStackRenderStateBoundsMixin",
     "LayerLightSectionStorageSnapshotMixin",
     "LevelRendererDeferredSkyMixin",
+    "LevelExtractorDirtySectionsMixin",
     "LevelExtractorEntityVisibilityMixin",
     "LevelExtractorRegionCacheMixin",
     "LevelRendererGizmoReuseMixin",
