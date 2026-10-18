@@ -170,6 +170,7 @@
     "RenderTypeGroupIndexMixin",
     "ShaderManagerSourcePatchMixin",
     "SkyDataLayerStorageMapSnapshotMixin",
+    "SkyLightSectionStorageLookupMixin",
     "SkyRendererFarPlaneMixin",
     "SodiumEntityRendererDirectWriteMixin",
     "SodiumExtraFrameCounterMixin",

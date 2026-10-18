@@ -27,6 +27,11 @@ public abstract class DataLayerStorageMapSnapshotMixin implements LightSnapshotM
     }
 
     @Override
+    public int txoptimizations$skyLight(long blockNode) {
+        throw new IllegalStateException("No sky light in " + this.getClass().getName());
+    }
+
+    @Override
     public DataLayerStorageMap<?> txoptimizations$snapshotWith(LightSectionTree tree) {
         throw new IllegalStateException("No light snapshot support for " + this.getClass().getName());
     }

@@ -5,8 +5,10 @@ import it.unimi.dsi.fastutil.longs.LongIterator;
 import it.unimi.dsi.fastutil.longs.LongSet;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import java.util.Arrays;
+import net.minecraft.core.BlockPos;
 import net.minecraft.core.SectionPos;
 import net.minecraft.world.level.chunk.DataLayer;
+import net.minecraft.world.level.lighting.LightEngine;
 
 public final class LightSectionTree {
 
@@ -57,6 +59,43 @@ public final class LightSectionTree {
             return NO_TOP;
 
         return region.top(column(zeroNode));
+    }
+
+    public int skyLight(long blockNode, int lowestY) {
+        long   sectionNode = SectionPos.blockToSection(blockNode);
+        Region region      = this.regions.get(sectionNode & REGION_MASK);
+
+        if (region == null)
+            return LightEngine.MAX_LEVEL;
+
+        int column   = column(sectionNode);
+        int top      = region.top(column);
+        int sectionY = SectionPos.y(sectionNode);
+
+        if (top == NO_TOP || top == lowestY || sectionY >= top)
+            return LightEngine.MAX_LEVEL;
+
+        DataLayer[] layers = region.columns[column];
+
+        if (layers == null)
+            return LightEngine.MAX_LEVEL;
+
+        int       x     = SectionPos.sectionRelative(BlockPos.getX(blockNode));
+        int       z     = SectionPos.sectionRelative(BlockPos.getZ(blockNode));
+        int       index = sectionY - this.minY;
+        DataLayer layer = index < 0 ? null : layers[index];
+
+        if (layer != null)
+            return layer.get(x, SectionPos.sectionRelative(BlockPos.getY(blockNode)), z);
+
+        while (++sectionY < top) {
+            layer = ++index < 0 ? null : layers[index];
+
+            if (layer != null)
+                return layer.get(x, 0, z);
+        }
+
+        return LightEngine.MAX_LEVEL;
     }
 
     public LightSectionTree with(LongSet changed, LightSnapshotMap source) {

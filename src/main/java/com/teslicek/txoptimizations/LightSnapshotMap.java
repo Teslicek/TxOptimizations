@@ -10,5 +10,7 @@ public interface LightSnapshotMap {
 
     int txoptimizations$top(long zeroNode);
 
+    int txoptimizations$skyLight(long blockNode);
+
     DataLayerStorageMap<?> txoptimizations$snapshotWith(LightSectionTree tree);
 }

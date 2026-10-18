@@ -15,6 +15,10 @@ public final class LightSectionView extends Long2ObjectOpenHashMap<DataLayer> {
         this.tree = tree;
     }
 
+    public LightSectionTree tree() {
+        return this.tree;
+    }
+
     @Override
     public DataLayer get(long key) {
         return this.tree.layer(key);

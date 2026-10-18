@@ -2,6 +2,7 @@ package com.teslicek.txoptimizations.mixin;
 
 import com.teslicek.txoptimizations.LightSectionTree;
 import com.teslicek.txoptimizations.LightSectionView;
+import com.teslicek.txoptimizations.LightSnapshotMap;
 import com.teslicek.txoptimizations.LightTopView;
 import it.unimi.dsi.fastutil.longs.Long2IntOpenHashMap;
 import net.minecraft.world.level.lighting.DataLayerStorageMap;
@@ -22,6 +23,12 @@ public abstract class SkyDataLayerStorageMapSnapshotMixin {
 
     public int txoptimizations$top(long zeroNode) {
         return this.topSections.getOrDefault(zeroNode, LightSectionTree.NO_TOP);
+    }
+
+    public int txoptimizations$skyLight(long blockNode) {
+        LightSectionView sections = (LightSectionView) ((LightSnapshotMap) (Object) this).txoptimizations$sections();
+
+        return sections.tree().skyLight(blockNode, this.currentLowestY);
     }
 
     public DataLayerStorageMap<?> txoptimizations$snapshotWith(LightSectionTree tree) {
