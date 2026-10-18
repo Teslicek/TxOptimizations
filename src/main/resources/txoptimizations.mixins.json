@@ -55,6 +55,7 @@
     "EntityHitboxDebugRendererMixin",
     "EntityRenderDispatcherCacheMixin",
     "EntityCullBoxCacheMixin",
+    "EntityPlayerPassengersMixin",
     "EntityRenderDispatcherSkinCacheMixin",
     "EntityRendererShadowBlockMixin",
     "EntityRendererCullBoxMixin",

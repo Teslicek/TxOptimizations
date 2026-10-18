@@ -561,6 +561,10 @@ Before registering blocks, the game builds its data fixers (the rules that upgra
 
 Every launch, vanilla builds the shape and lighting cache of all 35,723 block states one after another on the main thread, which took 840 ms in a test run. The states are still registered in the same order, but their caches are now built on all cores right after the block classes finish loading, before anything reads them; in the same test it took 517 ms. Building them inside the block class setup deadlocks, because copper and flower pot blocks read other blocks while their cache is built, so the build waits until that setup is done. A check that rebuilt all 35,723 caches one at a time afterwards found no difference in any cached value.
 
+### Frozen tick passengers
+
+While ticking is frozen (`/tick freeze`), every frame and every tick asks each entity how many players ride it, to decide whether it still moves smoothly, and the answer always came from a new stream over all of its passengers and their passengers. An entity without passengers now answers 0 straight away, which is the count the empty stream returned. An entity that carries passengers counts them through the same stream as before.
+
 ### Memory
 
 Less live memory means shorter and rarer garbage collections.
