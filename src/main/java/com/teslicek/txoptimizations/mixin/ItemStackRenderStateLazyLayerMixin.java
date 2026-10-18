@@ -1,12 +1,13 @@
 package com.teslicek.txoptimizations.mixin;
 
+import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
+import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
 import java.util.Arrays;
 import net.minecraft.client.renderer.item.ItemStackRenderState;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Overwrite;
 import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.injection.At;
-import org.spongepowered.asm.mixin.injection.Redirect;
 
 @Mixin(ItemStackRenderState.class)
 public abstract class ItemStackRenderStateLazyLayerMixin {
@@ -17,8 +18,8 @@ public abstract class ItemStackRenderStateLazyLayerMixin {
     @Shadow
     private ItemStackRenderState.LayerRenderState[] layers;
 
-    @Redirect(method = "<init>", at = @At(value = "NEW", target = "(Lnet/minecraft/client/renderer/item/ItemStackRenderState;)Lnet/minecraft/client/renderer/item/ItemStackRenderState$LayerRenderState;"))
-    private ItemStackRenderState.LayerRenderState txoptimizations$deferFirstLayer(ItemStackRenderState owner) {
+    @WrapOperation(method = "<init>", at = @At(value = "NEW", target = "(Lnet/minecraft/client/renderer/item/ItemStackRenderState;)Lnet/minecraft/client/renderer/item/ItemStackRenderState$LayerRenderState;"))
+    private ItemStackRenderState.LayerRenderState txoptimizations$deferFirstLayer(ItemStackRenderState owner, Operation<ItemStackRenderState.LayerRenderState> original) {
         return null;
     }
 
