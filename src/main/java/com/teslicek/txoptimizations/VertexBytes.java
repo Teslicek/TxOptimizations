@@ -59,6 +59,13 @@ public final class VertexBytes {
         putNormal(pointer + 32L, normal);
     }
 
+    public static void putBlock(long pointer, float x, float y, float z, int argb, float u, float v, int light) {
+        putPosition(pointer, x, y, z);
+        putColor(pointer + 12L, argb);
+        putUv(pointer + 16L, u, v);
+        putPacked(pointer + 24L, light);
+    }
+
     public static byte normalByte(float value) {
         return (byte) ((int) (Mth.clamp(value, -1.0F, 1.0F) * 127.0F) & BYTE_MASK);
     }
