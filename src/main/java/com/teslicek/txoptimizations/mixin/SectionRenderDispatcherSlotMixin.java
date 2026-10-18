@@ -21,6 +21,9 @@ public abstract class SectionRenderDispatcherSlotMixin {
 
     @Inject(method = "<init>", at = @At("RETURN"))
     private void txoptimizations$assignMeshSlots(CallbackInfo ci) {
+        if (ChunkSectionLayer.values().length * 2 != SectionAllocations.SLOTS)
+            throw new IllegalStateException("Section allocations hold " + SectionAllocations.SLOTS + " slots but there are " + ChunkSectionLayer.values().length + " section layers");
+
         this.chunkUberBuffers.forEach((layer, buffers) -> {
             ((UberBufferSlot) buffers.vertexBuffer()).txoptimizations$setSlot(SectionAllocations.vertexSlot(layer));
             ((UberBufferSlot) buffers.indexBuffer()).txoptimizations$setSlot(SectionAllocations.indexSlot(layer));

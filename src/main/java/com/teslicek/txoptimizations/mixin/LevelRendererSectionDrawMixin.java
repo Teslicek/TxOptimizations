@@ -5,6 +5,7 @@ import com.mojang.blaze3d.vertex.UberGpuBuffer;
 import com.mojang.renderpearl.api.buffers.GpuBuffer;
 import com.mojang.renderpearl.api.pipeline.IndexType;
 import com.teslicek.txoptimizations.SectionAllocations;
+import com.teslicek.txoptimizations.SectionLayers;
 import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import java.util.ArrayList;
@@ -29,9 +30,6 @@ import org.spongepowered.asm.mixin.Unique;
 public abstract class LevelRendererSectionDrawMixin {
 
     @Unique
-    private static final ChunkSectionLayer[] LAYERS = ChunkSectionLayer.values();
-
-    @Unique
     private static final int GROUP_HASH_SEED = 173;
 
     @Shadow
@@ -52,10 +50,10 @@ public abstract class LevelRendererSectionDrawMixin {
         if (dispatcher == null)
             return 0;
 
-        int[] vertexSizes = new int[LAYERS.length];
+        int[] vertexSizes = new int[SectionLayers.VALUES.length];
 
-        for (int layerIndex = 0; layerIndex < LAYERS.length; layerIndex ++)
-            vertexSizes[layerIndex] = LAYERS[layerIndex].pipeline(false).getVertexFormatBinding(0).getVertexSize();
+        for (int layerIndex = 0; layerIndex < SectionLayers.VALUES.length; layerIndex ++)
+            vertexSizes[layerIndex] = SectionLayers.VALUES[layerIndex].pipeline(false).getVertexFormatBinding(0).getVertexSize();
 
         Int2ObjectOpenHashMap<LevelRenderer.ChunkDrawGroup> drawGroupCache           = new Int2ObjectOpenHashMap<>();
         int                                                 largestIndexCount        = 0;
@@ -75,8 +73,8 @@ public abstract class LevelRendererSectionDrawMixin {
 
                 int sectionInfoDataIndex = -1;
 
-                for (int layerIndex = 0; layerIndex < LAYERS.length; layerIndex ++) {
-                    ChunkSectionLayer        layer            = LAYERS[layerIndex];
+                for (int layerIndex = 0; layerIndex < SectionLayers.VALUES.length; layerIndex ++) {
+                    ChunkSectionLayer        layer            = SectionLayers.VALUES[layerIndex];
                     TlsfAllocator.Allocation vertexAllocation = allocations.txoptimizations$allocation(SectionAllocations.vertexSlot(layer));
 
                     if (vertexAllocation == null)
