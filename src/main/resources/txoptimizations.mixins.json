@@ -36,6 +36,7 @@
     "CameraNearPlaneAccessor",
     "ClientChunkCachePrecipitationMixin",
     "ClientLevelBiomeBlendMixin",
+    "ChunkSectionsToRenderPackedTerrainMixin",
     "ClientLevelAnimateFluidMixin",
     "ClipContextAirMixin",
     "CommandSuggestionsRenderThreadMixin",

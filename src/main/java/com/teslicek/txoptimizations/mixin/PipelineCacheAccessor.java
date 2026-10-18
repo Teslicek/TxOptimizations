@@ -3,6 +3,7 @@ package com.teslicek.txoptimizations.mixin;
 import com.mojang.blaze3d.pipeline.PipelineCache;
 import com.mojang.renderpearl.api.pipeline.CompiledRenderPipeline;
 import com.mojang.renderpearl.api.pipeline.RenderPipeline;
+import com.mojang.renderpearl.api.pipeline.ShaderSource;
 import java.util.Map;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.gen.Accessor;
@@ -12,4 +13,7 @@ public interface PipelineCacheAccessor {
 
     @Accessor("cache")
     Map<RenderPipeline, CompiledRenderPipeline> txoptimizations$cache();
+
+    @Accessor("shaderSource")
+    ShaderSource txoptimizations$shaderSource();
 }
