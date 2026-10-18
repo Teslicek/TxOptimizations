@@ -4,7 +4,9 @@ import com.mojang.blaze3d.vertex.TlsfAllocator;
 import com.mojang.blaze3d.vertex.UberGpuBuffer;
 import com.mojang.renderpearl.api.buffers.GpuBuffer;
 import com.mojang.renderpearl.api.pipeline.IndexType;
+import com.teslicek.txoptimizations.FacingCulling;
 import com.teslicek.txoptimizations.SectionAllocations;
+import com.teslicek.txoptimizations.SectionFacing;
 import com.teslicek.txoptimizations.SectionLayers;
 import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
@@ -17,8 +19,11 @@ import net.minecraft.client.renderer.chunk.ChunkSectionLayer;
 import net.minecraft.client.renderer.chunk.SectionMesh;
 import net.minecraft.client.renderer.chunk.SectionRenderDispatcher;
 import net.minecraft.client.renderer.state.OptionsRenderState;
+import net.minecraft.client.renderer.state.level.CameraRenderState;
+import net.minecraft.client.renderer.state.level.LevelRenderState;
 import net.minecraft.core.BlockPos;
 import net.minecraft.util.Util;
+import org.joml.Vector3dc;
 import org.jspecify.annotations.Nullable;
 import org.spongepowered.asm.mixin.Final;
 import org.spongepowered.asm.mixin.Mixin;
@@ -41,6 +46,10 @@ public abstract class LevelRendererSectionDrawMixin {
     private OptionsRenderState optionsRenderState;
 
     @Shadow
+    @Final
+    private LevelRenderState levelRenderState;
+
+    @Shadow
     private @Nullable SectionRenderDispatcher sectionRenderDispatcher;
 
     @Overwrite
@@ -50,11 +59,14 @@ public abstract class LevelRendererSectionDrawMixin {
         if (dispatcher == null)
             return 0;
 
-        int[] vertexSizes = new int[SectionLayers.VALUES.length];
+        ChunkSectionLayer[] layers      = SectionLayers.VALUES;
+        int[]               vertexSizes = new int[layers.length];
 
-        for (int layerIndex = 0; layerIndex < SectionLayers.VALUES.length; layerIndex ++)
-            vertexSizes[layerIndex] = SectionLayers.VALUES[layerIndex].pipeline(false).getVertexFormatBinding(0).getVertexSize();
+        for (int layerIndex = 0; layerIndex < layers.length; layerIndex ++)
+            vertexSizes[layerIndex] = layers[layerIndex].pipeline(false).getVertexFormatBinding(0).getVertexSize();
 
+        CameraRenderState                                   camera                   = this.levelRenderState.cameraRenderState;
+        Vector3dc                                           eye                      = FacingCulling.eye(camera.pos, camera.viewRotationMatrix);
         Int2ObjectOpenHashMap<LevelRenderer.ChunkDrawGroup> drawGroupCache           = new Int2ObjectOpenHashMap<>();
         int                                                 largestIndexCount        = 0;
         int                                                 lastTransparentGroupHash = 0;
@@ -71,10 +83,15 @@ public abstract class LevelRendererSectionDrawMixin {
                 if (!(sectionMesh instanceof SectionAllocations allocations))
                     continue;
 
-                int sectionInfoDataIndex = -1;
+                SectionFacing facing               = (SectionFacing) sectionMesh;
+                BlockPos      renderOffset         = section.getRenderOrigin();
+                double        eyeX                 = eye.x() - renderOffset.getX();
+                double        eyeY                 = eye.y() - renderOffset.getY();
+                double        eyeZ                 = eye.z() - renderOffset.getZ();
+                int           sectionInfoDataIndex = -1;
 
-                for (int layerIndex = 0; layerIndex < SectionLayers.VALUES.length; layerIndex ++) {
-                    ChunkSectionLayer        layer            = SectionLayers.VALUES[layerIndex];
+                for (int layerIndex = 0; layerIndex < layers.length; layerIndex ++) {
+                    ChunkSectionLayer        layer            = layers[layerIndex];
                     TlsfAllocator.Allocation vertexAllocation = allocations.txoptimizations$allocation(SectionAllocations.vertexSlot(layer));
 
                     if (vertexAllocation == null)
@@ -95,8 +112,6 @@ public abstract class LevelRendererSectionDrawMixin {
                     }
 
                     if (sectionInfoDataIndex == -1) {
-                        BlockPos renderOffset = section.getRenderOrigin();
-
                         sectionInfoDataIndex = sectionInfos.size();
                         sectionInfos.add(new DynamicGpuData.ChunkSectionInfo(renderOffset.getX(), renderOffset.getY(), renderOffset.getZ(), section.getVisibility(now, fadeDuration)));
                     }
@@ -118,23 +133,44 @@ public abstract class LevelRendererSectionDrawMixin {
                         firstIndex   = (int) indexAllocation.getOffsetFromHeap() / indexType.bytes;
                     }
 
-                    int                          baseVertex = (int) vertexAllocation.getOffsetFromHeap() / vertexSizes[layerIndex];
-                    LevelRenderer.ChunkDrawGroup drawGroup  = null;
+                    int baseVertex = (int) vertexAllocation.getOffsetFromHeap() / vertexSizes[layerIndex];
 
-                    if (layer.translucent() && respectTranslucentOrder) {
+                    if (!layer.translucent()) {
+                        if (indexAllocation != null)
+                            throw new IllegalStateException(layer.label() + " geometry of the section at " + renderOffset + " has its own index buffer, but its facing groups index the shared quad buffer");
+
+                        int[] ranges = facing.txoptimizations$facingRanges(layer);
+
+                        if (ranges == null)
+                            throw new IllegalStateException(layer.label() + " geometry of the section at " + renderOffset + " was never grouped by facing");
+
+                        int visibleGroups = FacingCulling.visibleGroups(ranges, eyeX, eyeY, eyeZ);
+
+                        if (visibleGroups == 0)
+                            continue;
+
+                        LevelRenderer.ChunkDrawGroup drawGroup = drawGroupCache.get(combinedHash);
+
+                        if (drawGroup == null)
+                            drawGroup = txoptimizations$addDrawGroup(drawGroupCache, drawGroups.get(layer), combinedHash, vertexBuffer, null, null);
+
+                        FacingCulling.addDraws(drawGroup.draws(), ranges, visibleGroups, baseVertex, sectionInfoDataIndex);
+                        continue;
+                    }
+
+                    LevelRenderer.ChunkDrawGroup drawGroup = null;
+
+                    if (respectTranslucentOrder) {
                         if (combinedHash == lastTransparentGroupHash)
                             drawGroup = drawGroups.get(layer).getLast();
 
                         lastTransparentGroupHash = combinedHash;
                     } else {
-                        drawGroup = drawGroupCache.getOrDefault(combinedHash, null);
+                        drawGroup = drawGroupCache.get(combinedHash);
                     }
 
-                    if (drawGroup == null) {
-                        drawGroup = new LevelRenderer.ChunkDrawGroup(vertexBuffer.slice(), indexBuffer != null ? indexBuffer.slice() : null, indexType, new ArrayList<>());
-                        drawGroupCache.put(combinedHash, drawGroup);
-                        drawGroups.get(layer).add(drawGroup);
-                    }
+                    if (drawGroup == null)
+                        drawGroup = txoptimizations$addDrawGroup(drawGroupCache, drawGroups.get(layer), combinedHash, vertexBuffer, indexBuffer, indexType);
 
                     drawGroup.draws().add(new DynamicGpuData.IndexedDraw(draw.indexCount(), 1, firstIndex, baseVertex, sectionInfoDataIndex));
                 }
@@ -144,6 +180,16 @@ public abstract class LevelRendererSectionDrawMixin {
         }
 
         return largestIndexCount;
+    }
+
+    @Unique
+    private static LevelRenderer.ChunkDrawGroup txoptimizations$addDrawGroup(Int2ObjectOpenHashMap<LevelRenderer.ChunkDrawGroup> drawGroupCache, List<LevelRenderer.ChunkDrawGroup> layerGroups, int combinedHash, GpuBuffer vertexBuffer, @Nullable GpuBuffer indexBuffer, @Nullable IndexType indexType) {
+        LevelRenderer.ChunkDrawGroup drawGroup = new LevelRenderer.ChunkDrawGroup(vertexBuffer.slice(), indexBuffer != null ? indexBuffer.slice() : null, indexType, new ArrayList<>());
+
+        drawGroupCache.put(combinedHash, drawGroup);
+        layerGroups.add(drawGroup);
+
+        return drawGroup;
     }
 
     @Unique
