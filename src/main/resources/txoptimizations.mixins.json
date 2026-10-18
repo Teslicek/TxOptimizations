@@ -42,6 +42,7 @@
     "CompactVectorArrayAccessor",
     "CompiledSectionMeshAllocationMixin",
     "CompiledSectionMeshFacingMixin",
+    "CompiledSectionMeshUploadFlagsMixin",
     "CuboidGizmoSharedCornersMixin",
     "CursorCounterMixin",
     "DataLayerStorageMapSnapshotMixin",
