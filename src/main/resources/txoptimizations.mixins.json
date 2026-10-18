@@ -26,6 +26,8 @@
     "BlockEntityRenderDispatcherCacheMixin",
     "BlockEntityRenderDistanceMixin",
     "BlockStateCacheDedupMixin",
+    "BlockTintCacheLatestCacheInfoMixin",
+    "BlockTintCacheLayerMemoMixin",
     "BrushableBlockExtractSkipMixin",
     "BufferBuilderDirectWriteMixin",
     "BufferBuilderElementCacheMixin",

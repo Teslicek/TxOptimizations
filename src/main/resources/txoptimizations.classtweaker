@@ -70,3 +70,7 @@ accessible class net/minecraft/world/level/lighting/BlockLightSectionStorage$Blo
 
 # Section light window
 accessible field net/minecraft/client/renderer/block/BlockModelLighter CACHE Ljava/lang/ThreadLocal;
+
+# Block tint layer memo
+accessible class net/minecraft/client/color/block/BlockTintCache$LatestCacheInfo
+accessible class net/minecraft/client/color/block/BlockTintCache$CacheData
