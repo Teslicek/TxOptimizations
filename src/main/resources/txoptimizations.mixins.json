@@ -120,7 +120,6 @@
     "PreparedRenderTypeEqualsMixin",
     "PreparedRenderTypeDrawMixin",
     "ProjectionMatrixBufferSkipMixin",
-    "ProjectionTypePackedSortingMixin",
     "QuadParticleCornerCacheMixin",
     "QuadParticleFeatureMapPoolMixin",
     "QuadParticleLayerCacheMixin",
