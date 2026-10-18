@@ -69,6 +69,8 @@
     "EntityRendererLeashHolderMixin",
     "LeashDataAccessor",
     "EntityVisibilityMemoMixin",
+    "EntityNameTagMemoMixin",
+    "EntityRendererNameTagMemoMixin",
     "EnvironmentAttributeValueCacheMixin",
     "FeaturePreparedFrameIndexedMixin",
     "FeaturePreparedGroupAccessor",
