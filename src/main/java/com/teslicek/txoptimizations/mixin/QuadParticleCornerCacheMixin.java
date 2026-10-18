@@ -1,23 +1,21 @@
 package com.teslicek.txoptimizations.mixin;
 
+import com.mojang.blaze3d.vertex.DefaultVertexFormat;
 import com.mojang.blaze3d.vertex.VertexConsumer;
 import com.teslicek.txoptimizations.DirectVertexBuffer;
+import com.teslicek.txoptimizations.TexturedVertexLayout;
 import java.util.Map;
-import net.caffeinemc.mods.sodium.api.util.ColorARGB;
-import net.caffeinemc.mods.sodium.api.vertex.buffer.VertexBufferWriter;
-import net.caffeinemc.mods.sodium.api.vertex.format.common.ParticleVertex;
 import net.minecraft.client.particle.SingleQuadParticle;
 import net.minecraft.client.renderer.state.level.QuadParticleRenderState;
 import org.joml.Quaternionf;
 import org.joml.Vector3f;
-import org.lwjgl.system.MemoryStack;
 import org.spongepowered.asm.mixin.Final;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Overwrite;
 import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.Unique;
 
-@Mixin(value = QuadParticleRenderState.class, priority = 1100)
+@Mixin(QuadParticleRenderState.class)
 public abstract class QuadParticleCornerCacheMixin {
 
     @Unique
@@ -78,7 +76,7 @@ public abstract class QuadParticleCornerCacheMixin {
         int[]                       ints   = stored.txoptimizations$intValues();
         int                         count  = stored.txoptimizations$particleCount();
 
-        if (!(builder instanceof DirectVertexBuffer direct) || !direct.txoptimizations$writesFormat(ParticleVertex.FORMAT)) {
+        if (!(builder instanceof DirectVertexBuffer direct) || !direct.txoptimizations$writesFormat(DefaultVertexFormat.PARTICLE)) {
             for (int particle = 0; particle < count; particle ++) {
                 int f = particle * FLOATS_PER_PARTICLE;
                 int i = particle * INTS_PER_PARTICLE;
@@ -92,69 +90,50 @@ public abstract class QuadParticleCornerCacheMixin {
         if (count == 0)
             return;
 
-        long pointer = direct.txoptimizations$reserveVertices(count * VERTICES);
+        TexturedVertexLayout layout  = TexturedVertexLayout.PARTICLE;
+        long                 pointer = direct.txoptimizations$reserveVertices(count * VERTICES);
 
         for (int particle = 0; particle < count; particle ++) {
             int f = particle * FLOATS_PER_PARTICLE;
             int i = particle * INTS_PER_PARTICLE;
 
-            txoptimizations$rotateCorners(ROTATION.set(floats[f + 3], floats[f + 4], floats[f + 5], floats[f + 6]));
-            txoptimizations$putQuad(pointer, floats[f], floats[f + 1], floats[f + 2], floats[f + 7], floats[f + 8], floats[f + 9], floats[f + 10], floats[f + 11], ColorARGB.toABGR(ints[i]), ints[i + 1]);
-            pointer += VERTICES * ParticleVertex.STRIDE;
-        }
-    }
-
-    @Overwrite
-    private void sodium$emitVertices(VertexBufferWriter writer, float x, float y, float z, float size, float u0, float u1, float v0, float v1, int color, int light, Quaternionf quaternion) {
-        txoptimizations$rotateCorners(quaternion);
-
-        if (writer instanceof DirectVertexBuffer direct && direct.txoptimizations$writesFormat(ParticleVertex.FORMAT)) {
-            txoptimizations$putQuad(direct.txoptimizations$reserveVertices(VERTICES), x, y, z, size, u0, u1, v0, v1, color, light);
-            return;
-        }
-
-        try (MemoryStack stack = MemoryStack.stackPush()) {
-            long buffer = stack.nmalloc(VERTICES * ParticleVertex.STRIDE);
-
-            txoptimizations$putQuad(buffer, x, y, z, size, u0, u1, v0, v1, color, light);
-            writer.push(stack, buffer, VERTICES, ParticleVertex.FORMAT);
+            txoptimizations$rotateCorners(floats[f + 3], floats[f + 4], floats[f + 5], floats[f + 6]);
+            txoptimizations$putVertex(pointer, layout, 0, floats[f], floats[f + 1], floats[f + 2], floats[f + 7], floats[f + 9], floats[f + 11], ints[i], ints[i + 1]);
+            txoptimizations$putVertex(pointer + layout.stride(), layout, 1, floats[f], floats[f + 1], floats[f + 2], floats[f + 7], floats[f + 9], floats[f + 10], ints[i], ints[i + 1]);
+            txoptimizations$putVertex(pointer + 2L * layout.stride(), layout, 2, floats[f], floats[f + 1], floats[f + 2], floats[f + 7], floats[f + 8], floats[f + 10], ints[i], ints[i + 1]);
+            txoptimizations$putVertex(pointer + 3L * layout.stride(), layout, 3, floats[f], floats[f + 1], floats[f + 2], floats[f + 7], floats[f + 8], floats[f + 11], ints[i], ints[i + 1]);
+            pointer += (long) VERTICES * layout.stride();
         }
     }
 
     @Unique
-    private static void txoptimizations$putQuad(long buffer, float x, float y, float z, float size, float u0, float u1, float v0, float v1, int color, int light) {
-        txoptimizations$putVertex(buffer, 0, x, y, z, size, u1, v1, color, light);
-        txoptimizations$putVertex(buffer + ParticleVertex.STRIDE, 1, x, y, z, size, u1, v0, color, light);
-        txoptimizations$putVertex(buffer + 2L * ParticleVertex.STRIDE, 2, x, y, z, size, u0, v0, color, light);
-        txoptimizations$putVertex(buffer + 3L * ParticleVertex.STRIDE, 3, x, y, z, size, u0, v1, color, light);
-    }
+    private static void txoptimizations$rotateCorners(float x, float y, float z, float w) {
+        int xBits = Float.floatToRawIntBits(x);
+        int yBits = Float.floatToRawIntBits(y);
+        int zBits = Float.floatToRawIntBits(z);
+        int wBits = Float.floatToRawIntBits(w);
 
-    @Unique
-    private static void txoptimizations$rotateCorners(Quaternionf quaternion) {
-        int x = Float.floatToRawIntBits(quaternion.x);
-        int y = Float.floatToRawIntBits(quaternion.y);
-        int z = Float.floatToRawIntBits(quaternion.z);
-        int w = Float.floatToRawIntBits(quaternion.w);
-
-        if (cached && x == cachedX && y == cachedY && z == cachedZ && w == cachedW)
+        if (cached && xBits == cachedX && yBits == cachedY && zBits == cachedZ && wBits == cachedW)
             return;
+
+        ROTATION.set(x, y, z, w);
 
         for (int corner = 0; corner < VERTICES; corner ++) {
-            VERTEX.set(CORNER_X[corner], CORNER_Y[corner], 0.0F).rotate(quaternion);
+            VERTEX.set(CORNER_X[corner], CORNER_Y[corner], 0.0F).rotate(ROTATION);
             ROTATED[corner * 3]     = VERTEX.x;
             ROTATED[corner * 3 + 1] = VERTEX.y;
             ROTATED[corner * 3 + 2] = VERTEX.z;
         }
 
         cached  = true;
-        cachedX = x;
-        cachedY = y;
-        cachedZ = z;
-        cachedW = w;
+        cachedX = xBits;
+        cachedY = yBits;
+        cachedZ = zBits;
+        cachedW = wBits;
     }
 
     @Unique
-    private static void txoptimizations$putVertex(long pointer, int corner, float x, float y, float z, float size, float u, float v, int color, int light) {
-        ParticleVertex.put(pointer, ROTATED[corner * 3] * size + x, ROTATED[corner * 3 + 1] * size + y, ROTATED[corner * 3 + 2] * size + z, u, v, color, light);
+    private static void txoptimizations$putVertex(long pointer, TexturedVertexLayout layout, int corner, float x, float y, float z, float scale, float u, float v, int color, int light) {
+        layout.put(pointer, ROTATED[corner * 3] * scale + x, ROTATED[corner * 3 + 1] * scale + y, ROTATED[corner * 3 + 2] * scale + z, color, u, v, light);
     }
 }

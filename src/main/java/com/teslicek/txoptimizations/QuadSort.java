@@ -11,6 +11,8 @@ public final class QuadSort {
     private static final int DIGIT_BITS      = 8;
     private static final int BUCKETS         = 1 << DIGIT_BITS;
     private static final int KEY_SHIFT       = Integer.SIZE;
+    private static final int SIGN_DIGIT      = DIGITS - 1;
+    private static final int SIGN_BUCKET     = BUCKETS >> 1;
 
     private static final List<int[]> PREVIOUS = new ArrayList<>();
     private static final int[]       COUNTS   = new int[BUCKETS];
@@ -25,6 +27,28 @@ public final class QuadSort {
     private QuadSort() {
     }
 
+    public static int key(float distance) {
+        int bits = Float.floatToIntBits(distance);
+
+        return ~(bits ^ bits >> 31 & Integer.MAX_VALUE);
+    }
+
+    public static int[] sorted(int[] keys, int length) {
+        long[] values = pack(keys, length, new long[length]);
+
+        if (length > RADIX_THRESHOLD)
+            values = radixSort(values, new long[length], length, new int[BUCKETS]);
+        else
+            Arrays.sort(values, 0, length);
+
+        int[] result = new int[length];
+
+        for (int index = 0; index < length; index ++)
+            result[index] = (int) values[index];
+
+        return result;
+    }
+
     public static int[] keys(int length) {
         checkOwner();
 
@@ -37,32 +61,42 @@ public final class QuadSort {
     public static int[] sort(int[] keys, int length) {
         checkOwner();
 
-        boolean signed   = length <= RADIX_THRESHOLD;
-        int     slot     = nextSlot();
-        int[]   previous = slot < PREVIOUS.size() ? PREVIOUS.get(slot) : null;
+        int   slot     = nextSlot();
+        int[] previous = slot < PREVIOUS.size() ? PREVIOUS.get(slot) : null;
 
-        if (previous != null && previous.length == length && isStableOrder(previous, keys, signed))
+        if (previous != null && previous.length == length && isSortedOrder(previous, keys))
             return previous;
 
-        long[] values = signed ? sortSigned(keys, length) : sortUnsigned(keys, length);
-        int[]  order  = previous != null && previous.length == length ? previous : new int[length];
+        if (packed.length < length) {
+            packed  = new long[length];
+            scratch = new long[length];
+        }
+
+        long[] values = pack(keys, length, packed);
+
+        if (length > RADIX_THRESHOLD)
+            values = radixSort(values, scratch, length, COUNTS);
+        else
+            Arrays.sort(values, 0, length);
+
+        int[] result = previous != null && previous.length == length ? previous : new int[length];
 
         for (int index = 0; index < length; index ++)
-            order[index] = (int) values[index];
+            result[index] = (int) values[index];
 
         if (slot < PREVIOUS.size())
-            PREVIOUS.set(slot, order);
+            PREVIOUS.set(slot, result);
         else
-            PREVIOUS.add(order);
+            PREVIOUS.add(result);
 
-        return order;
+        return result;
     }
 
-    private static boolean isStableOrder(int[] order, int[] keys, boolean signed) {
+    private static boolean isSortedOrder(int[] order, int[] keys) {
         for (int position = 1; position < order.length; position ++) {
             int before     = order[position - 1];
             int after      = order[position];
-            int comparison = signed ? Integer.compare(keys[before], keys[after]) : Integer.compareUnsigned(keys[before], keys[after]);
+            int comparison = Integer.compare(keys[before], keys[after]);
 
             if (comparison > 0 || comparison == 0 && before > after)
                 return false;
@@ -71,48 +105,39 @@ public final class QuadSort {
         return true;
     }
 
-    private static long[] sortSigned(int[] keys, int length) {
-        long[] values = buffer(length);
-
+    private static long[] pack(int[] keys, int length, long[] values) {
         for (int index = 0; index < length; index ++)
             values[index] = (long) keys[index] << KEY_SHIFT | index;
-
-        Arrays.sort(values, 0, length);
 
         return values;
     }
 
-    private static long[] sortUnsigned(int[] keys, int length) {
-        long[] values = buffer(length);
-        long[] other  = scratch;
-
-        for (int index = 0; index < length; index ++)
-            values[index] = (long) keys[index] << KEY_SHIFT | index;
-
+    private static long[] radixSort(long[] values, long[] other, int length, int[] counts) {
         for (int digit = 0; digit < DIGITS; digit ++) {
             int shift = KEY_SHIFT + digit * DIGIT_BITS;
+            int flip  = digit == SIGN_DIGIT ? SIGN_BUCKET : 0;
 
-            Arrays.fill(COUNTS, 0);
+            Arrays.fill(counts, 0);
 
             for (int index = 0; index < length; index ++)
-                COUNTS[(int) (values[index] >>> shift) & BUCKETS - 1] ++;
+                counts[bucket(values[index], shift, flip)] ++;
 
-            if (COUNTS[(int) (values[0] >>> shift) & BUCKETS - 1] == length)
+            if (counts[bucket(values[0], shift, flip)] == length)
                 continue;
 
             int sum = 0;
 
             for (int bucket = 0; bucket < BUCKETS; bucket ++) {
-                int count = COUNTS[bucket];
+                int count = counts[bucket];
 
-                COUNTS[bucket]  = sum;
+                counts[bucket]  = sum;
                 sum            += count;
             }
 
             for (int index = 0; index < length; index ++) {
                 long value = values[index];
 
-                other[COUNTS[(int) (value >>> shift) & BUCKETS - 1] ++] = value;
+                other[counts[bucket(value, shift, flip)] ++] = value;
             }
 
             long[] swap = values;
@@ -124,13 +149,8 @@ public final class QuadSort {
         return values;
     }
 
-    private static long[] buffer(int length) {
-        if (packed.length < length) {
-            packed  = new long[length];
-            scratch = new long[length];
-        }
-
-        return packed;
+    private static int bucket(long value, int shift, int flip) {
+        return ((int) (value >>> shift) & BUCKETS - 1) ^ flip;
     }
 
     private static int nextSlot() {

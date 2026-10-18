@@ -93,7 +93,7 @@ public final class ReloadSampler {
     }
 
     private static boolean isGameCode(String className) {
-        return className.startsWith("net.minecraft.") || className.startsWith("com.mojang.") || className.startsWith("com.teslicek.") || className.startsWith("net.caffeinemc.");
+        return className.startsWith("net.minecraft.") || className.startsWith("com.mojang.") || className.startsWith("com.teslicek.");
     }
 
     private static String frame(StackTraceElement element) {
