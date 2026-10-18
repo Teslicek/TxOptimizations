@@ -353,7 +353,7 @@ Every model part drew its children by iterating its child map, which created an 
 
 ### Entity culling boxes
 
-Every entity checked against the view frustum got a new bounding box, grown by half a block, every frame (about 11 MB/s in singleplayer). An entity that has not moved keeps the same bounding box object, so the grown box is now kept per entity and reused while the box it came from is the same object. A moving entity gets a new box as before.
+Every entity checked against the view frustum got a new bounding box, grown by half a block, every frame (about 11 MB/s in singleplayer). The check now works out the six coordinates of the grown box from the culling box with the same arithmetic vanilla's box constructor uses, runs vanilla's invalid and zero size tests on them and passes them straight to the frustum test, so neither a still nor a moving entity creates a grown box, and no box is kept per entity. A box is only created where vanilla needs one beyond that test: the four block box around an entity whose culling box is invalid, and the box spanning a leashed entity and its holder when neither is visible on its own.
 
 ### Particle draw maps
 

@@ -58,7 +58,6 @@
     "EntityEquipmentCullingHeadMixin",
     "EntityHitboxDebugRendererMixin",
     "EntityRenderDispatcherCacheMixin",
-    "EntityCullBoxCacheMixin",
     "EntityPlayerPassengersMixin",
     "EntityRenderDispatcherSkinCacheMixin",
     "EntitySharedFlagsMixin",
