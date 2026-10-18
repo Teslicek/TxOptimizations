@@ -95,6 +95,7 @@
     "ItemFrameRenderOffsetMixin",
     "ItemLayerRenderStateAccessor",
     "ItemStackRenderStateBoundsMixin",
+    "LayerLightSectionStorageQueueMixin",
     "LayerLightSectionStorageSnapshotMixin",
     "LayerLightSectionStorageWriteMixin",
     "LevelRendererDeferredSkyMixin",
