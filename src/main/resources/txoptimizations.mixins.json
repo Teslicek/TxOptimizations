@@ -22,6 +22,7 @@
     "BaseGpuBufferSliceCacheMixin",
     "BakedSheetGlyphDirectWriteMixin",
     "BlockDataLayerStorageMapSnapshotMixin",
+    "BlockModelLighterCacheWindowMixin",
     "BlockEntityRenderDispatcherCacheMixin",
     "BlockEntityRenderDistanceMixin",
     "BlockStateCacheDedupMixin",
