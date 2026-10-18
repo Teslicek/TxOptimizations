@@ -569,6 +569,10 @@ While ticking is frozen (`/tick freeze`), every frame and every tick asks each e
 
 Every frame, level extraction looks up the update state of each visible chunk section to find the sections that need a rebuild, and each lookup worked out the section's slot in the update grid with two modulo operations before reading it. The grid of render sections is laid out the same way, so the slot number every render section already carries is now tried first. When the update state in that slot belongs to the same section and the section lies inside the grid, it is exactly the state the full lookup returns; in any other case the full lookup runs as before.
 
+### Section update scan
+
+Every frame, level extraction walked all visible chunk sections and looked up each one's update state to find the few that need a rebuild. The answer for a section only changes when a block or light change marks a clean section dirty, when the update grid or the grid of render sections moves with the camera or is created, or when the list of visible sections is cleared or refilled. Each scan now remembers, in visible order, the sections that were still dirty when it checked them. While none of those changes has happened since, the next scan checks only the remembered sections, with the same checks in the same order; every other visible section was clean or outside the grid at the last scan and still is. Changes are counted when they start and when they end, so a change made by another thread while a scan runs makes the following scan a full one, and any change makes the next scan walk all visible sections as before.
+
 ### Memory
 
 Less live memory means shorter and rarer garbage collections.
