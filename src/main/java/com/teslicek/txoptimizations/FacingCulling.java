@@ -8,8 +8,6 @@ import com.mojang.renderpearl.api.vertex.VertexFormat;
 import com.mojang.renderpearl.api.vertex.VertexFormatElement;
 import java.nio.ByteBuffer;
 import java.util.Arrays;
-import java.util.List;
-import net.minecraft.client.renderer.DynamicGpuData;
 import net.minecraft.world.phys.Vec3;
 import org.joml.Matrix4d;
 import org.joml.Matrix4f;
@@ -142,7 +140,7 @@ public final class FacingCulling {
         return visible;
     }
 
-    public static void addDraws(List<DynamicGpuData.IndexedDraw> draws, int[] ranges, int visibleGroups, int baseVertex, int sectionInfo) {
+    public static void addDraws(SectionDrawList draws, int drawGroup, int[] ranges, int visibleGroups, int baseVertex, int sectionInfo) {
         int runStart   = NO_RUN;
         int groupStart = 0;
 
@@ -156,7 +154,7 @@ public final class FacingCulling {
                 if (runStart == NO_RUN)
                     runStart = groupStart;
             } else if (runStart != NO_RUN) {
-                draws.add(draw(runStart, groupStart, baseVertex, sectionInfo));
+                addRun(draws, drawGroup, runStart, groupStart, baseVertex, sectionInfo);
                 runStart = NO_RUN;
             }
 
@@ -164,11 +162,11 @@ public final class FacingCulling {
         }
 
         if (runStart != NO_RUN)
-            draws.add(draw(runStart, groupStart, baseVertex, sectionInfo));
+            addRun(draws, drawGroup, runStart, groupStart, baseVertex, sectionInfo);
     }
 
-    private static DynamicGpuData.IndexedDraw draw(int firstQuad, int endQuad, int baseVertex, int sectionInfo) {
-        return new DynamicGpuData.IndexedDraw((endQuad - firstQuad) * INDICES_PER_QUAD, 1, firstQuad * INDICES_PER_QUAD, baseVertex, sectionInfo);
+    private static void addRun(SectionDrawList draws, int drawGroup, int firstQuad, int endQuad, int baseVertex, int sectionInfo) {
+        draws.add(drawGroup, (endQuad - firstQuad) * INDICES_PER_QUAD, firstQuad * INDICES_PER_QUAD, baseVertex, sectionInfo);
     }
 
     private static boolean facesEye(int[] ranges, int group, double x, double y, double z) {

@@ -11,8 +11,7 @@ public final class NativeWrites {
     }
 
     public static long reserve(ByteBuffer buffer, int bytes) {
-        if (!buffer.isDirect() || buffer.isReadOnly() || buffer.order() != ByteOrder.nativeOrder())
-            throw new IllegalArgumentException("Expected a writable native order direct buffer but got " + buffer + " in " + buffer.order());
+        requireNative(buffer);
 
         int position = buffer.position();
 
@@ -22,5 +21,19 @@ public final class NativeWrites {
         buffer.position(position + bytes);
 
         return MemoryUtil.memAddress0(buffer) + position;
+    }
+
+    public static long at(ByteBuffer buffer, int offset, int bytes) {
+        requireNative(buffer);
+
+        if (offset < 0 || bytes < 0 || buffer.capacity() - offset < bytes)
+            throw new IndexOutOfBoundsException(bytes + " bytes at " + offset + " do not fit in " + buffer);
+
+        return MemoryUtil.memAddress0(buffer) + offset;
+    }
+
+    private static void requireNative(ByteBuffer buffer) {
+        if (!buffer.isDirect() || buffer.isReadOnly() || buffer.order() != ByteOrder.nativeOrder())
+            throw new IllegalArgumentException("Expected a writable native order direct buffer but got " + buffer + " in " + buffer.order());
     }
 }
