@@ -6,6 +6,8 @@ import com.mojang.blaze3d.vertex.MeshData;
 import com.mojang.renderpearl.api.buffers.GpuBuffer;
 import com.mojang.renderpearl.api.buffers.GpuBufferSlice;
 import com.mojang.renderpearl.api.device.GpuDevice;
+import com.teslicek.txoptimizations.BackgroundVertexCopy;
+import com.teslicek.txoptimizations.VertexCopy;
 import java.nio.BufferOverflowException;
 import java.nio.ByteBuffer;
 import java.util.List;
@@ -17,15 +19,29 @@ import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Overwrite;
 import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.Unique;
+import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Constant;
+import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.ModifyConstant;
+import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
+import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 @Mixin(StagedVertexBuffer.class)
-public abstract class StagedVertexBufferDirectCopyMixin {
+public abstract class StagedVertexBufferDirectCopyMixin implements BackgroundVertexCopy {
 
     @Shadow
     @Final
     private ByteBufferBuilder stagingBuffer;
+
+    @Shadow
+    @Final
+    private List<StagedVertexBuffer.Draw> draws;
+
+    @Unique
+    private final VertexCopy txoptimizations$vertexCopy = new VertexCopy();
+
+    @Unique
+    private GpuBufferSlice.MappedView txoptimizations$vertexView;
 
     @Shadow
     private static CompactVectorArray decodeSortingPoints(StagedVertexBuffer.Draw draw) {
@@ -39,48 +55,66 @@ public abstract class StagedVertexBufferDirectCopyMixin {
 
     @Overwrite
     private void uploadDrawsToBuffers(GpuDevice device, List<StagedVertexBuffer.Draw> draws, GpuBuffer vertexGpuBuffer, @Nullable GpuBuffer indexGpuBuffer, int vertexBufferSize, int indexBufferSize) {
-        try (GpuBufferSlice.MappedView view = vertexGpuBuffer.slice(0L, vertexBufferSize).map(false, true)) {
+        if (this.txoptimizations$vertexView != null)
+            throw new IllegalStateException("The previous vertex upload has not finished");
+
+        this.txoptimizations$vertexView = vertexGpuBuffer.slice(0L, vertexBufferSize).map(false, true);
+
+        ByteBuffer vertices = this.txoptimizations$vertexView.data();
+
+        this.txoptimizations$vertexCopy.begin();
+
+        for (StagedVertexBuffer.Draw draw : draws) {
+            if (draw.isEmpty())
+                continue;
+
+            StagedVertexBufferDrawAccessor accessor = (StagedVertexBufferDrawAccessor) draw;
+
+            vertices.position(accessor.txoptimizations$vertexOffset());
+
+            for (ByteBufferBuilder.Result slice : accessor.txoptimizations$vertexBufferSlices())
+                this.txoptimizations$queueCopy(slice, vertices);
+        }
+
+        this.txoptimizations$vertexCopy.seal();
+
+        if (indexGpuBuffer == null)
+            return;
+
+        try (GpuBufferSlice.MappedView view = indexGpuBuffer.slice(0L, indexBufferSize).map(false, true)) {
             ByteBuffer buffer = view.data();
 
             for (StagedVertexBuffer.Draw draw : draws) {
-                if (draw.isEmpty())
-                    continue;
-
                 StagedVertexBufferDrawAccessor accessor = (StagedVertexBufferDrawAccessor) draw;
 
-                buffer.position(accessor.txoptimizations$vertexOffset());
+                if (draw.isEmpty() || accessor.txoptimizations$quadSorting() == null)
+                    continue;
 
-                for (ByteBufferBuilder.Result slice : accessor.txoptimizations$vertexBufferSlices())
-                    this.txoptimizations$copy(slice, buffer);
+                MeshData.SortState sortState = new MeshData.SortState(decodeSortingPoints(draw), accessor.txoptimizations$indexType());
+
+                buffer.position(accessor.txoptimizations$indexOffset());
+                sortState.writeSortedIndexBuffer(buffer, accessor.txoptimizations$quadSorting());
             }
-        }
-
-        if (indexGpuBuffer != null) {
-            try (GpuBufferSlice.MappedView view = indexGpuBuffer.slice(0L, indexBufferSize).map(false, true)) {
-                ByteBuffer buffer = view.data();
-
-                for (StagedVertexBuffer.Draw draw : draws) {
-                    StagedVertexBufferDrawAccessor accessor = (StagedVertexBufferDrawAccessor) draw;
-
-                    if (draw.isEmpty() || accessor.txoptimizations$quadSorting() == null)
-                        continue;
-
-                    MeshData.SortState sortState = new MeshData.SortState(decodeSortingPoints(draw), accessor.txoptimizations$indexType());
-
-                    buffer.position(accessor.txoptimizations$indexOffset());
-                    sortState.writeSortedIndexBuffer(buffer, accessor.txoptimizations$quadSorting());
-                }
-            }
-        }
-
-        for (StagedVertexBuffer.Draw draw : draws) {
-            if (!draw.isEmpty())
-                ((StagedVertexBufferDrawAccessor) draw).txoptimizations$freeVertexData();
         }
     }
 
+    @Override
+    public void txoptimizations$copyVerticesInBackground() {
+        this.txoptimizations$vertexCopy.startInBackground();
+    }
+
+    @Inject(method = "getExecuteInfo", at = @At("HEAD"))
+    private void txoptimizations$finishBeforeDraw(StagedVertexBuffer.Draw draw, CallbackInfoReturnable<StagedVertexBuffer.ExecuteInfo> cir) {
+        this.txoptimizations$finishVertexCopy();
+    }
+
+    @Inject(method = {"endDraw", "close"}, at = @At("HEAD"))
+    private void txoptimizations$finishBeforeRelease(CallbackInfo ci) {
+        this.txoptimizations$finishVertexCopy();
+    }
+
     @Unique
-    private void txoptimizations$copy(ByteBufferBuilder.Result slice, ByteBuffer buffer) {
+    private void txoptimizations$queueCopy(ByteBufferBuilder.Result slice, ByteBuffer buffer) {
         ByteBufferBuilderAccessor builder = (ByteBufferBuilderAccessor) this.stagingBuffer;
         ByteBufferResultAccessor  result  = (ByteBufferResultAccessor) slice;
         int                       size    = slice.size();
@@ -92,7 +126,22 @@ public abstract class StagedVertexBufferDirectCopyMixin {
         if (size > buffer.remaining())
             throw new BufferOverflowException();
 
-        MemoryUtil.memCopy(builder.txoptimizations$pointer() + result.txoptimizations$offset(), MemoryUtil.memAddress(buffer), size);
+        this.txoptimizations$vertexCopy.add(builder.txoptimizations$pointer() + result.txoptimizations$offset(), MemoryUtil.memAddress(buffer), size);
         buffer.position(start + size);
+    }
+
+    @Unique
+    private void txoptimizations$finishVertexCopy() {
+        if (this.txoptimizations$vertexView == null)
+            return;
+
+        this.txoptimizations$vertexCopy.finish();
+        this.txoptimizations$vertexView.close();
+        this.txoptimizations$vertexView = null;
+
+        for (StagedVertexBuffer.Draw draw : this.draws) {
+            if (!draw.isEmpty())
+                ((StagedVertexBufferDrawAccessor) draw).txoptimizations$freeVertexData();
+        }
     }
 }

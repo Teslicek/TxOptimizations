@@ -109,6 +109,7 @@
     "LevelRendererGizmoReuseMixin",
     "LevelRendererSectionDrawMixin",
     "LevelRendererVisibleSectionsMixin",
+    "LevelRendererVertexCopyMixin",
     "MapInstanceAtlasMixin",
     "MapInstanceColorTableMixin",
     "MapRenderStateAtlasMixin",
