@@ -75,3 +75,8 @@ accessible class net/minecraft/client/renderer/chunk/SectionRenderDispatcher$Sec
 accessible class net/minecraft/client/renderer/LevelRenderer$ChunkDrawGroup
 accessible method net/minecraft/client/renderer/LevelRenderer$ChunkDrawGroup <init> (Lcom/mojang/renderpearl/api/buffers/GpuBufferSlice;Lcom/mojang/renderpearl/api/buffers/GpuBufferSlice;Lcom/mojang/renderpearl/api/pipeline/IndexType;Ljava/util/List;)V
 accessible field com/mojang/blaze3d/vertex/UberGpuBuffer$UberGpuBufferHeap gpuBuffer Lcom/mojang/renderpearl/api/buffers/GpuBuffer;
+# Section dirty state lookup by index
+accessible class net/minecraft/client/RotatingSectionStorage$Node
+accessible field net/minecraft/client/RotatingSectionStorage nodes [Lnet/minecraft/client/RotatingSectionStorage$Node;
+accessible field net/minecraft/client/SectionUpdateTracker storage Lnet/minecraft/client/RotatingSectionStorage;
+accessible method net/minecraft/client/RotatingSectionStorage containsSection (III)Z

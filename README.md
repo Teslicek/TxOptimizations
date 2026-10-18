@@ -572,6 +572,25 @@ Every frame, vanilla asks the vertex and index uber buffers of each terrain laye
 ### Section draw commands
 
 Every frame the terrain's indirect draw commands (five ints per draw) and section infos (a position and a fade value per section) are written into GPU-visible memory. Each value went through `ByteBuffer.putInt`, which checks the position against the limit and passes through the JDK's scoped memory access with a reachability fence, and each section info also went through a new `Std140Builder` that aligned every value. Averaged over 8 benchmark scenes, writing the draw commands took 6.2% of the render thread. Both records now check once that the buffer is a writable direct buffer in native byte order with room for the whole record, which every buffer vanilla passes is, store their values with `MemoryUtil` at the same offsets and move the position past them as before. The bytes are identical: the buffer's byte order is the native one the stores use, the section info keeps the std140 layout the builder produced (three ints with the float right after them), and floats are stored by their raw bits like `putFloat`.
+### Frozen tick passengers
+
+While ticking is frozen (`/tick freeze`), every frame and every tick asks each entity how many players ride it, to decide whether it still moves smoothly, and the answer always came from a new stream over all of its passengers and their passengers. An entity without passengers now answers 0 straight away, which is the count the empty stream returned. An entity that carries passengers counts them through the same stream as before.
+
+### Section update lookups
+
+Every frame, level extraction looks up the update state of each visible chunk section to find the sections that need a rebuild, and each lookup worked out the section's slot in the update grid with two modulo operations before reading it. The grid of render sections is laid out the same way, so the slot number every render section already carries is now tried first. When the update state in that slot belongs to the same section and the section lies inside the grid, it is exactly the state the full lookup returns; in any other case the full lookup runs as before.
+
+### Section update scan
+
+Every frame, level extraction walked all visible chunk sections and looked up each one's update state to find the few that need a rebuild. The answer for a section only changes when a block or light change marks a clean section dirty, when the update grid or the grid of render sections moves with the camera or is created, or when the list of visible sections is cleared or refilled. Each scan now remembers, in visible order, the sections that were still dirty when it checked them. While none of those changes has happened since, the next scan checks only the remembered sections, with the same checks in the same order; every other visible section was clean or outside the grid at the last scan and still is. Changes are counted when they start and when they end, so a change made by another thread while a scan runs makes the following scan a full one, and any change makes the next scan walk all visible sections as before.
+
+### Block entity sections
+
+Every frame, block entity extraction walked all visible chunk sections and fetched each one's mesh to see whether it holds any block entities, although most sections hold none. A section only gains block entities when a mesh that has some is installed on it after it compiles. Each frame now remembers, in visible order, the sections whose mesh had block entities when it checked them. While no mesh with block entities has been installed and the list of visible sections has not been cleared or refilled since, the next frame checks only those remembered sections, with the same fade test and extraction in the same order; every other visible section had no block entities at the last check and still has none. Meshes are also installed from the section compile threads, so each install is counted when it starts and when it ends, and a frame that starts while one is still running is followed by a full walk. Any install of a mesh with block entities and any change to the visible list makes the next frame walk all visible sections as before.
+
+### Display entity view range
+
+Every frame, each block, item and text display read its view range from its synced entity data to decide whether it is close enough to draw, which goes through the data table, the data entry and a boxed float. The view range only changes through the synced data, and every change to synced data calls the entity's update hook right after the new value is stored, so each display now keeps its view range in a plain field that is read when the display is created and again whenever that hook reports the view range. The distance check uses that field with the same arithmetic, so it gives the same answer.
 
 ### Memory
 
