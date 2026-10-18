@@ -101,6 +101,7 @@
     "LevelExtractorEntityVisibilityMixin",
     "LevelExtractorRegionCacheMixin",
     "LevelRendererGizmoReuseMixin",
+    "LevelRendererSectionDrawMixin",
     "LevelRendererSodiumGraphSkipMixin",
     "MapInstanceAtlasMixin",
     "MapInstanceColorTableMixin",
