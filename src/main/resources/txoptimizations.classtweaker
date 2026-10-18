@@ -88,3 +88,7 @@ accessible class net/minecraft/client/color/block/BlockTintCache$LatestCacheInfo
 accessible class net/minecraft/client/color/block/BlockTintCache$CacheData
 # Glyph effect quads
 accessible class net/minecraft/client/gui/font/glyphs/BakedSheetGlyph$EffectInstance
+
+# Culling head check
+accessible field net/minecraft/world/entity/LivingEntity equipment Lnet/minecraft/world/entity/EntityEquipment;
+accessible field net/minecraft/world/item/ItemStack item Lnet/minecraft/core/Holder;
