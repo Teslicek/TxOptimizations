@@ -66,11 +66,11 @@ Every frame, `EntityRenderDispatcher.getAvatarRenderer` reads each player's skin
 
 ### Translucent sorting
 
-Translucent geometry such as entity translucency, text, see-through name tags and glints is sorted back to front every frame. Vanilla reads the center of every quad with six bounds-checked `ByteBuffer.getFloat` calls and writes the six sorted indices per quad through an `IntConsumer` lambda. TxOptimizations reads the same floats straight from native memory when the buffer is direct and in native byte order (one bounds check for the whole range up front), computes the centers with the same arithmetic, and writes the same index values straight to the buffer's memory when it is direct and in native byte order, with one bounds check for the whole range, and through a short or int view of the buffer otherwise. Sodium's sort of up to 80 quads ran fastutil's indirect quicksort with a comparator per comparison and then a pass that orders equal keys by index; it now packs each key and index into one long and sorts those, which gives exactly the same order (by key, then by index). Unstable sorts are left as they were. The bytes written and the final buffer position are identical. Sodium's closest-point entity sort option, when enabled, replaces the center decoding with its own and is unaffected.
+Translucent geometry such as entity translucency, text, see-through name tags and glints is sorted back to front every frame. Vanilla reads the center of every quad with six bounds-checked `ByteBuffer.getFloat` calls and writes the six sorted indices per quad through an `IntConsumer` lambda. TxOptimizations reads the same floats straight from native memory when the buffer is direct and in native byte order (one bounds check for the whole range up front), computes the centers with the same arithmetic, and writes the same index values straight to the buffer's memory when it is direct and in native byte order, with one bounds check for the whole range, and through a short or int view of the buffer otherwise. The bytes written and the final buffer position are identical.
 
 ### Glow check spectator state
 
-Sodium asks `Minecraft.shouldEntityAppearGlowing` for every entity every frame, and for every entity that is not glowing vanilla checks whether the local player is a spectator. TxOptimizations computes that once per frame and reuses it for the other entities.
+Entity extraction asks `Minecraft.shouldEntityAppearGlowing` for every entity every frame, and for every entity that is not glowing vanilla checks whether the local player is a spectator. TxOptimizations computes that once per frame and reuses it for the other entities.
 
 ### Environment attribute values
 
@@ -92,15 +92,11 @@ Every frame cleared the main color and depth target before rendering, and the wo
 
 ### Particle corners
 
-For every particle, Sodium rotated the four corners of the quad by the particle rotation, four quaternion rotations per particle per frame. Camera-facing particles all carry the camera rotation, so the rotated corners are the same for each of them. The rotated corners are kept while the rotation stays bit-for-bit the same, and only the per-particle scale and offset are applied, in the same order as before, so every vertex is identical.
+For every particle, vanilla rotated the four corners of the quad by the particle rotation, four quaternion rotations per particle per frame. Camera-facing particles all carry the camera rotation, so the rotated corners are the same for each of them. The rotated corners are kept while the rotation stays bit-for-bit the same, and only the per-particle scale and offset are applied, in the same order as before, so every vertex is identical.
 
 ### Debug lines
 
 Hitboxes and other debug lines are built with a pose that is always the identity, yet vanilla transformed every vertex position and normal through it, allocating a vector each time, and multiplied both ends of every line by the full view matrix only to read the view depth for near-plane clipping. With hitboxes shown this cost several percent of the render thread. The values are now written directly, only the depth row of the view matrix is evaluated with the same arithmetic, and an error is thrown if the pose is ever anything but the identity. When the line buffer duplicates vertices for line quads and has position, color, normal and line width, each line is written straight into the buffer in its final form (start, its copy, end) with the same encoding the buffer builder uses, leaving the end vertex for the builder to copy exactly as it would after its own calls.
-
-### Item quad normals
-
-Sodium writes item model quads by transforming and renormalizing the normal of every vertex, although the four vertices of a quad nearly always share one normal. The transformed normal is now reused while consecutive vertices carry the same normal, so most quads do this work once instead of four times.
 
 ### Indirect terrain draws
 
@@ -108,7 +104,7 @@ On GPUs with the multi-draw extension Sodium hands every section's draw commands
 
 ### Render thread memory stack
 
-Every LWJGL call that needs scratch memory (descriptor pushes, buffer copies, mapping, glyph drawing, terrain push constants) fetches the thread's `MemoryStack` from a `ThreadLocal`. The render thread's ThreadLocal table is crowded, so this lookup missed its first slot and probed on almost every call, 1.7% of the render thread in the BedWars prelobby. The render thread's stack is now captured once when Minecraft starts, and `MemoryStack.stackGet` returns it directly when called from that thread. It is the same object the ThreadLocal returns, and every other thread still uses the ThreadLocal.
+Every LWJGL call that needs scratch memory (descriptor pushes, buffer copies, mapping) fetches the thread's `MemoryStack` from a `ThreadLocal`. The render thread's ThreadLocal table is crowded, so this lookup missed its first slot and probed on almost every call, 1.7% of the render thread in the BedWars prelobby. The render thread's stack is now captured once when Minecraft starts, and `MemoryStack.stackGet` returns it directly when called from that thread. It is the same object the ThreadLocal returns, and every other thread still uses the ThreadLocal.
 
 ### Empty render phase checks
 
@@ -120,7 +116,7 @@ Every frame the camera checks whether it is in water, lava or powder snow: one f
 
 ### Per-frame allocations
 
-Garbage collection pauses of 6 to 8 ms were the worst frames, and their frequency follows how fast the game allocates. `/txprofile`'s allocation sampling showed several sources in TxOptimizations' own code. Wrapped calls with many arguments boxed every float and int into an array on each call: the glyph writer, when it fell back to vanilla for GUI text, and the baked block entity model swap in Sodium's chunk meshing. They now use injectors that pass arguments without boxing. Each render pass gets a number, and a pipeline records the number of the last pass that checked its color targets, so the check still runs once per pipeline per pass without a set that was filled and cleared in every pass. Each pipeline now keeps its uniform names and binding slots in two small arrays, built once in the map's own order from its fixed uniform map, so binding a pipeline walks the arrays instead of every slot of the hash map (1.9% of the render thread in the BedWars prelobby). Binding a vertex buffer writes the buffer and offset straight to stack memory instead of wrapping each in a new `LongBuffer`. The driver receives the same values in every case.
+Garbage collection pauses of 6 to 8 ms were the worst frames, and their frequency follows how fast the game allocates. `/txprofile`'s allocation sampling showed several sources in TxOptimizations' own code. Wrapped calls with many arguments boxed every float and int into an array on each call: the glyph writer and the baked block entity model swap in chunk meshing. They now use injectors that pass arguments without boxing. Each render pass gets a number, and a pipeline records the number of the last pass that checked its color targets, so the check still runs once per pipeline per pass without a set that was filled and cleared in every pass. Each pipeline now keeps its uniform names and binding slots in two small arrays, built once in the map's own order from its fixed uniform map, so binding a pipeline walks the arrays instead of every slot of the hash map (1.9% of the render thread in the BedWars prelobby). Binding a vertex buffer writes the buffer and offset straight to stack memory instead of wrapping each in a new `LongBuffer`. The driver receives the same values in every case.
 
 ### Packed gizmo lines
 
@@ -152,7 +148,7 @@ Name tags, holograms and other text in the world were laid out again every frame
 
 ### Direct vertex writes
 
-Sodium writes every glyph, particle, entity cuboid and item quad into a small stack buffer and then copies it into the frame's vertex buffer, one native memory copy per glyph or cuboid. At a busy server spawn these copies took about 10% of the render thread. When the vertex buffer uses exactly the format being written, TxOptimizations reserves the space in the buffer first and writes the same bytes straight into it, updating the vertex count and last vertex pointer the same way Sodium's push does. Buffers with another format keep Sodium's converting push. Glyphs written into other buffers, such as GUI text, also skip Sodium's glyph hook: they go through the same stack buffer and converting push Sodium uses, which avoids the callback object Sodium's cancellable hook allocated for every character (about 4 MB/s at a server spawn). See-through text (name tags and text displays seen through walls) and GUI text use vanilla's position, UV and color format without light, so Sodium converted every one of their glyph vertices field by field (0.8% of the render thread in a BedWars game). Glyphs for those buffers are now written straight in that format: the same position, UV and color bytes the conversion produced, with the light dropped as vanilla drops it for that format.
+Vanilla writes every glyph, particle, entity model cube and item quad one vertex at a time through the buffer builder: each vertex checks the previous one, reserves its own space and then sets its position, color, UVs, light and normal one element at a time, and glyph, particle and item positions each go through a new vector. When the vertex buffer uses exactly the format being written, TxOptimizations reserves the space for the whole glyph, cube or quad, or for a whole particle layer, at once and writes the same bytes straight into it, updating the vertex count and last vertex pointer the same way the builder does. World text is written in vanilla's lit glyph format, and see-through text (name tags and text displays seen through walls) and GUI text in vanilla's position, UV and color format, where the light is dropped as vanilla drops it for that format. Every position, color, UV, light and normal byte is the one vanilla's builder writes, which a comparison against vanilla's builder confirmed for all four formats. Buffers with any other format, and cubes and item quads drawn off the render thread, keep vanilla's per-vertex path.
 
 ### Attribute lookups
 
@@ -284,11 +280,11 @@ Every render pass set the viewport and scissor and bound its first pipeline agai
 
 ### Particle vertices
 
-Particles were turned into vertices one at a time: a callback per particle, Sodium's per-particle hook with its own buffer lookup, and a separate vertex reservation for each quad. Each particle layer is now written in one pass straight from the stored particle arrays into one reservation, with the same corner math, colors, UVs and light, so the vertex data is identical. Each vertex position is computed in local floats, the same multiply then add JOML's `mul` and `add` do (Java never fuses them), instead of going through a shared vector object's fields (3.4 to 3.8% of the render thread with 750 particles at a CubeCraft spawn, inside particle preparation). Buffers that cannot be written directly still go through the vanilla per-particle path.
+Particles were turned into vertices one at a time: a callback and a new rotation per particle, a new vector for every corner, and a separate vertex reservation for each vertex. Each particle layer is now written in one pass straight from the stored particle arrays into one reservation, with the same corner math, colors, UVs and light, so the vertex data is identical. Each vertex position is computed in local floats, the same multiply then add JOML's `mul` and `add` do (Java never fuses them), instead of going through a shared vector object's fields (3.4 to 3.8% of the render thread with 750 particles at a CubeCraft spawn, inside particle preparation). Buffers that cannot be written directly still go through the vanilla per-particle path.
 
 ### Model part rotation
 
-Every rotated model part (entity limbs, heads, armor) rotated both its pose matrix and its normal matrix with JOML's `rotateZYX`, and each call computed the same three sines and cosines again. The angles are now turned into sines and cosines once and both matrices are rotated with JOML's own formulas, including its separate paths for identity, translation-only and affine matrices and the matrix property flags it sets. A test of 2,000,000 random matrices and angles against JOML 1.10.9 matched every bit. Most rotated parts turn around only one or two axes, so an angle of exactly zero now skips its sine and cosine: JOML returns that same zero and exactly 1 for it (checked against JOML 1.10.9 for both signed zeros), so the matrices are identical. JOML's fast math mode still computes them.
+Every rotated model part (entity limbs, heads, armor) built a new quaternion from its three angles and rotated both its pose matrix and its normal matrix by it, and each of the two rotations worked out the same nine rotation terms from the quaternion again. The quaternion is now computed in local values with JOML's own formula, its rotation terms are worked out once, and both matrices are rotated by them with JOML's own formulas, including its separate paths for identity, translation-only, affine and general matrices and the matrix property flags it sets. Most rotated parts turn around only one or two axes, so a half angle of exactly zero now skips its sine and cosine: JOML returns that same zero and exactly 1 for it, so the matrices are identical. JOML's fast math mode still computes them. A test of 3,000,000 random poses and angles, including signed zeros, infinities and NaN, against vanilla's rotation with JOML 1.10.9 matched every value and property flag.
 
 ### Item model bounds
 
@@ -316,7 +312,7 @@ Sodium only animates textures that are on screen, so every frame it marked every
 
 ### Translucent sort reuse
 
-Translucent entity, item and text quads are sorted back to front before every upload, 3.4 to 4.7% of the render thread at busy server spawns. Each sort's result is now remembered by its position among the frame's sorts, and the next frame first checks in one pass whether the remembered order is still sorted under the new distances (ties ordered by quad index). If it is, it is exactly the order a stable sort would produce, so it is used without sorting. Otherwise the quads are sorted with the same orderings Sodium uses (signed keys up to 80 quads, unsigned above), using packed key and index values, a reused buffer, and skipping radix passes where every key lands in the same bucket. A test of 26,037 random sorts against Sodium's own sort matched every result. None of this allocates in steady state: the quad centers are decoded into an array kept per quad count and zeroed before each use, the sort keys go into one reused array, and each remembered order is rewritten in place. The index writer reads the remembered order directly, and only callers outside the upload path get their own copy. Together these were about 66 MB/s of garbage in a BedWars game.
+Translucent entity, item and text quads are sorted back to front before every upload. Vanilla works out a distance for every quad and sorts the quad indices with fastutil's merge sort, which calls a comparator lambda for every comparison and keeps equal distances in index order. Each sort's result is now remembered by its position among the frame's sorts, and the next frame first checks in one pass whether the remembered order is still sorted under the new distances (ties ordered by quad index). If it is, it is exactly the order the stable sort would produce, so it is used without sorting. Otherwise every distance becomes an integer key that orders exactly like `Float.compare`, each key is packed with its quad index into one long, and up to 80 quads are sorted with `Arrays.sort` and larger counts with a radix sort that skips passes where every key lands in the same bucket, which gives vanilla's order. A test of 60,000 random sorts with ties, signed zeros, infinities and NaN matched vanilla's order every time, through both the remembered and the fresh path. None of this allocates in steady state: the quad centers are decoded into an array kept per quad count and zeroed before each use, the sort keys go into one reused array, and each remembered order is rewritten in place. The index writer reads the remembered order directly, and only callers outside the upload path get their own copy. Translucent terrain, which is sorted on the section build threads, uses the same keys and sorts without the remembered orders.
 
 ### Transient command buffer
 
@@ -345,15 +341,11 @@ Each draw's model-view, color, offset and texture matrix are compared with the p
 
 ### Identity model parts
 
-Every visible model part pushed a copy of the pose stack, applied its offset, rotation and scale, drew, and popped the copy again. Sodium already skips the transform when a part has no offset, no rotation and unit scale, so for those parts (roots, hats, jackets, sleeves and other overlay layers) the push and pop only copied two matrices. Such parts now draw and recurse into their children on the current pose directly; parts with any transform still push, transform and pop.
+Every visible model part pushed a copy of the pose stack, applied its offset, rotation and scale, drew, and popped the copy again. For parts with no offset, no rotation and unit scale (roots, hats, jackets, sleeves and other overlay layers) that only copied two matrices and translated the copy by zero. Such parts now draw and recurse into their children on the current pose directly; parts with any transform still push, transform and pop. Translating a finite matrix by zero leaves every value as it was, apart from turning a negative zero translation into a positive zero, which does not change any pixel.
 
 ### Rotation-only culling
 
 Sodium's cull thread rebuilds three section trees every frame the camera changes, which on servers kept it busy for 21 to 67% of a core while just looking around. Only the narrow tree is frustum tested; the regular and wide trees depend on the camera position, the search distances, the occlusion setting and which sections are waiting to rebuild. While none of those change and no section is pending, a rotation-only frame now keeps the previous regular and wide trees, which the renderer already frustum tests per frame during movement. The sections right next to the camera are added to those two trees even outside the frustum, so they no longer depend on the view direction. When the camera stops, a full cull runs once and the narrow tree comes back as before.
-
-### Entity check order
-
-Sodium wraps every entity renderer's visibility check and runs its own section test first, which reads the entity's glowing flag, builds its culling box and walks the section tree, and only then lets vanilla reject the entity by distance and frustum. On servers that cost about 2% of the render thread, mostly spent on entities behind the camera. Both checks are side-effect free, so Sodium's wrapper is turned off and the same section test now runs at the end of vanilla's check, only for entities vanilla would draw. Renderers that override the check (shulkers, guardians, end crystals and any modded override) still get it through their call to vanilla's check, so their own extra conditions see the same result as before. Sodium's wrapper also passed the camera position and partial tick through a boxed argument array on every call, three `Double`s, a `Float` and an `Object[]` per entity per frame (40 MB/s at the LifestealSMP spawn, 52 MB/s in a BedWars game). The new check takes them as plain values.
 
 ### Model pose reset
 
@@ -365,9 +357,7 @@ Before drawing its layers, every armor stand set up its full pose and then asked
 
 ### Cuboid normals
 
-Sodium transformed all six face normals of an entity cuboid every time the normal matrix changed (1% of the render thread in singleplayer). Opposite faces use exactly the negated matrix column, so their packed normals are the byte-wise negation of each other. Only the up, south and east normals are transformed now, and down, north and west are flipped from them, which gives the same bytes (checked on 40 million matrices including NaN, infinities and signed zeros).
-
-Item and block model quads transformed their face normal again for every quad, although an item model repeats the same few normals across all its quads under one pose (2.8% of the render thread with many items in view). The render thread now keeps the last 8 transformed normals for the current normal matrix, and drops them as soon as any of the matrix's nine values or its trusted-normals flag differs bit for bit, so every quad gets exactly the value Sodium's transform would compute.
+Every entity model cube transformed, normalized and packed the normal of each of its faces every time it was drawn, and every item quad did the same for its face. The render thread now keeps the packed normal of each of the six face directions for the current normal matrix, and drops them as soon as any of the matrix's nine values or its trusted-normals flag differs bit for bit, so every cube face and item quad gets exactly the bytes vanilla's transform would produce. Opposite faces use exactly the negated direction, and vanilla's normal packing is symmetric around zero, so a direction whose opposite is already known takes its bytes negated instead of being transformed again, which gives the same bytes (checked on 9 million random direction pairs and matrices including NaN, infinities and signed zeros). Faces whose normal is not one of the six direction vectors are transformed as before, and so is anything that goes through vanilla's per-vertex path.
 
 ### Collision cursor
 
@@ -389,9 +379,7 @@ Every entity, text or item draw with its own transform wrote that transform into
 When a uniform write equals the previous one, the previous block is reused. That reuse now also returns the slice object made for that block instead of a new one, as long as it still points at the same block of the same buffer, which is what a new slice would describe (3.8 MB/s in the BedWars prelobby).
 ### Model cube writes
 
-Sodium writes entity model cubes through a cancellable hook on every cube, which allocated a callback object per cube per frame (about 5 MB/s in a world with mobs). Model parts now hand their cubes straight to Sodium's cuboid writer, with the same color conversion, light and overlay, so every vertex is identical. Vertex consumers Sodium cannot write to still go through the cube's own method.
-
-Every model part drew its children by iterating its child map, which created an iterator object per model part per frame (5.2 MB/s in a world with many slimes). Child maps are fastutil array maps, so the children are now read in the same order straight from the map's value array. Any other kind of map keeps the iterator.
+Every model part drew its children by iterating its child map, which created an iterator object per model part per frame (5.2 MB/s in a world with many slimes). Child maps are fastutil array maps, so the children are now read in the same order straight from the map's value array. Any other kind of map keeps the iterator. A part's cubes are walked by index in the same order instead of through the cube list's iterator.
 
 ### Entity culling boxes
 
@@ -459,7 +447,7 @@ With hitboxes shown (F3+B), every visible entity built its boxes and its view ar
 
 ### Unused region cache
 
-Every frame, vanilla's level extraction created a new region cache for rebuilding the visible sections it tracks. With Sodium that list of sections is always empty, so the cache was never used, but each one still allocated its hash map (about 4 MB/s of garbage in a server lobby). While the list is empty, one shared cache that is never touched now stands in for it. If the list ever has sections, a new cache is created as before.
+Every frame, vanilla's level extraction created a new region cache with its own hash map for the visible sections that need rebuilding, although most frames have none. The cache is now created when the first section of the frame asks it for a region, and that one cache serves every later section of the same frame, so every section gets the same region as before.
 
 ### GUI texture setups
 

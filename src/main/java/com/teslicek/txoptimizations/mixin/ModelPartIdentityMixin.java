@@ -3,13 +3,10 @@ package com.teslicek.txoptimizations.mixin;
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.blaze3d.vertex.VertexConsumer;
 import com.teslicek.txoptimizations.ArrayMapValues;
-import com.teslicek.txoptimizations.SodiumCuboids;
+import com.teslicek.txoptimizations.ModelRotation;
 import it.unimi.dsi.fastutil.objects.Object2ObjectArrayMap;
 import java.util.List;
 import java.util.Map;
-import net.caffeinemc.mods.sodium.api.util.ColorARGB;
-import net.caffeinemc.mods.sodium.api.vertex.buffer.VertexBufferWriter;
-import net.caffeinemc.mods.sodium.client.render.immediate.model.EntityRenderer;
 import net.minecraft.client.model.geom.ModelPart;
 import org.spongepowered.asm.mixin.Final;
 import org.spongepowered.asm.mixin.Mixin;
@@ -61,24 +58,21 @@ public abstract class ModelPartIdentityMixin {
     @Final
     private Map<String, ModelPart> children;
 
-    @Shadow
-    public abstract void translateAndRotate(PoseStack poseStack);
+    @Overwrite
+    public void translateAndRotate(PoseStack poseStack) {
+        poseStack.translate(this.x / 16.0F, this.y / 16.0F, this.z / 16.0F);
+
+        if (this.xRot != 0.0F || this.yRot != 0.0F || this.zRot != 0.0F)
+            ModelRotation.rotateZYX(poseStack.last(), this.zRot, this.yRot, this.xRot);
+
+        if (this.xScale != 1.0F || this.yScale != 1.0F || this.zScale != 1.0F)
+            poseStack.scale(this.xScale, this.yScale, this.zScale);
+    }
 
     @Overwrite
     private void compile(PoseStack.Pose pose, VertexConsumer builder, int lightCoords, int overlayCoords, int color) {
-        VertexBufferWriter writer = VertexBufferWriter.tryOf(builder);
-
-        if (writer == null) {
-            for (int index = 0; index < this.cubes.size(); index ++)
-                this.cubes.get(index).compile(pose, builder, lightCoords, overlayCoords, color);
-
-            return;
-        }
-
-        int abgr = ColorARGB.toABGR(color);
-
         for (int index = 0; index < this.cubes.size(); index ++)
-            EntityRenderer.renderCuboid(pose, writer, SodiumCuboids.of(this.cubes.get(index)), lightCoords, overlayCoords, abgr);
+            this.cubes.get(index).compile(pose, builder, lightCoords, overlayCoords, color);
     }
 
     @Overwrite
