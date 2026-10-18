@@ -561,6 +561,10 @@ Before registering blocks, the game builds its data fixers (the rules that upgra
 
 Every launch, vanilla builds the shape and lighting cache of all 35,723 block states one after another on the main thread, which took 840 ms in a test run. The states are still registered in the same order, but their caches are now built on all cores right after the block classes finish loading, before anything reads them; in the same test it took 517 ms. Building them inside the block class setup deadlocks, because copper and flower pot blocks read other blocks while their cache is built, so the build waits until that setup is done. A check that rebuilt all 35,723 caches one at a time afterwards found no difference in any cached value.
 
+### Section buffer lookups
+
+Every frame, vanilla asks the vertex and index uber buffers of each terrain layer where every visible section's mesh is stored, and each buffer answers from a hash map keyed by the mesh. Averaged over 8 benchmark scenes, these lookups took 23% of the render thread. Each compiled mesh now keeps its six allocations (vertex and index for each layer) in a small array, and the uber buffers' map calls read and write that array instead: when an upload stores an allocation, when one is looked up or freed, and when a buffer closes. Each buffer also keeps the set of meshes that hold one of its allocations, so closing it clears exactly the entries the map clear dropped. Vanilla only allocates buffer space for compiled meshes, so the placeholder meshes of empty and unbuilt sections still have none. Every lookup returns the same allocation object the map returned, so the draws use the same buffers and offsets. Memory stays about the same, since each mesh gains a six-slot array and each allocation loses its hash map entry.
+
 ### Memory
 
 Less live memory means shorter and rarer garbage collections.

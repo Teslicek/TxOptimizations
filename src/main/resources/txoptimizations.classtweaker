@@ -67,3 +67,6 @@ accessible class net/minecraft/client/renderer/rendertype/RenderSetup$TextureBin
 # Light snapshot overlay
 accessible class net/minecraft/world/level/lighting/SkyLightSectionStorage$SkyDataLayerStorageMap
 accessible class net/minecraft/world/level/lighting/BlockLightSectionStorage$BlockDataLayerStorageMap
+
+# Section buffer allocation slots
+accessible class net/minecraft/client/renderer/chunk/SectionRenderDispatcher$SectionUberBuffers
