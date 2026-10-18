@@ -21,6 +21,7 @@
     "BakedModelEncoderNormalMixin",
     "BaseGpuBufferSliceCacheMixin",
     "BakedSheetGlyphDirectWriteMixin",
+    "BakedSheetGlyphQuadMixin",
     "BlockDataLayerStorageMapSnapshotMixin",
     "BlockEntityRenderDispatcherCacheMixin",
     "BlockEntityRenderDistanceMixin",
