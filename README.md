@@ -573,6 +573,10 @@ Every frame, level extraction looks up the update state of each visible chunk se
 
 Every frame, level extraction walked all visible chunk sections and looked up each one's update state to find the few that need a rebuild. The answer for a section only changes when a block or light change marks a clean section dirty, when the update grid or the grid of render sections moves with the camera or is created, or when the list of visible sections is cleared or refilled. Each scan now remembers, in visible order, the sections that were still dirty when it checked them. While none of those changes has happened since, the next scan checks only the remembered sections, with the same checks in the same order; every other visible section was clean or outside the grid at the last scan and still is. Changes are counted when they start and when they end, so a change made by another thread while a scan runs makes the following scan a full one, and any change makes the next scan walk all visible sections as before.
 
+### Block entity sections
+
+Every frame, block entity extraction walked all visible chunk sections and fetched each one's mesh to see whether it holds any block entities, although most sections hold none. A section only gains block entities when a mesh that has some is installed on it after it compiles. Each frame now remembers, in visible order, the sections whose mesh had block entities when it checked them. While no mesh with block entities has been installed and the list of visible sections has not been cleared or refilled since, the next frame checks only those remembered sections, with the same fade test and extraction in the same order; every other visible section had no block entities at the last check and still has none. Meshes are also installed from the section compile threads, so each install is counted when it starts and when it ends, and a frame that starts while one is still running is followed by a full walk. Any install of a mesh with block entities and any change to the visible list makes the next frame walk all visible sections as before.
+
 ### Memory
 
 Less live memory means shorter and rarer garbage collections.

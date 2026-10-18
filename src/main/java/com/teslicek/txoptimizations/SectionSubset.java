@@ -7,7 +7,8 @@ import net.minecraft.client.renderer.chunk.SectionRenderDispatcher;
 
 public final class SectionSubset {
 
-    public static final SectionSubset DIRTY = new SectionSubset();
+    public static final SectionSubset DIRTY          = new SectionSubset();
+    public static final SectionSubset BLOCK_ENTITIES = new SectionSubset();
 
     private static final long UNSETTLED = -1L;
 
@@ -58,17 +59,19 @@ public final class SectionSubset {
         this.recorded.add(section);
     }
 
-    private void clear() {
+    private void endVisibleListChange() {
         this.subset.clear();
         this.recorded.clear();
+        this.endChange();
     }
 
     public static void beginVisibleChange() {
         DIRTY.beginChange();
+        BLOCK_ENTITIES.beginChange();
     }
 
     public static void endVisibleChange() {
-        DIRTY.clear();
-        DIRTY.endChange();
+        DIRTY.endVisibleListChange();
+        BLOCK_ENTITIES.endVisibleListChange();
     }
 }
