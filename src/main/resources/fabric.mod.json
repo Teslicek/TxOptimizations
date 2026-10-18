@@ -18,8 +18,7 @@
     "fabricloader": ">=0.19.5",
     "minecraft": "~26.3",
     "java": ">=25",
-    "fabric-api": "*",
-    "sodium": "*"
+    "fabric-api": "*"
   },
   "entrypoints": {
     "client": [
@@ -27,17 +26,13 @@
     ]
   },
   "accessWidener": "txoptimizations.classtweaker",
-  "custom": {
-    "sodium:options": {
-      "mixin.features.render.entity.cull": false
-    }
-  },
   "breaks": {
     "immediatelyfast": "*",
     "obe": "*",
     "entityculling": "*",
     "ferritecore": "*",
     "gnetum": "*",
-    "moreculling": "*"
+    "moreculling": "*",
+    "sodium": "*"
   }
 }

@@ -98,10 +98,6 @@ For every particle, vanilla rotated the four corners of the quad by the particle
 
 Hitboxes and other debug lines are built with a pose that is always the identity, yet vanilla transformed every vertex position and normal through it, allocating a vector each time, and multiplied both ends of every line by the full view matrix only to read the view depth for near-plane clipping. With hitboxes shown this cost several percent of the render thread. The values are now written directly, only the depth row of the view matrix is evaluated with the same arithmetic, and an error is thrown if the pose is ever anything but the identity. When the line buffer duplicates vertices for line quads and has position, color, normal and line width, each line is written straight into the buffer in its final form (start, its copy, end) with the same encoding the buffer builder uses, leaving the end vertex for the builder to copy exactly as it would after its own calls.
 
-### Indirect terrain draws
-
-On GPUs with the multi-draw extension Sodium hands every section's draw commands to the driver through `vkCmdDrawMultiIndexedEXT`, and the driver walks all of them on the render thread each frame. Sodium's indirect path writes the same commands into a GPU-visible buffer and issues one indirect draw per region, so the GPU reads the list instead. It is now used whenever the device supports indirect multi-draw.
-
 ### Render thread memory stack
 
 Every LWJGL call that needs scratch memory (descriptor pushes, buffer copies, mapping) fetches the thread's `MemoryStack` from a `ThreadLocal`. The render thread's ThreadLocal table is crowded, so this lookup missed its first slot and probed on almost every call, 1.7% of the render thread in the BedWars prelobby. The render thread's stack is now captured once when Minecraft starts, and `MemoryStack.stackGet` returns it directly when called from that thread. It is the same object the ThreadLocal returns, and every other thread still uses the ThreadLocal.
@@ -121,14 +117,6 @@ Garbage collection pauses of 6 to 8 ms were the worst frames, and their frequenc
 ### Packed gizmo lines
 
 With hitboxes shown, every entity's box became 8 corner `Vec3`s and 12 `Line` records each frame, plus the list storage for them, about 35 MB/s in the BedWars prelobby. Gizmo groups now keep their lines as plain numbers (start and end coordinates, color and width), box edges are written from the box coordinates directly, and the line renderer reads those numbers. The coordinates are the same doubles the `Vec3`s held, in the same order. Anything that still reads the list as `Line` objects gets them built on access. The two gizmo collections that `LevelRenderer` rebuilt every frame are now cleared and refilled instead, since the previous frame's collections are dropped at that point and were already drawn, so the line arrays keep their capacity and stop being reallocated. Each line written straight into a line buffer reserved space twice, once for the copy of the previous line's end vertex that line buffers add and once for the new line. When the buffer already has room for both, it is now one reservation with the same copy and the same bytes, vertex count and last-vertex pointer; otherwise it goes through the two separate steps as before, so the buffer grows exactly as it did.
-
-### Sodium cull tree arrays
-
-Every async cull pass builds new section trees for the wide, regular and local results, and each tree allocates a 32 KB bit array (about 137 MB/s on Sodium's cull thread in BedWars and at a busy spawn). Once a pass is handed over, only the render thread holds its trees: in Sodium's map of cull results and as the tree the current render list was read from. The render thread can still read a replaced tree until the render list is finalized for the frame, so trees are only checked at the end of that step: every tree from a handed-over pass that is in neither place anymore returns its arrays to a pool, including a local result that was never taken. New trees take a zeroed array from the pool, which is what a new array would hold. Each tree is released once, trees from cancelled passes are left to the garbage collector, and the pool keeps at most 64 arrays. The check only walks the tracked trees when a new pass was handed over or one of the live tree references changed since the last check; otherwise nothing could have died.
-
-### Region pass lookups
-
-Each region kept its per-pass section data and cached draw batches in hash maps keyed by render pass, looked up for every region and pass each frame. With only three passes they are now also held in arrays indexed by pass, and the lookups read the arrays.
 
 ### Repeated binds
 
@@ -200,9 +188,7 @@ With a frame limit set, the limiter waits until the next frame is due by parking
 
 ### FPS counter
 
-TxOptimizations draws its own FPS counter in the top left corner (`123 FPS`, white, no shadow, at 2,2), hidden while the F3 screen is open or the HUD is hidden. `K` toggles it (rebindable under Options > Controls > TxOptimizations), and the choice is saved in `config/txoptimizations.json`. The number is the average frame rate over the last 0.5 seconds and updates every 0.5 seconds, the same as Sodium Extra's FPS overlay. It only counts frames, and the text is rebuilt only when the number changes, so drawing it skips the per-frame translation and text-direction work that Sodium Extra's overlay goes through.
-
-Sodium Extra records every frame and sorts the last 5 seconds of frame times twice every 0.5 seconds for its 1% and 0.1% low values, even when its overlay is off, which took about 0.8% of the render thread at high frame rates. When Sodium Extra is installed, TxOptimizations skips that recording, so Sodium Extra's own FPS overlay (its Show FPS option, `show_fps` in `config/sodium-extra-options.json`) should be switched off.
+TxOptimizations draws its own FPS counter in the top left corner (`123 FPS`, white, no shadow, at 2,2), hidden while the F3 screen is open or the HUD is hidden. `K` toggles it (rebindable under Options > Controls > TxOptimizations), and the choice is saved in `config/txoptimizations.json`. The number is the average frame rate over the last 0.5 seconds and updates every 0.5 seconds. It only counts frames, and the text is rebuilt only when the number changes, so drawing it skips translating and laying out the text again every frame.
 
 ### Baked block entities
 
@@ -246,11 +232,11 @@ Entities that are culled, or were not extracted in any frame since the previous 
 
 ### Persistent buffer mapping
 
-Every write into a CPU-visible GPU buffer (dynamic transforms, uniforms, fog, clouds, vertex staging, Sodium's indirect command and uniform buffers) mapped the buffer's memory with `vmaMapMemory` and unmapped it again when the view closed, two native calls per write. A spark profile showed these calls at 2.8% of the render thread. Each buffer is now mapped the first time it is written and stays mapped until it is destroyed. Every mappable buffer is allocated host-visible and host-coherent, so the GPU sees the same bytes at the same addresses without any flush, and vanilla's check that a buffer is not closed while a view is open still works.
+Every write into a CPU-visible GPU buffer (dynamic transforms, uniforms, fog, clouds, vertex staging) mapped the buffer's memory with `vmaMapMemory` and unmapped it again when the view closed, two native calls per write. A spark profile showed these calls at 2.8% of the render thread. Each buffer is now mapped the first time it is written and stays mapped until it is destroyed. Every mappable buffer is allocated host-visible and host-coherent, so the GPU sees the same bytes at the same addresses without any flush, and vanilla's check that a buffer is not closed while a view is open still works.
 
 ### Texel buffer views
 
-Pushing descriptors that use a texel buffer (Sodium's section time buffer for every terrain layer, the cloud buffer) created a Vulkan buffer view on every push and queued it for destruction two frames later, 1.4% of the render thread. The view only depends on the buffer, offset, size and format, so it is now kept on the buffer (up to 8 per buffer) and destroyed together with the buffer, after the GPU is done with it. Whether the view came from the buffer is kept on the render pass between creating the view and queueing it for destruction, instead of in a holder object allocated on every descriptor push (2.7 MB/s).
+Pushing descriptors that use a texel buffer (the cloud buffer) created a Vulkan buffer view on every push and queued it for destruction two frames later. The view only depends on the buffer, offset, size and format, so it is now kept on the buffer (up to 8 per buffer) and destroyed together with the buffer, after the GPU is done with it. Whether the view came from the buffer is kept on the render pass between creating the view and queueing it for destruction, instead of in a holder object allocated on every descriptor push.
 
 ### Pipeline switches
 
@@ -270,10 +256,6 @@ The hand and screen effect passes drained their submit collections twice per fra
 
 At the end of every frame the GUI item atlas walked all its slots looking for slots marked to be dropped after the frame. The sweep now only runs when a slot was marked since the last sweep.
 
-### Sodium per-frame checks
-
-Sodium read the operating system name to pick the sub-texel precision every frame and updated its chunk build time estimators every frame. The precision is computed once, and the estimators only update after new build results arrived; without new data the update leaves them unchanged.
-
 ### Viewport, scissor and pipeline binds
 
 Every render pass set the viewport and scissor and bound its first pipeline again, even when the command buffer already had exactly that state from the previous pass. The bound pipeline and both dynamic states stay valid across render passes in the same command buffer, so a viewport, scissor or pipeline that is already set is no longer recorded again. `vkCmdBindPipeline` alone was 2.8% of the render thread in the BedWars prelobby. Pushed descriptors also stay valid across render passes, so the check that skips pushing an identical descriptor set with the same pipeline layout now spans the whole command buffer instead of a single pass. The remembered state is dropped whenever a new command buffer starts recording.
@@ -290,10 +272,6 @@ Every rotated model part (entity limbs, heads, armor) built a new quaternion fro
 
 Items on shelves and dropped items asked for their model's bounding box every frame, and because their render state is cleared or recreated every frame, vanilla rebuilt the box from every vertex of the model each time (about 1% of the render thread at a server spawn full of shelves). The box only depends on the model's extents, its item transform, the hand and its local transform, so single-layer items now keep it in a cache keyed by exactly those values. Items with Fabric mesh quads, which add their own vertices to the box, and multi-layer items still compute it every time.
 
-### Region bookkeeping
-
-Sodium walked its whole hash table of terrain regions every frame to let each region free GPU memory it no longer needs, and most of that time went into stepping over empty table slots (0.87% of the render thread in a singleplayer profile). Regions are now also kept in a plain list that is updated when a region is created or removed, and the per-frame pass walks that list. Every region is still visited once per frame; only the order differs, which only changes which free region id is handed out next.
-
 ### Raycast air
 
 Every block a raycast passes through (the per-frame crosshair pick, the third-person camera collision) asked the block for its shape. Air never has a shape in any raycast mode, so air blocks now return the empty shape directly.
@@ -305,10 +283,6 @@ Every particle with physics checked its movement against the blocks around it ea
 ### Ambient block ticks
 
 Every client tick, 1334 random blocks around the player get their ambient effects (campfire smoke, dripping water, ambient particles), and each one was looked up twice, once for the block and once for its fluid. The fluid is part of the block state, so it is now read from the block state already looked up. The debug world, where block lookups do not come from the chunk sections, keeps the second lookup.
-
-### Animated sprite marks
-
-Sodium only animates textures that are on screen, so every frame it marked every animated sprite in every visible section as active (0.85% of the render thread in a singleplayer profile). The mark is only cleared when the texture atlases advance their animations once per client tick, so marking the same sprites again in later frames of the same tick changes nothing. The marking pass now runs again only after an atlas animation step, a new set of render lists, or a change to any section's animated sprites.
 
 ### Translucent sort reuse
 
@@ -342,10 +316,6 @@ Each draw's model-view, color, offset and texture matrix are compared with the p
 ### Identity model parts
 
 Every visible model part pushed a copy of the pose stack, applied its offset, rotation and scale, drew, and popped the copy again. For parts with no offset, no rotation and unit scale (roots, hats, jackets, sleeves and other overlay layers) that only copied two matrices and translated the copy by zero. Such parts now draw and recurse into their children on the current pose directly; parts with any transform still push, transform and pop. Translating a finite matrix by zero leaves every value as it was, apart from turning a negative zero translation into a positive zero, which does not change any pixel.
-
-### Rotation-only culling
-
-Sodium's cull thread rebuilds three section trees every frame the camera changes, which on servers kept it busy for 21 to 67% of a core while just looking around. Only the narrow tree is frustum tested; the regular and wide trees depend on the camera position, the search distances, the occlusion setting and which sections are waiting to rebuild. While none of those change and no section is pending, a rotation-only frame now keeps the previous regular and wide trees, which the renderer already frustum tests per frame during movement. The sections right next to the camera are added to those two trees even outside the frustum, so they no longer depend on the view direction. When the camera stops, a full cull runs once and the narrow tree comes back as before.
 
 ### Model pose reset
 
@@ -395,7 +365,7 @@ Every GUI glyph converted its 2D pose into a new 4x4 matrix before writing its v
 
 ### Buffer slices
 
-Asking a GPU buffer for a slice covering all of it created a new slice object each time, and Sodium does that for every chunk region drawn each frame. The slice is now created once per buffer, since a buffer never changes size. Sodium's indirect terrain draws also created a slice of the command buffer per region per frame; each draw batch now remembers its last 8 slices, with their buffer, offset and length kept in flat arrays so a miss while moving costs only a few comparisons, and reuses one with the same buffer, offset and length.
+Asking a GPU buffer for a slice covering all of it created a new slice object each time, and vanilla does that for every entity, item, text, GUI and particle draw each frame. The slice is now created once per buffer, since a buffer never changes size.
 
 ### Feature phase loop
 
@@ -421,25 +391,11 @@ Every time an entity, item or text render type was prepared for a frame, it buil
 
 Every sound the game plays asks the sound thread for an audio channel and waits for the answer on the render thread. The wait parked the render thread, so on top of the sound thread's own wake-up it also had to be woken by the operating system again, 0.3 to 0.5 ms per sound in `/txprofile`. The render thread now spins until the channel arrives and then takes it the same way, so the same channel is used at the same point, without the second wake-up.
 
-### Terrain push constants
-
-For every chunk region it draws, Sodium writes the region's camera offset, age and id into 20 bytes of stack memory and pushes them to the shader. Taking those bytes from the memory stack wrapped them in a new `ByteBuffer` each time (about 20 MB/s of garbage in a singleplayer world at render distance 32). The push constants are copied into the command buffer when they are pushed, so one buffer is now reused for every region and receives the same bytes.
-
-On Java 25 and newer, LWJGL makes every native call through the Foreign Function API and wraps the function's address in a new `MemorySegment` on each call. The JIT usually removes that wrapper, but on the push constant path it did not, which left 2.8 to 4.1 MB/s of garbage in `/txprofile` on LifestealSMP. Push constants now call the same `vkCmdPushConstants` function from the device's function table with the same arguments, through a downcall that keeps one segment for that address and replaces it only if the address changes.
-
 ### Light snapshots
 
 The light engine keeps one map of light sections it updates and publishes a read-only snapshot of it for every other thread. Every time lighting changed, vanilla published a full copy of the whole map. At render distance 32 that map holds around 100,000 sections, so each copy allocated arrays of several MB on the render thread and on every server worker thread. While moving, `/txprofile` showed most garbage collections forced by these huge arrays, each pausing the game for 8 to 10 ms.
 
 A snapshot is now the last full copy plus a small map of the sections that changed since it. Each new snapshot copies the previous small map and adds the sections the light engine recorded as changed since the previous snapshot, with their current data. Lookups check the small map first and then the full copy, so every lookup returns exactly what a full copy would. Nothing ever modifies a published full copy or a published change map. Once the changes since the last full copy would exceed a sixteenth of the sections (at least 512), the next snapshot is a full copy again, the same way vanilla makes it, and becomes the new base.
-
-### Visible region lookup
-
-Every time Sodium collects the visible chunk sections, it looks up each section's render region (8 by 4 by 8 sections) in a hash map, 2.6% of the render thread while flying in singleplayer. Sections are visited in tree order, so consecutive sections usually share a region. Each collection now remembers the last region it looked up and its coordinates, and reuses it while the next section is in the same region. A collection only reads the region map and runs on one thread from start to end, so the region is the same one the map would return.
-
-### Vanilla section graph
-
-With Sodium, vanilla's section occlusion graph still updated every frame, although Sodium gives it a view area that contains no sections, so every result it can produce (visible sections, chunks it waits for, the culling and octree debug views) stays empty. Each time the camera entered a new section it still copied the sets of loaded chunks and empty sections (about 10 MB/s of garbage while flying at render distance 32) and ran a full graph update on a background thread. The update is now skipped while Sodium's empty view area is in use. Sodium does its own terrain culling in the same frame as before, and the frustum flag the graph would set only gated a call that Sodium already replaces with nothing.
 
 ### Entity hitboxes
 
@@ -461,10 +417,6 @@ Every entity, item and text render type prepared for a frame asked its texture t
 
 Every item frame built a new render offset vector twice per frame, once when its entity was placed and once when the frame was drawn (about 5 MB/s of garbage at a spawn full of map frames). The offset only depends on the direction the frame faces, so the six offsets are now built once with the same arithmetic and shared. A vector cannot be changed, so every caller reads the same values.
 
-### Section copy cache cleanup
-
-Every frame, Sodium's cache of chunk section copies for meshing checked all of its up to 512 entries and dropped the ones unused for more than 5 seconds (0.9% of the render thread at a server spawn). The cache is a linked map in order of last use: every use moves an entry to the end and stamps it with the current time, which never goes back. Expired entries are therefore always at the front, so the cleanup now drops entries from the front until it reaches one that has not expired, which removes exactly the same entries.
-
 ### Breaking overlay rotation
 
 The block breaking crack overlay computes its texture coordinates per vertex and called `Direction.getRotation()` for every vertex, which allocates a new quaternion and evaluates its sines and cosines (1.3% of the render thread in a CubeCraft lobby). The six rotations are now built once by that same method and reused. The overlay only reads them, so every vertex gets the same values.
@@ -480,10 +432,6 @@ When an entity asks for a vertex builder, its prepared render type is searched i
 ### Sky behind terrain
 
 Vanilla draws the sky disc, sunrise glow, sun, moon and stars over the whole screen before any terrain, and the opaque terrain then paints over most of it. In a server lobby these sky passes took 0.019 ms of a 0.131 ms GPU frame. In the overworld with the default transparency, the sky is now drawn right after opaque and cutout terrain and before everything else, with copies of the vanilla sky pipelines whose vertices are placed at the far plane and depth tested against the terrain, so only pixels without terrain are shaded. Terrain does not blend and always writes depth, entities, particles, text, outlines and translucent terrain are still drawn after the sky, and the sky layers keep their order and blending, so the image is the same. The vanilla sky shaders get the far plane line only under a define that just these copies set; if a resource pack replaces one of them and the expected line is missing, the sky is drawn the vanilla way. With Iris installed the sky is also drawn the vanilla way, because Iris closes and replaces the main render pass at the point where the deferred sky continues it.
-
-### RGSS close-up terrain
-
-With RGSS texture filtering, Sodium's terrain shader takes four texture samples around every pixel, plus one sharp sample, and blends them by how small the texture is on screen. In a server lobby terrain is limited by pixel shading (a fifth of the pixels made solid terrain three times faster), and most nearby terrain shows texels at least a pixel wide, where that blend weight is exactly 0 and the result is exactly the sharp sample. The shader now returns the sharp sample right away in that case and skips the four RGSS samples; every other pixel is computed as before. The line is added to Sodium's shader source as it loads, and a replaced shader without the expected line is left alone.
 
 ### Shader cache
 
@@ -503,7 +451,7 @@ Every resource reload closed the OpenAL audio device and opened it again, which 
 
 ### Shaders compiled on first use
 
-A reload compiles every pipeline Minecraft registers while it prepares, but pipelines that mods create themselves, like Sodium's terrain pipelines, were only compiled the first time they were drawn after the reload, and the render thread waited about 18 ms for them in a CubeCraft reload. A reload now also compiles, while it prepares, every pipeline that was compiled on first use since the last reload, with the same shaders, and adds it to the new pipeline cache. A pipeline that fails to compile is left out and compiled on first use as before.
+A reload compiles every pipeline Minecraft registers while it prepares, but pipelines that mods create themselves, like TxOptimizations' own HUD and sky pipelines, were only compiled the first time they were drawn after the reload, and the render thread waited for them. A reload now also compiles, while it prepares, every pipeline that was compiled on first use since the last reload, with the same shaders, and adds it to the new pipeline cache. A pipeline that fails to compile is left out and compiled on first use as before.
 
 ### Language files on reload
 
@@ -535,7 +483,7 @@ Model loading is the last part of a reload to finish, and its final step wrote a
 
 ### GPU memory freed in the background
 
-Vulkan resources that are closed are destroyed two frames later, once the GPU is done with them, and that destruction ran on the render thread. After a resource reload Sodium closes the buffers of every loaded chunk, and destroying them all in one frame took 17 ms of a 33 ms frame on CubeCraft. Buffers, textures and texture views are now destroyed on a single background thread in the same order, at the same point after the GPU finished with them; the GPU memory allocator is internally synchronized, so this is safe. Other resources are destroyed on the render thread as before, and the game waits for the background thread before it shuts the GPU device down.
+Vulkan resources that are closed are destroyed two frames later, once the GPU is done with them, and that destruction ran on the render thread. Destroying many at once stalls the frame: after a resource reload with Sodium, which closed the buffers of every loaded chunk region, it took 17 ms of a 33 ms frame on CubeCraft. Buffers, textures and texture views are now destroyed on a single background thread in the same order, at the same point after the GPU finished with them; the GPU memory allocator is internally synchronized, so this is safe. Other resources are destroyed on the render thread as before, and the game waits for the background thread before it shuts the GPU device down.
 
 ### First inventory open
 
@@ -560,9 +508,7 @@ Less live memory means shorter and rarer garbage collections.
 
 ## Commands
 
-`/txprofile reload` makes the next resource reload, such as the one after a server sends its resource pack, run with vanilla's reload profiling, which logs to `latest.log` how long the reload took and how long each reload listener spent preparing and applying. `/txprofile` records 10 seconds and saves one report to the `txoptimizations` folder. The frame in which the profile starts is not counted, since starting the Flight Recorder can stall it for 100 to 300 ms. The report starts with the frame rate from every frame's time: average, 1% low and 0.1% low (the frame rate at the 99th and 99.9th percentile frame time) and the worst frame, followed by GPU command counts per frame (render passes, pipeline sets, draws, multi-draw calls, indirect and batched draws), the scene (server or world, dimension, position, loaded entities and players, particles), whether hitboxes, chunk borders and the F3 overlay are on, the video options, the GPU and driver, the JVM with its collector, heap and launch flags, and the swapchain's format, image count and present mode next to the format of the main framebuffer that is copied into it. Then come frame time percentiles (p50 to p99.9), how many frames took longer than 1, 2, 4, 8 and 16 ms, and the frame count, average frame rate and worst frame of every second. The GPU part lists the time of every render pass and pipeline per frame, plus terrain draws and triangles. It also lists the 10 frames that took the GPU longest, each with its 4 most expensive passes, timed when the frame's results were read. The CPU part samples the render thread's call stack every millisecond and lists every sampled method by its own time (with its top callers), the 30 hottest call stacks up to 12 frames deep, and every method by its time including callees, plus the CPU time of every thread. A separate section covers only the slowest 1% of frames: what the render thread was doing inside them, their 15 hottest call stacks, the 10 worst frames with the samples taken during each, and every garbage collection with its time, length, the old generation's size after it and the used and committed size of all memory pools, marked on any slow frame it overlaps. It also lists how much memory each thread allocated per second and how much the render thread allocates per frame, which is what fills the young generation and sets how often those collections happen. The JDK's built-in Flight Recorder adds JVM events: every safepoint, every VM operation by name (garbage collection, deoptimization, handshakes and others) with the longest ones, every JIT compilation with the longest ones, deoptimizations by method and reason, and every time the render thread parked or waited for a lock for 0.2 ms or longer, by call site. Every garbage collection pause is broken down into G1's phases with their times, the slowest worker in each parallel phase (object copy, root scanning, code roots and others), the eden, survivor and old generation sizes before and after it, and how many regions it collected and MB it copied, which shows whether a long young pause comes from surviving objects or from scanning references. It also samples the allocations, listed per thread by class and by allocation site six frames deep. About 10000 samples make one sample roughly 0.01%, so shares below that are not measurable. Sampling another thread's stack briefly pauses it, so the render thread runs a little slower while the profile records. Copy labels are worked out once per buffer and pipeline labels once per pipeline, and the profiler's timestamp queries are reset in one call per frame after reading them instead of one call per query, to keep the profile's own cost low.
-
-`/txocclusion` measures how much drawn terrain in the next frame is hidden behind other terrain.
+`/txprofile reload` makes the next resource reload, such as the one after a server sends its resource pack, run with vanilla's reload profiling, which logs to `latest.log` how long the reload took and how long each reload listener spent preparing and applying. `/txprofile` records 10 seconds and saves one report to the `txoptimizations` folder. The frame in which the profile starts is not counted, since starting the Flight Recorder can stall it for 100 to 300 ms. The report starts with the frame rate from every frame's time: average, 1% low and 0.1% low (the frame rate at the 99th and 99.9th percentile frame time) and the worst frame, followed by GPU command counts per frame (render passes, pipeline sets, draws, multi-draw calls, indirect and batched draws), the scene (server or world, dimension, position, loaded entities and players, particles), whether hitboxes, chunk borders and the F3 overlay are on, the video options, the GPU and driver, the JVM with its collector, heap and launch flags, and the swapchain's format, image count and present mode next to the format of the main framebuffer that is copied into it. Then come frame time percentiles (p50 to p99.9), how many frames took longer than 1, 2, 4, 8 and 16 ms, and the frame count, average frame rate and worst frame of every second. The GPU part lists the time of every render pass and pipeline per frame. It also lists the 10 frames that took the GPU longest, each with its 4 most expensive passes, timed when the frame's results were read. The CPU part samples the render thread's call stack every millisecond and lists every sampled method by its own time (with its top callers), the 30 hottest call stacks up to 12 frames deep, and every method by its time including callees, plus the CPU time of every thread. A separate section covers only the slowest 1% of frames: what the render thread was doing inside them, their 15 hottest call stacks, the 10 worst frames with the samples taken during each, and every garbage collection with its time, length, the old generation's size after it and the used and committed size of all memory pools, marked on any slow frame it overlaps. It also lists how much memory each thread allocated per second and how much the render thread allocates per frame, which is what fills the young generation and sets how often those collections happen. The JDK's built-in Flight Recorder adds JVM events: every safepoint, every VM operation by name (garbage collection, deoptimization, handshakes and others) with the longest ones, every JIT compilation with the longest ones, deoptimizations by method and reason, and every time the render thread parked or waited for a lock for 0.2 ms or longer, by call site. Every garbage collection pause is broken down into G1's phases with their times, the slowest worker in each parallel phase (object copy, root scanning, code roots and others), the eden, survivor and old generation sizes before and after it, and how many regions it collected and MB it copied, which shows whether a long young pause comes from surviving objects or from scanning references. It also samples the allocations, listed per thread by class and by allocation site six frames deep. About 10000 samples make one sample roughly 0.01%, so shares below that are not measurable. Sampling another thread's stack briefly pauses it, so the render thread runs a little slower while the profile records. Copy labels are worked out once per buffer and pipeline labels once per pipeline, and the profiler's timestamp queries are reset in one call per frame after reading them instead of one call per query, to keep the profile's own cost low.
 
 ## Fixes
 
