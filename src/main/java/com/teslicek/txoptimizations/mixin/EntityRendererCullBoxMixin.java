@@ -1,6 +1,7 @@
 package com.teslicek.txoptimizations.mixin;
 
 import com.teslicek.txoptimizations.FrustumBoxTest;
+import com.teslicek.txoptimizations.LeashHolder;
 import com.teslicek.txoptimizations.mixin.cull.EntityRendererCullAccessor;
 import net.minecraft.client.renderer.culling.Frustum;
 import net.minecraft.client.renderer.entity.EntityRenderDispatcher;
@@ -66,7 +67,7 @@ public abstract class EntityRendererCullBoxMixin<T extends Entity> {
         if (!(entity instanceof Leashable leashable))
             return false;
 
-        Entity leashHolder = leashable.getLeashHolder();
+        Entity leashHolder = LeashHolder.of(leashable);
 
         if (leashHolder == null)
             return false;
