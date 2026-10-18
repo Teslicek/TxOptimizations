@@ -110,6 +110,7 @@
     "LevelExtractorRegionCacheMixin",
     "LevelRendererGizmoReuseMixin",
     "LevelRendererSectionDrawMixin",
+    "LevelRendererTranslucentResortMixin",
     "LevelRendererVisibleSectionsMixin",
     "MapInstanceAtlasMixin",
     "MapInstanceColorTableMixin",
