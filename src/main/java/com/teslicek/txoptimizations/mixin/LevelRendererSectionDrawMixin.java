@@ -1,8 +1,6 @@
 package com.teslicek.txoptimizations.mixin;
 
 import com.mojang.blaze3d.systems.RenderSystem;
-import com.mojang.blaze3d.vertex.TlsfAllocator;
-import com.mojang.blaze3d.vertex.UberGpuBuffer;
 import com.mojang.renderpearl.api.buffers.GpuBuffer;
 import com.mojang.renderpearl.api.buffers.GpuBufferSlice;
 import com.mojang.renderpearl.api.pipeline.PrimitiveTopology;
@@ -64,9 +62,6 @@ public abstract class LevelRendererSectionDrawMixin {
 
     @Unique
     private final SectionDrawList txoptimizations$draws = new SectionDrawList();
-
-    @Unique
-    private int[] txoptimizations$vertexSizes = new int[0];
 
     @Overwrite
     public ChunkSectionsToRender prepareChunkRendersIndirect(Matrix4fc modelViewMatrix, boolean respectTranslucentOrder) {
@@ -139,14 +134,6 @@ public abstract class LevelRendererSectionDrawMixin {
         if (dispatcher == null)
             return draws.finish();
 
-        if (this.txoptimizations$vertexSizes.length != layers.length)
-            this.txoptimizations$vertexSizes = new int[layers.length];
-
-        int[] vertexSizes = this.txoptimizations$vertexSizes;
-
-        for (int layerIndex = 0; layerIndex < layers.length; layerIndex ++)
-            vertexSizes[layerIndex] = layers[layerIndex].pipeline(false).getVertexFormatBinding(0).getVertexSize();
-
         CameraRenderState camera = this.levelRenderState.cameraRenderState;
         Vector3dc         eye    = FacingCulling.eye(camera.pos, camera.viewRotationMatrix);
 
@@ -170,34 +157,21 @@ public abstract class LevelRendererSectionDrawMixin {
                 int           sectionInfoDataIndex = -1;
 
                 for (int layerIndex = 0; layerIndex < layers.length; layerIndex ++) {
-                    ChunkSectionLayer        layer            = layers[layerIndex];
-                    TlsfAllocator.Allocation vertexAllocation = allocations.txoptimizations$allocation(SectionAllocations.vertexSlot(layer));
-
-                    if (vertexAllocation == null)
-                        continue;
-
-                    SectionMesh.SectionDraw draw = sectionMesh.getSectionDraw(layer);
+                    SectionMesh.SectionDraw draw = allocations.txoptimizations$drawableDraw(layerIndex);
 
                     if (draw == null)
                         continue;
 
-                    TlsfAllocator.Allocation indexAllocation = null;
-
-                    if (draw.hasCustomIndexBuffer()) {
-                        indexAllocation = allocations.txoptimizations$allocation(SectionAllocations.indexSlot(layer));
-
-                        if (indexAllocation == null)
-                            continue;
-                    }
-
                     if (sectionInfoDataIndex == -1)
                         sectionInfoDataIndex = draws.addSection(renderOffset.getX(), renderOffset.getY(), renderOffset.getZ(), section.getVisibility(now, fadeDuration));
 
-                    GpuBuffer vertexBuffer = txoptimizations$gpuBuffer(vertexAllocation);
-                    int       baseVertex   = (int) vertexAllocation.getOffsetFromHeap() / vertexSizes[layerIndex];
+                    ChunkSectionLayer layer        = layers[layerIndex];
+                    int               vertexSlot   = SectionAllocations.vertexSlot(layer);
+                    GpuBuffer         vertexBuffer = allocations.txoptimizations$buffer(vertexSlot);
+                    int               baseVertex   = allocations.txoptimizations$firstElement(vertexSlot);
 
                     if (!layer.translucent()) {
-                        if (indexAllocation != null)
+                        if (draw.hasCustomIndexBuffer())
                             throw new IllegalStateException(layer.label() + " geometry of the section at " + renderOffset + " has its own index buffer, but its facing groups index the shared quad buffer");
 
                         draws.shareIndexBuffer(draw.indexCount());
@@ -216,15 +190,15 @@ public abstract class LevelRendererSectionDrawMixin {
                         continue;
                     }
 
-                    if (indexAllocation == null) {
+                    if (!draw.hasCustomIndexBuffer()) {
                         draws.shareIndexBuffer(draw.indexCount());
                         draws.add(draws.group(layerIndex, true, vertexBuffer, null, null), draw.indexCount(), 0, baseVertex, sectionInfoDataIndex);
                         continue;
                     }
 
-                    int firstIndex = (int) indexAllocation.getOffsetFromHeap() / draw.indexType().bytes;
+                    int indexSlot = SectionAllocations.indexSlot(layer);
 
-                    draws.add(draws.group(layerIndex, true, vertexBuffer, txoptimizations$gpuBuffer(indexAllocation), draw.indexType()), draw.indexCount(), firstIndex, baseVertex, sectionInfoDataIndex);
+                    draws.add(draws.group(layerIndex, true, vertexBuffer, allocations.txoptimizations$buffer(indexSlot), draw.indexType()), draw.indexCount(), allocations.txoptimizations$firstElement(indexSlot), baseVertex, sectionInfoDataIndex);
                 }
             }
         } finally {
@@ -232,10 +206,5 @@ public abstract class LevelRendererSectionDrawMixin {
         }
 
         return draws.finish();
-    }
-
-    @Unique
-    private static GpuBuffer txoptimizations$gpuBuffer(TlsfAllocator.Allocation allocation) {
-        return ((UberGpuBuffer.UberGpuBufferHeap) allocation.getHeap()).gpuBuffer;
     }
 }
