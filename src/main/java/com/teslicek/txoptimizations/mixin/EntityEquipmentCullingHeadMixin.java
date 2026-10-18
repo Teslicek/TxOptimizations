@@ -1,6 +1,7 @@
 package com.teslicek.txoptimizations.mixin;
 
 import com.teslicek.txoptimizations.CullingHead;
+import com.teslicek.txoptimizations.CullingHeadTracker;
 import java.util.EnumMap;
 import net.minecraft.world.entity.EntityEquipment;
 import net.minecraft.world.entity.EquipmentSlot;
@@ -16,21 +17,25 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 @Mixin(EntityEquipment.class)
-public abstract class EntityEquipmentCullingHeadMixin implements CullingHead {
+public abstract class EntityEquipmentCullingHeadMixin implements CullingHeadTracker {
 
     @Shadow
     @Final
     private EnumMap<EquipmentSlot, ItemStack> items;
 
     @Unique
-    private ItemStack txoptimizations$cullingHead;
+    private CullingHead txoptimizations$owner;
 
     @Override
-    public ItemStack txoptimizations$getCullingHead() {
-        return this.txoptimizations$cullingHead;
+    public void txoptimizations$trackFor(CullingHead owner) {
+        if (this.txoptimizations$owner != null)
+            throw new IllegalStateException("Equipment already tracks the culling head of another entity");
+
+        this.txoptimizations$owner = owner;
+        this.txoptimizations$updateCullingHead();
     }
 
-    @Inject(method = {"<init>(Ljava/util/EnumMap;)V", "setAll", "clear"}, at = @At("RETURN"))
+    @Inject(method = {"setAll", "clear"}, at = @At("RETURN"))
     private void txoptimizations$trackCullingHead(CallbackInfo ci) {
         this.txoptimizations$updateCullingHead();
     }
@@ -43,8 +48,11 @@ public abstract class EntityEquipmentCullingHeadMixin implements CullingHead {
 
     @Unique
     private void txoptimizations$updateCullingHead() {
+        if (this.txoptimizations$owner == null)
+            return;
+
         ItemStack head = this.items.getOrDefault(EquipmentSlot.HEAD, ItemStack.EMPTY);
 
-        this.txoptimizations$cullingHead = head != ItemStack.EMPTY && head.item.value() == Items.DRAGON_HEAD ? head : ItemStack.EMPTY;
+        this.txoptimizations$owner.txoptimizations$setCullingHead(head != ItemStack.EMPTY && head.item.value() == Items.DRAGON_HEAD ? head : ItemStack.EMPTY);
     }
 }

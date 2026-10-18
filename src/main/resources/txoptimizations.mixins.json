@@ -105,6 +105,7 @@
     "ItemLayerRenderStateAccessor",
     "ItemStackRenderStateBoundsMixin",
     "ItemStackRenderStateLazyLayerMixin",
+    "LivingEntityCullingHeadMixin",
     "LivingEntityRendererCullingHeadMixin",
     "LayerLightSectionStorageQueueMixin",
     "LayerLightSectionStorageSnapshotMixin",
