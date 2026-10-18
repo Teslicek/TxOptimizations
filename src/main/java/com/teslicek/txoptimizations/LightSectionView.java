@@ -6,43 +6,27 @@ import it.unimi.dsi.fastutil.longs.LongSet;
 import it.unimi.dsi.fastutil.objects.ObjectCollection;
 import net.minecraft.world.level.chunk.DataLayer;
 
-public final class LayeredSectionMap extends Long2ObjectOpenHashMap<DataLayer> {
+public final class LightSectionView extends Long2ObjectOpenHashMap<DataLayer> {
 
-    private final Long2ObjectOpenHashMap<DataLayer> base;
-    private final Long2ObjectOpenHashMap<DataLayer> changes;
+    private final LightSectionTree tree;
 
-    public LayeredSectionMap(Long2ObjectOpenHashMap<DataLayer> base, Long2ObjectOpenHashMap<DataLayer> changes) {
+    public LightSectionView(LightSectionTree tree) {
         super(0);
-        this.base    = base;
-        this.changes = changes;
+        this.tree = tree;
     }
 
-    public Long2ObjectOpenHashMap<DataLayer> base() {
-        return this.base;
+    public LightSectionTree tree() {
+        return this.tree;
     }
 
     @Override
     public DataLayer get(long key) {
-        DataLayer changed = this.changes.get(key);
-
-        if (changed != null)
-            return changed;
-
-        if (this.changes.containsKey(key))
-            return null;
-
-        return this.base.get(key);
+        return this.tree.layer(key);
     }
 
     @Override
     public boolean containsKey(long key) {
-        if (this.changes.get(key) != null)
-            return true;
-
-        if (this.changes.containsKey(key))
-            return false;
-
-        return this.base.containsKey(key);
+        return this.tree.layer(key) != null;
     }
 
     @Override

@@ -1,8 +1,10 @@
 package com.teslicek.txoptimizations.mixin;
 
+import com.teslicek.txoptimizations.LightSectionTree;
+import com.teslicek.txoptimizations.LightSectionView;
+import com.teslicek.txoptimizations.LightSnapshotMap;
+import com.teslicek.txoptimizations.LightTopView;
 import it.unimi.dsi.fastutil.longs.Long2IntOpenHashMap;
-import it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap;
-import net.minecraft.world.level.chunk.DataLayer;
 import net.minecraft.world.level.lighting.DataLayerStorageMap;
 import net.minecraft.world.level.lighting.SkyLightSectionStorage;
 import org.spongepowered.asm.mixin.Final;
@@ -19,7 +21,17 @@ public abstract class SkyDataLayerStorageMapSnapshotMixin {
     @Final
     private Long2IntOpenHashMap topSections;
 
-    public DataLayerStorageMap<?> txoptimizations$snapshotWith(Long2ObjectOpenHashMap<DataLayer> sections) {
-        return new SkyLightSectionStorage.SkyDataLayerStorageMap(sections, this.topSections.clone(), this.currentLowestY);
+    public int txoptimizations$top(long zeroNode) {
+        return this.topSections.getOrDefault(zeroNode, LightSectionTree.NO_TOP);
+    }
+
+    public int txoptimizations$skyLight(long blockNode) {
+        LightSectionView sections = (LightSectionView) ((LightSnapshotMap) (Object) this).txoptimizations$sections();
+
+        return sections.tree().skyLight(blockNode, this.currentLowestY);
+    }
+
+    public DataLayerStorageMap<?> txoptimizations$snapshotWith(LightSectionTree tree) {
+        return new SkyLightSectionStorage.SkyDataLayerStorageMap(new LightSectionView(tree), new LightTopView(tree), this.currentLowestY);
     }
 }
