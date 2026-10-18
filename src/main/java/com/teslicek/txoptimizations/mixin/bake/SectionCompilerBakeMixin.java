@@ -5,26 +5,46 @@ import com.llamalad7.mixinextras.injector.v2.WrapWithCondition;
 import com.llamalad7.mixinextras.sugar.Local;
 import com.llamalad7.mixinextras.sugar.Share;
 import com.llamalad7.mixinextras.sugar.ref.LocalRef;
+import com.mojang.blaze3d.vertex.BufferBuilder;
+import com.mojang.blaze3d.vertex.VertexSorting;
 import com.teslicek.txoptimizations.bake.Baking;
 import com.teslicek.txoptimizations.bake.Cushions;
-import net.minecraft.client.renderer.block.BlockQuadOutput;
-import net.minecraft.client.renderer.block.ModelBlockRenderer;
+import java.util.Map;
+import net.fabricmc.fabric.api.client.renderer.v1.Renderer;
+import net.fabricmc.fabric.api.client.renderer.v1.mesh.QuadEmitter;
+import net.fabricmc.fabric.api.client.renderer.v1.render.AltModelBlockRenderer;
+import net.minecraft.client.color.block.BlockColors;
+import net.minecraft.client.renderer.SectionBufferBuilderPack;
 import net.minecraft.client.renderer.block.dispatch.BlockStateModel;
+import net.minecraft.client.renderer.chunk.ChunkSectionLayer;
 import net.minecraft.client.renderer.chunk.RenderSectionRegion;
 import net.minecraft.client.renderer.chunk.SectionCompiler;
+import net.minecraft.client.renderer.texture.OverlayTexture;
 import net.minecraft.core.SectionPos;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.RenderShape;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
+import org.spongepowered.asm.mixin.Final;
 import org.spongepowered.asm.mixin.Mixin;
+import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
-import org.spongepowered.asm.mixin.injection.ModifyArg;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 @Mixin(SectionCompiler.class)
 public abstract class SectionCompilerBakeMixin {
+
+    @Shadow
+    @Final
+    private boolean ambientOcclusion;
+
+    @Shadow
+    @Final
+    private BlockColors blockColors;
+
+    @Shadow
+    protected abstract BufferBuilder getOrBeginLayer(Map<ChunkSectionLayer, BufferBuilder> startedLayers, SectionBufferBuilderPack builders, ChunkSectionLayer layer);
 
     @ModifyExpressionValue(method = "compile", at = @At(value = "INVOKE", target = "Lnet/minecraft/client/renderer/chunk/RenderSectionRegion;getBlockState(Lnet/minecraft/core/BlockPos;)Lnet/minecraft/world/level/block/state/BlockState;"))
     private BlockState txoptimizations$forgetBlockEntity(BlockState state, @Share("blockEntity") LocalRef<BlockEntity> blockEntity) {
@@ -50,18 +70,20 @@ public abstract class SectionCompilerBakeMixin {
         return Baking.meshedRenderShape(blockEntity.get(), section, shape);
     }
 
-    @ModifyArg(method = "compile", at = @At(value = "INVOKE", target = "Lnet/minecraft/client/renderer/block/ModelBlockRenderer;tesselateBlock(Lnet/minecraft/client/renderer/block/BlockQuadOutput;FFFLnet/minecraft/client/renderer/block/BlockAndTintGetter;Lnet/minecraft/core/BlockPos;Lnet/minecraft/world/level/block/state/BlockState;Lnet/minecraft/client/renderer/block/dispatch/BlockStateModel;J)V"), index = 7)
+    @ModifyExpressionValue(method = "compile", at = @At(value = "INVOKE", target = "Lnet/minecraft/client/renderer/block/BlockStateModelSet;get(Lnet/minecraft/world/level/block/state/BlockState;)Lnet/minecraft/client/renderer/block/dispatch/BlockStateModel;"))
     private BlockStateModel txoptimizations$chooseMeshedModel(BlockStateModel model, @Share("blockEntity") LocalRef<BlockEntity> blockEntity) {
         return Baking.meshedModel(blockEntity.get(), model);
     }
 
     @Inject(method = "compile", at = @At(value = "INVOKE", target = "Ljava/util/Map;entrySet()Ljava/util/Set;"))
-    private void txoptimizations$meshCushions(CallbackInfoReturnable<SectionCompiler.Results> cir, @Local(argsOnly = true) SectionPos section, @Local(argsOnly = true) RenderSectionRegion region, @Local ModelBlockRenderer blockRenderer, @Local(ordinal = 0) BlockQuadOutput quadOutput) {
+    private void txoptimizations$meshCushions(SectionPos section, RenderSectionRegion region, VertexSorting vertexSorting, SectionBufferBuilderPack builders, CallbackInfoReturnable<SectionCompiler.Results> cir, @Local(name = "startedLayers") Map<ChunkSectionLayer, BufferBuilder> startedLayers) {
         if (!Cushions.hasCushions(section))
             return;
 
-        BlockState air = Blocks.AIR.defaultBlockState();
+        AltModelBlockRenderer renderer = Renderer.get().altModelBlockRenderer(this.ambientOcclusion, true, this.blockColors);
+        QuadEmitter           emitter  = Renderer.get().quadEmitter(quad -> quad.buffer(OverlayTexture.NO_OVERLAY, this.getOrBeginLayer(startedLayers, builders, quad.chunkLayer())));
+        BlockState            air      = Blocks.AIR.defaultBlockState();
 
-        Cushions.forEachMeshed(section, (pos, model) -> blockRenderer.tesselateBlock(quadOutput, SectionPos.sectionRelative(pos.getX()), SectionPos.sectionRelative(pos.getY()), SectionPos.sectionRelative(pos.getZ()), region, pos, air, model, air.getSeed(pos)));
+        Cushions.forEachMeshed(section, (pos, model) -> renderer.tesselateBlock(emitter, SectionPos.sectionRelative(pos.getX()), SectionPos.sectionRelative(pos.getY()), SectionPos.sectionRelative(pos.getZ()), region, pos, air, model, air.getSeed(pos)));
     }
 }
