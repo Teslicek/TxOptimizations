@@ -16,7 +16,6 @@ import org.joml.Matrix3d;
 import org.joml.Matrix4f;
 import org.joml.Matrix4fc;
 import org.joml.Vector3d;
-import org.jspecify.annotations.Nullable;
 import org.lwjgl.system.MemoryStack;
 import org.lwjgl.system.MemoryUtil;
 import org.slf4j.Logger;
@@ -25,23 +24,23 @@ public final class FacingCulling {
 
     private static final Logger LOGGER = LogUtils.getLogger();
 
-    private static final int    GROUPS                = 7;
+    public static final int GROUPS   = 7;
+    public static final int RANGES   = GROUPS * 3;
+    public static final int OCCUPIED = GROUPS + 3;
+
     private static final int    UNASSIGNED            = 3;
     private static final int    OPPOSITE              = GROUPS - 1;
     private static final int    PLANES                = GROUPS;
     private static final int    THINNESS              = GROUPS * 2;
-    private static final int    OCCUPIED              = PLANES + UNASSIGNED;
-    private static final int    RANGES                = GROUPS * 3;
-    private static final int    BOX_HALF              = 3;
-    private static final int    BOX_SIZE              = 6;
     private static final int    AXES                  = 3;
     private static final int    X                     = 0;
     private static final int    Y                     = 1;
     private static final int    Z                     = 2;
     private static final int    W                     = 3;
     private static final int    ROW                   = 4;
-    private static final int    NO_RUN                = -1;
     private static final int    NO_SUBPIXEL_BITS      = -1;
+    private static final int    SEGMENT_FIELD_BITS    = 3;
+    private static final int    SEGMENT_FIELD         = (1 << SEGMENT_FIELD_BITS) - 1;
     private static final int    VERTICES_PER_QUAD     = PrimitiveTopology.QUADS.primitiveLength;
     private static final int    INDICES_PER_QUAD      = PrimitiveTopology.QUADS.indexCount(VERTICES_PER_QUAD);
     private static final double MAX_INVERSE_THICKNESS = 4.0;
@@ -64,6 +63,7 @@ public final class FacingCulling {
     private static final double[] CLIP_ABS     = new double[ROW * ROW];
     private static final double[] ERROR_SCALE  = new double[ROW];
     private static final double[] ERROR_OFFSET = new double[ROW];
+    private static final int[]    SEGMENTS     = segments();
 
     private static boolean projectionCaptured;
     private static boolean backendWarned;
@@ -103,21 +103,7 @@ public final class FacingCulling {
         return new float[] {Float.POSITIVE_INFINITY, Float.POSITIVE_INFINITY, Float.POSITIVE_INFINITY, Float.NEGATIVE_INFINITY, Float.NEGATIVE_INFINITY, Float.NEGATIVE_INFINITY};
     }
 
-    public static double @Nullable [] facingBox(float[] bounds) {
-        if (!(bounds[X] <= bounds[AXES + X]))
-            return null;
-
-        double[] box = new double[BOX_SIZE];
-
-        for (int axis = 0; axis < AXES; axis ++) {
-            box[axis]            = ((double) bounds[axis] + bounds[AXES + axis]) * 0.5;
-            box[BOX_HALF + axis] = ((double) bounds[AXES + axis] - bounds[axis]) * 0.5 + SLACK;
-        }
-
-        return box;
-    }
-
-    public static int[] groupQuads(MeshData mesh, float[] bounds) {
+    public static void groupQuads(MeshData mesh, float[] bounds, int[] ranges, int offset) {
         MeshData.DrawState state = mesh.drawState();
 
         if (state.primitiveTopology() != PrimitiveTopology.QUADS)
@@ -142,7 +128,7 @@ public final class FacingCulling {
         if ((long) quads * vertexSize * VERTICES_PER_QUAD > vertices.remaining())
             throw new IllegalStateException(quads + " quads of " + vertexSize * VERTICES_PER_QUAD + " bytes do not fit in " + vertices.remaining() + " bytes of vertex data");
 
-        return groupVertices(MemoryUtil.memAddress(vertices), position.offset(), vertexSize, quads, bounds);
+        groupVertices(MemoryUtil.memAddress(vertices), position.offset(), vertexSize, quads, bounds, ranges, offset);
     }
 
     public static void captureProjection(Matrix4fc projection) {
@@ -162,21 +148,27 @@ public final class FacingCulling {
         cullable        = prepareFrame(PROJECTION, viewRotation, camera, width, height, subpixelBits());
     }
 
-    public static void prepareSection(double @Nullable [] box, int originX, int originY, int originZ) {
+    public static void prepareSection(int[] record, int originX, int originY, int originZ) {
         sectionCullable = false;
 
-        if (!cullable || box == null)
+        if (!cullable || !DrawRecords.bounded(record))
             return;
 
+        float  minX    = DrawRecords.bound(record, X);
+        float  minY    = DrawRecords.bound(record, Y);
+        float  minZ    = DrawRecords.bound(record, Z);
+        float  maxX    = DrawRecords.bound(record, AXES + X);
+        float  maxY    = DrawRecords.bound(record, AXES + Y);
+        float  maxZ    = DrawRecords.bound(record, AXES + Z);
         int    blockX  = originX - cameraBlockX;
         int    blockY  = originY - cameraBlockY;
         int    blockZ  = originZ - cameraBlockZ;
-        double halfX   = box[BOX_HALF + X];
-        double halfY   = box[BOX_HALF + Y];
-        double halfZ   = box[BOX_HALF + Z];
-        double centerX = box[X] + blockX + cameraOffsetX;
-        double centerY = box[Y] + blockY + cameraOffsetY;
-        double centerZ = box[Z] + blockZ + cameraOffsetZ;
+        double halfX   = ((double) maxX - minX) * 0.5 + SLACK;
+        double halfY   = ((double) maxY - minY) * 0.5 + SLACK;
+        double halfZ   = ((double) maxZ - minZ) * 0.5 + SLACK;
+        double centerX = ((double) minX + maxX) * 0.5 + blockX + cameraOffsetX;
+        double centerY = ((double) minY + maxY) * 0.5 + blockY + cameraOffsetY;
+        double centerZ = ((double) minZ + maxZ) * 0.5 + blockZ + cameraOffsetZ;
         double reach   = larger(Math.abs(centerX) + halfX, larger(Math.abs(centerY) + halfY, Math.abs(centerZ) + halfZ)) + 1.0;
         double x       = clip(X, centerX, centerY, centerZ);
         double y       = clip(Y, centerX, centerY, centerZ);
@@ -219,43 +211,33 @@ public final class FacingCulling {
         sectionCullable  = true;
     }
 
-    public static int visibleGroups(int[] ranges) {
-        int occupied = ranges[OCCUPIED];
+    public static int visibleGroups(int[] ranges, int offset) {
+        int occupied = ranges[offset + OCCUPIED];
 
         if (!sectionCullable)
             return occupied;
 
-        int culled = behind(ranges, OPPOSITE - X, eyeWest) | behind(ranges, OPPOSITE - Y, eyeDown) | behind(ranges, OPPOSITE - Z, eyeNorth) | behind(ranges, X, eyeEast) | behind(ranges, Y, eyeUp) | behind(ranges, Z, eyeSouth);
+        int culled = behind(ranges, offset, OPPOSITE - X, eyeWest) | behind(ranges, offset, OPPOSITE - Y, eyeDown) | behind(ranges, offset, OPPOSITE - Z, eyeNorth) | behind(ranges, offset, X, eyeEast) | behind(ranges, offset, Y, eyeUp) | behind(ranges, offset, Z, eyeSouth);
 
         return occupied & ~culled;
     }
 
-    public static void addDraws(SectionDrawList draws, int drawGroup, int[] ranges, int visibleGroups, int baseVertex, int sectionInfo) {
-        int runStart   = NO_RUN;
-        int groupStart = 0;
+    public static void addDraws(SectionDrawList draws, int drawGroup, int[] ranges, int offset, int visibleGroups, int baseVertex, int sectionInfo) {
+        int segments = SEGMENTS[ranges[offset + OCCUPIED] & ~visibleGroups];
+        int count    = segments & SEGMENT_FIELD;
 
-        for (int group = 0; group < GROUPS; group ++) {
-            int groupEnd = ranges[group];
+        for (int segment = 0; segment < count; segment ++) {
+            int shift = SEGMENT_FIELD_BITS * (1 + 2 * segment);
+            int first = segments >>> shift & SEGMENT_FIELD;
+            int start = first == 0 ? 0 : ranges[offset + first - 1];
+            int end   = ranges[offset + (segments >>> shift + SEGMENT_FIELD_BITS & SEGMENT_FIELD)];
 
-            if (groupEnd == groupStart)
-                continue;
-
-            if ((visibleGroups & 1 << group) != 0) {
-                if (runStart == NO_RUN)
-                    runStart = groupStart;
-            } else if (runStart != NO_RUN) {
-                addRun(draws, drawGroup, runStart, groupStart, baseVertex, sectionInfo);
-                runStart = NO_RUN;
-            }
-
-            groupStart = groupEnd;
+            if (end != start)
+                draws.add(drawGroup, (end - start) * INDICES_PER_QUAD, start * INDICES_PER_QUAD, baseVertex, sectionInfo);
         }
-
-        if (runStart != NO_RUN)
-            addRun(draws, drawGroup, runStart, groupStart, baseVertex, sectionInfo);
     }
 
-    private static int[] groupVertices(long base, int positionOffset, int vertexSize, int quads, float[] bounds) {
+    private static void groupVertices(long base, int positionOffset, int vertexSize, int quads, float[] bounds, int[] target, int offset) {
         int     quadSize     = vertexSize * VERTICES_PER_QUAD;
         long    positions    = base + positionOffset;
         int[]   destinations = new int[quads];
@@ -307,8 +289,7 @@ public final class FacingCulling {
             destinations[quad] = next[destinations[quad]] ++;
 
         permute(base, quadSize, destinations);
-
-        return ranges;
+        System.arraycopy(ranges, 0, target, offset, RANGES);
     }
 
     private static boolean prepareFrame(Matrix4fc projection, Matrix4fc view, Vec3 camera, int width, int height, int subpixelBits) {
@@ -401,9 +382,9 @@ public final class FacingCulling {
         return NO_SUBPIXEL_BITS;
     }
 
-    private static int behind(int[] ranges, int group, double signedEye) {
-        double inverseThickness = Float.intBitsToFloat(ranges[THINNESS + group]);
-        double height           = Float.intBitsToFloat(ranges[PLANES + group]) - signedEye;
+    private static int behind(int[] ranges, int offset, int group, double signedEye) {
+        double inverseThickness = Float.intBitsToFloat(ranges[offset + THINNESS + group]);
+        double height           = Float.intBitsToFloat(ranges[offset + PLANES + group]) - signedEye;
 
         return height * sectionScale > Math.fma(sectionQuadratic, inverseThickness, sectionLinear) * inverseThickness ? 1 << group : 0;
     }
@@ -444,8 +425,34 @@ public final class FacingCulling {
         return Math.abs(matrix.get(0, row)) + Math.abs(matrix.get(1, row)) + Math.abs(matrix.get(2, row));
     }
 
-    private static void addRun(SectionDrawList draws, int drawGroup, int firstQuad, int endQuad, int baseVertex, int sectionInfo) {
-        draws.add(drawGroup, (endQuad - firstQuad) * INDICES_PER_QUAD, firstQuad * INDICES_PER_QUAD, baseVertex, sectionInfo);
+    private static int[] segments() {
+        int[] segments = new int[1 << GROUPS];
+
+        for (int culled = 0; culled < segments.length; culled ++) {
+            int packed = 0;
+            int count  = 0;
+            int first  = -1;
+
+            for (int group = 0; group <= GROUPS; group ++) {
+                if (group < GROUPS && (culled & 1 << group) == 0) {
+                    if (first == -1)
+                        first = group;
+
+                    continue;
+                }
+
+                if (first == -1)
+                    continue;
+
+                packed |= (first | group - 1 << SEGMENT_FIELD_BITS) << SEGMENT_FIELD_BITS * (1 + 2 * count);
+                count ++;
+                first = -1;
+            }
+
+            segments[culled] = packed | count;
+        }
+
+        return segments;
     }
 
     private static int classify(long first, int vertexSize) {

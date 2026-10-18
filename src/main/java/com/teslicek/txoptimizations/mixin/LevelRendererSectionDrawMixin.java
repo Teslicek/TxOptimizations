@@ -6,14 +6,15 @@ import com.mojang.renderpearl.api.buffers.GpuBuffer;
 import com.mojang.renderpearl.api.buffers.GpuBufferSlice;
 import com.mojang.renderpearl.api.pipeline.PrimitiveTopology;
 import com.mojang.renderpearl.api.textures.GpuTextureView;
+import com.teslicek.txoptimizations.DrawRecordHolder;
+import com.teslicek.txoptimizations.DrawRecords;
 import com.teslicek.txoptimizations.FacingCulling;
-import com.teslicek.txoptimizations.SectionAllocations;
 import com.teslicek.txoptimizations.SectionDrawList;
 import com.teslicek.txoptimizations.SectionDrawUniforms;
-import com.teslicek.txoptimizations.SectionFacing;
 import com.teslicek.txoptimizations.SectionLayers;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
@@ -22,7 +23,6 @@ import net.minecraft.client.renderer.GameRenderer;
 import net.minecraft.client.renderer.LevelRenderer;
 import net.minecraft.client.renderer.chunk.ChunkSectionLayer;
 import net.minecraft.client.renderer.chunk.ChunkSectionsToRender;
-import net.minecraft.client.renderer.chunk.SectionMesh;
 import net.minecraft.client.renderer.chunk.SectionRenderDispatcher;
 import net.minecraft.client.renderer.state.OptionsRenderState;
 import net.minecraft.client.renderer.state.level.CameraRenderState;
@@ -66,7 +66,31 @@ public abstract class LevelRendererSectionDrawMixin {
     private @Nullable SectionRenderDispatcher sectionRenderDispatcher;
 
     @Unique
+    private static final int CHUNK = 64;
+
+    @Unique
     private final SectionDrawList txoptimizations$draws = new SectionDrawList();
+
+    @Unique
+    private final SectionRenderDispatcher.RenderSection[] txoptimizations$chunkSections = new SectionRenderDispatcher.RenderSection[CHUNK];
+
+    @Unique
+    private final int[][] txoptimizations$chunkRecords = new int[CHUNK][];
+
+    @Unique
+    private final int[] txoptimizations$chunkFlags = new int[CHUNK];
+
+    @Unique
+    private final int[] txoptimizations$chunkX = new int[CHUNK];
+
+    @Unique
+    private final int[] txoptimizations$chunkY = new int[CHUNK];
+
+    @Unique
+    private final int[] txoptimizations$chunkZ = new int[CHUNK];
+
+    @Unique
+    private final float[] txoptimizations$chunkFades = new float[CHUNK];
 
     @Overwrite
     public ChunkSectionsToRender prepareChunkRendersIndirect(Matrix4fc modelViewMatrix, boolean respectTranslucentOrder) {
@@ -130,11 +154,11 @@ public abstract class LevelRendererSectionDrawMixin {
 
     @Unique
     private SectionDrawList txoptimizations$collectDraws(boolean respectTranslucentOrder) {
-        ChunkSectionLayer[]     layers     = SectionLayers.VALUES;
-        SectionDrawList         draws      = this.txoptimizations$draws;
-        SectionRenderDispatcher dispatcher = this.sectionRenderDispatcher;
+        boolean[]               translucent = SectionLayers.TRANSLUCENT;
+        SectionDrawList         draws       = this.txoptimizations$draws;
+        SectionRenderDispatcher dispatcher  = this.sectionRenderDispatcher;
 
-        draws.begin(layers.length, respectTranslucentOrder);
+        draws.begin(translucent.length, respectTranslucentOrder);
 
         if (dispatcher == null)
             return draws.finish();
@@ -148,72 +172,105 @@ public abstract class LevelRendererSectionDrawMixin {
         long fadeDuration = Util.toMillis(this.optionsRenderState.chunkSectionFadeInTime);
         long now          = Util.getMillis();
 
+        SectionRenderDispatcher.RenderSection[] chunkSections = this.txoptimizations$chunkSections;
+        int[][]                                 chunkRecords  = this.txoptimizations$chunkRecords;
+        int[]                                   chunkFlags    = this.txoptimizations$chunkFlags;
+        int[]                                   chunkX        = this.txoptimizations$chunkX;
+        int[]                                   chunkY        = this.txoptimizations$chunkY;
+        int[]                                   chunkZ        = this.txoptimizations$chunkZ;
+        float[]                                 chunkFades    = this.txoptimizations$chunkFades;
+        Object[]                                visible       = this.visibleSections.elements();
+        int                                     size          = this.visibleSections.size();
+
         try {
-            for (SectionRenderDispatcher.RenderSection section : this.visibleSections) {
-                SectionMesh sectionMesh = section.getSectionMesh();
+            for (int chunkStart = 0; chunkStart < size; chunkStart += CHUNK) {
+                int chunkSize = Math.min(CHUNK, size - chunkStart);
+                int drawn     = 0;
 
-                if (!(sectionMesh instanceof SectionAllocations allocations))
-                    continue;
+                for (int index = 0; index < chunkSize; index ++) {
+                    SectionRenderDispatcher.RenderSection section = (SectionRenderDispatcher.RenderSection) visible[chunkStart + index];
 
-                SectionFacing facing               = (SectionFacing) sectionMesh;
-                BlockPos      renderOffset         = section.getRenderOrigin();
-                int           sectionInfoDataIndex = -1;
-                boolean       facingPrepared       = false;
-
-                for (int layerIndex = 0; layerIndex < layers.length; layerIndex ++) {
-                    SectionMesh.SectionDraw draw = allocations.txoptimizations$drawableDraw(layerIndex);
-
-                    if (draw == null)
-                        continue;
-
-                    if (sectionInfoDataIndex == -1)
-                        sectionInfoDataIndex = draws.addSection(renderOffset.getX(), renderOffset.getY(), renderOffset.getZ(), section.getVisibility(now, fadeDuration));
-
-                    ChunkSectionLayer layer        = layers[layerIndex];
-                    int               vertexSlot   = SectionAllocations.vertexSlot(layer);
-                    GpuBuffer         vertexBuffer = allocations.txoptimizations$buffer(vertexSlot);
-                    int               baseVertex   = allocations.txoptimizations$firstElement(vertexSlot);
-
-                    if (!layer.translucent()) {
-                        if (draw.hasCustomIndexBuffer())
-                            throw new IllegalStateException(layer.label() + " geometry of the section at " + renderOffset + " has its own index buffer, but its facing groups index the shared quad buffer");
-
-                        draws.shareIndexBuffer(draw.indexCount());
-
-                        int[] ranges = facing.txoptimizations$facingRanges(layer);
-
-                        if (ranges == null)
-                            throw new IllegalStateException(layer.label() + " geometry of the section at " + renderOffset + " was never grouped by facing");
-
-                        if (!facingPrepared) {
-                            FacingCulling.prepareSection(facing.txoptimizations$facingBox(), renderOffset.getX(), renderOffset.getY(), renderOffset.getZ());
-                            facingPrepared = true;
-                        }
-
-                        int visibleGroups = FacingCulling.visibleGroups(ranges);
-
-                        if (visibleGroups == 0)
-                            continue;
-
-                        FacingCulling.addDraws(draws, draws.group(layerIndex, false, vertexBuffer, null, null), ranges, visibleGroups, baseVertex, sectionInfoDataIndex);
-                        continue;
-                    }
-
-                    if (!draw.hasCustomIndexBuffer()) {
-                        draws.shareIndexBuffer(draw.indexCount());
-                        draws.add(draws.group(layerIndex, true, vertexBuffer, null, null), draw.indexCount(), 0, baseVertex, sectionInfoDataIndex);
-                        continue;
-                    }
-
-                    int indexSlot = SectionAllocations.indexSlot(layer);
-
-                    draws.add(draws.group(layerIndex, true, vertexBuffer, allocations.txoptimizations$buffer(indexSlot), draw.indexType()), draw.indexCount(), allocations.txoptimizations$firstElement(indexSlot), baseVertex, sectionInfoDataIndex);
+                    chunkSections[index] = section;
+                    chunkRecords[index]  = section.getSectionMesh() instanceof DrawRecordHolder mesh ? mesh.txoptimizations$drawRecord() : null;
                 }
+
+                for (int index = 0; index < chunkSize; index ++) {
+                    int[] record = chunkRecords[index];
+
+                    if (record == null)
+                        continue;
+
+                    int flags = DrawRecords.flags(record);
+
+                    if (DrawRecords.drawable(flags) == 0)
+                        continue;
+
+                    SectionRenderDispatcher.RenderSection section      = chunkSections[index];
+                    BlockPos                              renderOffset = section.getRenderOrigin();
+
+                    chunkRecords[drawn] = record;
+                    chunkFlags[drawn]   = flags;
+                    chunkX[drawn]       = renderOffset.getX();
+                    chunkY[drawn]       = renderOffset.getY();
+                    chunkZ[drawn]       = renderOffset.getZ();
+                    chunkFades[drawn]   = section.getVisibility(now, fadeDuration);
+                    drawn ++;
+                }
+
+                for (int index = 0; index < drawn; index ++)
+                    txoptimizations$collectSection(draws, translucent, chunkRecords[index], chunkFlags[index], chunkX[index], chunkY[index], chunkZ[index], chunkFades[index]);
             }
         } finally {
+            Arrays.fill(chunkSections, null);
+            Arrays.fill(chunkRecords, null);
             dispatcher.unlock();
         }
 
         return draws.finish();
+    }
+
+    @Unique
+    private static void txoptimizations$collectSection(SectionDrawList draws, boolean[] translucent, int[] record, int flags, int originX, int originY, int originZ, float visibility) {
+        int     drawable    = DrawRecords.drawable(flags);
+        int     sectionInfo = draws.addSection(originX, originY, originZ, visibility);
+        boolean prepared    = false;
+
+        for (int layer = 0; layer < translucent.length; layer ++) {
+            if ((drawable & 1 << layer) == 0)
+                continue;
+
+            int block        = DrawRecords.block(flags, layer);
+            int vertexBuffer = record[block + DrawRecords.VERTEX_BUFFER];
+            int firstVertex  = record[block + DrawRecords.FIRST_VERTEX];
+            int indexCount   = record[block + DrawRecords.INDEX_COUNT];
+
+            if (!translucent[layer]) {
+                draws.shareIndexBuffer(indexCount);
+
+                if (!prepared) {
+                    FacingCulling.prepareSection(record, originX, originY, originZ);
+                    prepared = true;
+                }
+
+                int facing        = block + DrawRecords.FACING;
+                int visibleGroups = FacingCulling.visibleGroups(record, facing);
+
+                if (visibleGroups == 0)
+                    continue;
+
+                FacingCulling.addDraws(draws, draws.group(layer, false, vertexBuffer, DrawRecords.NO_BUFFER, 0), record, facing, visibleGroups, firstVertex, sectionInfo);
+                continue;
+            }
+
+            int format = record[block + DrawRecords.INDEX_FORMAT];
+
+            if (!DrawRecords.customIndex(format)) {
+                draws.shareIndexBuffer(indexCount);
+                draws.add(draws.group(layer, true, vertexBuffer, DrawRecords.NO_BUFFER, 0), indexCount, 0, firstVertex, sectionInfo);
+                continue;
+            }
+
+            draws.add(draws.group(layer, true, vertexBuffer, record[block + DrawRecords.INDEX_BUFFER], DrawRecords.indexType(format)), indexCount, record[block + DrawRecords.FIRST_INDEX], firstVertex, sectionInfo);
+        }
     }
 }

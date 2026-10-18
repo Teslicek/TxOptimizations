@@ -28,6 +28,9 @@ public final class SectionDrawList {
     private static final int INITIAL_GROUPS  = 16;
     private static final int INITIAL_DRAWS   = 4096;
 
+    private static final IndexType[] INDEX_TYPES       = IndexType.values();
+    private static final int[]       INDEX_TYPE_HASHES = indexTypeHashes();
+
     private GpuBuffer[]           vertexBuffers = new GpuBuffer[INITIAL_GROUPS];
     private @Nullable GpuBuffer[] indexBuffers  = new GpuBuffer[INITIAL_GROUPS];
     private @Nullable IndexType[] indexTypes    = new IndexType[INITIAL_GROUPS];
@@ -93,15 +96,12 @@ public final class SectionDrawList {
             this.largestIndexCount = indexCount;
     }
 
-    public int group(int layer, boolean translucent, GpuBuffer vertexBuffer, @Nullable GpuBuffer indexBuffer, @Nullable IndexType indexType) {
-        int hash = 31 * GROUP_HASH_SEED + vertexBuffer.hashCode();
+    public int group(int layer, boolean translucent, int vertexBuffer, int indexBuffer, int indexType) {
+        int hash = 31 * GROUP_HASH_SEED + SectionBuffers.hash(vertexBuffer);
 
-        if (indexBuffer != null) {
-            if (indexType == null)
-                throw new IllegalStateException("Section geometry in layer " + layer + " has its own index buffer " + indexBuffer + " but no index type");
-
-            hash = 31 * hash + indexBuffer.hashCode();
-            hash = 31 * hash + indexType.hashCode();
+        if (indexBuffer != DrawRecords.NO_BUFFER) {
+            hash = 31 * hash + SectionBuffers.hash(indexBuffer);
+            hash = 31 * hash + INDEX_TYPE_HASHES[indexType];
         }
 
         if (translucent && this.respectTranslucentOrder) {
@@ -289,15 +289,16 @@ public final class SectionDrawList {
         return this.layerGroups[layer][count - 1];
     }
 
-    private int addGroup(int layer, boolean translucent, int hash, GpuBuffer vertexBuffer, @Nullable GpuBuffer indexBuffer, @Nullable IndexType indexType) {
-        int group = this.groups;
+    private int addGroup(int layer, boolean translucent, int hash, int vertexBuffer, int indexBuffer, int indexType) {
+        int     group       = this.groups;
+        boolean customIndex = indexBuffer != DrawRecords.NO_BUFFER;
 
         if (group == this.vertexBuffers.length)
             this.growGroups(group * 2);
 
-        this.vertexBuffers[group] = vertexBuffer;
-        this.indexBuffers[group]  = indexBuffer;
-        this.indexTypes[group]    = indexType;
+        this.vertexBuffers[group] = SectionBuffers.buffer(vertexBuffer);
+        this.indexBuffers[group]  = customIndex ? SectionBuffers.buffer(indexBuffer) : null;
+        this.indexTypes[group]    = customIndex ? INDEX_TYPES[indexType] : null;
         this.groupLayers[group]   = layer;
         this.firstDraws[group]    = NONE;
         this.lastDraws[group]     = NONE;
@@ -373,5 +374,14 @@ public final class SectionDrawList {
             if (values[slot] != 0)
                 this.cacheGroup(keys[slot], values[slot] - 1);
         }
+    }
+
+    private static int[] indexTypeHashes() {
+        int[] hashes = new int[INDEX_TYPES.length];
+
+        for (IndexType type : INDEX_TYPES)
+            hashes[type.ordinal()] = type.hashCode();
+
+        return hashes;
     }
 }

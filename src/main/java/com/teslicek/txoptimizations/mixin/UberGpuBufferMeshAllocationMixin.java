@@ -1,8 +1,12 @@
 package com.teslicek.txoptimizations.mixin;
 
+import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
+import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
 import com.mojang.blaze3d.vertex.TlsfAllocator;
 import com.mojang.blaze3d.vertex.UberGpuBuffer;
+import com.mojang.renderpearl.api.buffers.GpuBuffer;
 import com.teslicek.txoptimizations.SectionAllocations;
+import com.teslicek.txoptimizations.SectionBuffers;
 import com.teslicek.txoptimizations.UberBufferSlot;
 import it.unimi.dsi.fastutil.objects.ReferenceOpenHashSet;
 import java.util.Map;
@@ -82,6 +86,12 @@ public abstract class UberGpuBufferMeshAllocationMixin implements UberBufferSlot
             mesh.txoptimizations$setAllocation(this.txoptimizations$slot, null);
 
         this.txoptimizations$meshes.clear();
+    }
+
+    @WrapOperation(method = {"uploadStagedAllocations", "close"}, at = @At(value = "INVOKE", target = "Lcom/mojang/renderpearl/api/buffers/GpuBuffer;close()V"), require = 2)
+    private void txoptimizations$releaseBufferId(GpuBuffer buffer, Operation<Void> original) {
+        SectionBuffers.release(buffer);
+        original.call(buffer);
     }
 
     @Unique
