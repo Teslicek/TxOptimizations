@@ -5,4 +5,6 @@ import net.minecraft.world.item.ItemStack;
 public interface CullingHead {
 
     ItemStack txoptimizations$getCullingHead();
+
+    void txoptimizations$setCullingHead(ItemStack head);
 }

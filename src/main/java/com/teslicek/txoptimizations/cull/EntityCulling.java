@@ -3,6 +3,7 @@ package com.teslicek.txoptimizations.cull;
 import com.mojang.logging.LogUtils;
 import com.teslicek.txoptimizations.ClientClock;
 import com.teslicek.txoptimizations.FrustumBoxTest;
+import com.teslicek.txoptimizations.NameTagMemo;
 import com.teslicek.txoptimizations.mixin.cull.EntityRendererCullAccessor;
 import java.util.ArrayList;
 import java.util.List;
@@ -145,14 +146,15 @@ public final class EntityCulling {
         if (entity.isDiscrete() || !((EntityRendererCullAccessor) dispatcher.getRenderer(entity)).txoptimizations$shouldShowName(entity, distance))
             return state;
 
-        double nameTagDistance   = entity instanceof LivingEntity living ? living.getAttributeValue(Attributes.NAME_TAG_DISTANCE) : NAME_TAG_DISTANCE;
-        double belowNameDistance = entity instanceof LivingEntity living ? living.getAttributeValue(Attributes.BELOW_NAME_DISTANCE) : BELOW_NAME_DISTANCE;
+        double      nameTagDistance   = entity instanceof LivingEntity living ? living.getAttributeValue(Attributes.NAME_TAG_DISTANCE) : NAME_TAG_DISTANCE;
+        double      belowNameDistance = entity instanceof LivingEntity living ? living.getAttributeValue(Attributes.BELOW_NAME_DISTANCE) : BELOW_NAME_DISTANCE;
+        NameTagMemo memo              = (NameTagMemo) entity;
 
         if (distance < Mth.square(belowNameDistance))
-            state.scoreText = entity.belowNameDisplay();
+            state.scoreText = memo.txoptimizations$reuseScoreText(entity.belowNameDisplay());
 
         if (distance < Mth.square(nameTagDistance)) {
-            state.nameTag           = entity.getDisplayName();
+            state.nameTag           = memo.txoptimizations$reuseNameTag(entity.getDisplayName());
             state.nameTagAttachment = entity.getAttachments().getNullable(EntityAttachment.NAME_TAG, 0, entity.getYRot(partialTick));
         }
 

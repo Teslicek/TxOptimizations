@@ -14,6 +14,6 @@ public abstract class LivingEntityRendererCullingHeadMixin {
 
     @Redirect(method = "getBoundingBoxForCulling(Lnet/minecraft/world/entity/LivingEntity;F)Lnet/minecraft/world/phys/AABB;", at = @At(value = "INVOKE", target = "Lnet/minecraft/world/entity/LivingEntity;getItemBySlot(Lnet/minecraft/world/entity/EquipmentSlot;)Lnet/minecraft/world/item/ItemStack;"))
     private ItemStack txoptimizations$cullingHead(LivingEntity entity, EquipmentSlot slot) {
-        return ((CullingHead) entity.equipment).txoptimizations$getCullingHead();
+        return ((CullingHead) entity).txoptimizations$getCullingHead();
     }
 }
