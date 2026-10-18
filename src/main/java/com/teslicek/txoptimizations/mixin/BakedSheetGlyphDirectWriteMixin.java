@@ -112,7 +112,7 @@ public abstract class BakedSheetGlyphDirectWriteMixin {
         if (!(builder instanceof DirectVertexBuffer direct))
             return false;
 
-        TexturedVertexLayout layout = TexturedVertexLayout.glyph(direct.txoptimizations$format());
+        TexturedVertexLayout layout = TexturedVertexLayout.textured(direct.txoptimizations$format());
 
         if (layout == null)
             return false;

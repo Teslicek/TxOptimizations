@@ -1,5 +1,6 @@
 package com.teslicek.txoptimizations.mixin;
 
+import com.mojang.blaze3d.pipeline.RenderTarget;
 import com.mojang.blaze3d.systems.RenderSystem;
 import com.mojang.renderpearl.api.buffers.GpuBuffer;
 import com.mojang.renderpearl.api.buffers.GpuBufferSlice;
@@ -17,6 +18,7 @@ import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
 import net.minecraft.client.renderer.DynamicGpuData;
+import net.minecraft.client.renderer.GameRenderer;
 import net.minecraft.client.renderer.LevelRenderer;
 import net.minecraft.client.renderer.chunk.ChunkSectionLayer;
 import net.minecraft.client.renderer.chunk.ChunkSectionsToRender;
@@ -30,7 +32,6 @@ import net.minecraft.client.renderer.texture.TextureManager;
 import net.minecraft.core.BlockPos;
 import net.minecraft.util.Util;
 import org.joml.Matrix4fc;
-import org.joml.Vector3dc;
 import org.jspecify.annotations.Nullable;
 import org.spongepowered.asm.mixin.Final;
 import org.spongepowered.asm.mixin.Mixin;
@@ -56,6 +57,10 @@ public abstract class LevelRendererSectionDrawMixin {
     @Shadow
     @Final
     private TextureManager textureManager;
+
+    @Shadow
+    @Final
+    private GameRenderer gameRenderer;
 
     @Shadow
     private @Nullable SectionRenderDispatcher sectionRenderDispatcher;
@@ -134,9 +139,10 @@ public abstract class LevelRendererSectionDrawMixin {
         if (dispatcher == null)
             return draws.finish();
 
-        CameraRenderState camera = this.levelRenderState.cameraRenderState;
-        Vector3dc         eye    = FacingCulling.eye(camera.pos, camera.viewRotationMatrix);
+        CameraRenderState camera       = this.levelRenderState.cameraRenderState;
+        RenderTarget      renderTarget = this.gameRenderer.mainRenderTarget();
 
+        FacingCulling.beginFrame(camera.pos, camera.viewRotationMatrix, renderTarget.width, renderTarget.height);
         dispatcher.lock();
 
         long fadeDuration = Util.toMillis(this.optionsRenderState.chunkSectionFadeInTime);
@@ -151,10 +157,8 @@ public abstract class LevelRendererSectionDrawMixin {
 
                 SectionFacing facing               = (SectionFacing) sectionMesh;
                 BlockPos      renderOffset         = section.getRenderOrigin();
-                double        eyeX                 = eye.x() - renderOffset.getX();
-                double        eyeY                 = eye.y() - renderOffset.getY();
-                double        eyeZ                 = eye.z() - renderOffset.getZ();
                 int           sectionInfoDataIndex = -1;
+                boolean       facingPrepared       = false;
 
                 for (int layerIndex = 0; layerIndex < layers.length; layerIndex ++) {
                     SectionMesh.SectionDraw draw = allocations.txoptimizations$drawableDraw(layerIndex);
@@ -181,7 +185,12 @@ public abstract class LevelRendererSectionDrawMixin {
                         if (ranges == null)
                             throw new IllegalStateException(layer.label() + " geometry of the section at " + renderOffset + " was never grouped by facing");
 
-                        int visibleGroups = FacingCulling.visibleGroups(ranges, eyeX, eyeY, eyeZ);
+                        if (!facingPrepared) {
+                            FacingCulling.prepareSection(facing.txoptimizations$facingBox(), renderOffset.getX(), renderOffset.getY(), renderOffset.getZ());
+                            facingPrepared = true;
+                        }
+
+                        int visibleGroups = FacingCulling.visibleGroups(ranges);
 
                         if (visibleGroups == 0)
                             continue;

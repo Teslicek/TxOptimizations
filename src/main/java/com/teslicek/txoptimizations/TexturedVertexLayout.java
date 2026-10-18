@@ -14,7 +14,7 @@ public record TexturedVertexLayout(VertexFormat format, int stride, int position
     public static final TexturedVertexLayout UNLIT_GLYPH = of(DefaultVertexFormat.POSITION_TEX_COLOR);
     public static final TexturedVertexLayout PARTICLE    = of(DefaultVertexFormat.PARTICLE);
 
-    public static TexturedVertexLayout glyph(VertexFormat format) {
+    public static TexturedVertexLayout textured(VertexFormat format) {
         if (format == LIT_GLYPH.format)
             return LIT_GLYPH;
 

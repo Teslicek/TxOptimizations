@@ -18,4 +18,7 @@ public interface ItemLayerRenderStateAccessor {
 
     @Accessor("localTransform")
     Matrix4f txoptimizations$localTransform();
+
+    @Accessor("usesBlockLight")
+    boolean txoptimizations$usesBlockLight();
 }

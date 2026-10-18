@@ -4,6 +4,9 @@ classTweaker  v1  official
 accessible field net/minecraft/client/model/geom/ModelPart children Ljava/util/Map;
 accessible method net/minecraft/client/resources/model/cuboid/FaceBakery recalculateWinding ([Lorg/joml/Vector3fc;[JLnet/minecraft/core/Direction;)V
 
+# Cuboid normals
+accessible field com/mojang/blaze3d/vertex/PoseStack$Pose trustedNormals Z
+
 # Model block state set accessing
 accessible field net/minecraft/client/renderer/block/BlockStateModelSet modelByState Ljava/util/Map;
 
@@ -88,3 +91,7 @@ accessible class net/minecraft/client/color/block/BlockTintCache$LatestCacheInfo
 accessible class net/minecraft/client/color/block/BlockTintCache$CacheData
 # Glyph effect quads
 accessible class net/minecraft/client/gui/font/glyphs/BakedSheetGlyph$EffectInstance
+
+# Culling head check
+accessible field net/minecraft/world/entity/LivingEntity equipment Lnet/minecraft/world/entity/EntityEquipment;
+accessible field net/minecraft/world/item/ItemStack item Lnet/minecraft/core/Holder;
