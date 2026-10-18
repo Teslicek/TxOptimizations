@@ -1,6 +1,5 @@
 package com.teslicek.txoptimizations.mixin;
 
-import com.mojang.blaze3d.vertex.DefaultVertexFormat;
 import com.mojang.blaze3d.vertex.VertexConsumer;
 import com.teslicek.txoptimizations.DirectVertexBuffer;
 import com.teslicek.txoptimizations.TexturedVertexLayout;
@@ -9,6 +8,7 @@ import net.minecraft.client.particle.SingleQuadParticle;
 import net.minecraft.client.renderer.state.level.QuadParticleRenderState;
 import org.joml.Quaternionf;
 import org.joml.Vector3f;
+import org.lwjgl.system.MemoryUtil;
 import org.spongepowered.asm.mixin.Final;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Overwrite;
@@ -76,7 +76,13 @@ public abstract class QuadParticleCornerCacheMixin {
         int[]                       ints   = stored.txoptimizations$intValues();
         int                         count  = stored.txoptimizations$particleCount();
 
-        if (!(builder instanceof DirectVertexBuffer direct) || !direct.txoptimizations$writesFormat(DefaultVertexFormat.PARTICLE)) {
+        if (count == 0)
+            return;
+
+        TexturedVertexLayout layout  = TexturedVertexLayout.PARTICLE;
+        long                 pointer = builder instanceof DirectVertexBuffer direct ? direct.txoptimizations$tryReserveVertices(layout.format(), count * VERTICES) : MemoryUtil.NULL;
+
+        if (pointer == MemoryUtil.NULL) {
             for (int particle = 0; particle < count; particle ++) {
                 int f = particle * FLOATS_PER_PARTICLE;
                 int i = particle * INTS_PER_PARTICLE;
@@ -86,12 +92,6 @@ public abstract class QuadParticleCornerCacheMixin {
 
             return;
         }
-
-        if (count == 0)
-            return;
-
-        TexturedVertexLayout layout  = TexturedVertexLayout.PARTICLE;
-        long                 pointer = direct.txoptimizations$reserveVertices(count * VERTICES);
 
         for (int particle = 0; particle < count; particle ++) {
             int f = particle * FLOATS_PER_PARTICLE;

@@ -6,7 +6,10 @@ import java.util.List;
 
 public final class QuadSort {
 
+    public static final int FEW_QUADS = 16;
+
     private static final int RADIX_THRESHOLD = 80;
+    private static final int INSERTION_LIMIT = 24;
     private static final int DIGITS          = 4;
     private static final int DIGIT_BITS      = 8;
     private static final int BUCKETS         = 1 << DIGIT_BITS;
@@ -33,20 +36,37 @@ public final class QuadSort {
         return ~(bits ^ bits >> 31 & Integer.MAX_VALUE);
     }
 
-    public static int[] sorted(int[] keys, int length) {
-        long[] values = pack(keys, length, new long[length]);
+    public static long pack(int key, int quad) {
+        return (long) key << KEY_SHIFT | quad;
+    }
 
-        if (length > RADIX_THRESHOLD)
-            values = radixSort(values, new long[length], length, new int[BUCKETS]);
-        else
-            Arrays.sort(values, 0, length);
+    public static int[] stableOrder(int[] keys) {
+        int[] order = new int[keys.length];
 
-        int[] result = new int[length];
+        for (int quad = 0; quad < keys.length; quad ++) {
+            int key   = keys[quad];
+            int index = quad - 1;
 
-        for (int index = 0; index < length; index ++)
-            result[index] = (int) values[index];
+            while (index >= 0 && keys[order[index]] > key) {
+                order[index + 1] = order[index];
+                index --;
+            }
 
-        return result;
+            order[index + 1] = quad;
+        }
+
+        return order;
+    }
+
+    public static int[] order(long[] values) {
+        sort(values, 0, values.length);
+
+        int[] order = new int[values.length];
+
+        for (int index = 0; index < values.length; index ++)
+            order[index] = (int) values[index];
+
+        return order;
     }
 
     public static int[] keys(int length) {
@@ -72,12 +92,15 @@ public final class QuadSort {
             scratch = new long[length];
         }
 
-        long[] values = pack(keys, length, packed);
+        long[] values = packed;
+
+        for (int index = 0; index < length; index ++)
+            values[index] = pack(keys[index], index);
 
         if (length > RADIX_THRESHOLD)
-            values = radixSort(values, scratch, length, COUNTS);
+            values = radixSort(values, scratch, length);
         else
-            Arrays.sort(values, 0, length);
+            sort(values, 0, length);
 
         int[] result = previous != null && previous.length == length ? previous : new int[length];
 
@@ -105,39 +128,32 @@ public final class QuadSort {
         return true;
     }
 
-    private static long[] pack(int[] keys, int length, long[] values) {
-        for (int index = 0; index < length; index ++)
-            values[index] = (long) keys[index] << KEY_SHIFT | index;
-
-        return values;
-    }
-
-    private static long[] radixSort(long[] values, long[] other, int length, int[] counts) {
+    private static long[] radixSort(long[] values, long[] other, int length) {
         for (int digit = 0; digit < DIGITS; digit ++) {
             int shift = KEY_SHIFT + digit * DIGIT_BITS;
             int flip  = digit == SIGN_DIGIT ? SIGN_BUCKET : 0;
 
-            Arrays.fill(counts, 0);
+            Arrays.fill(COUNTS, 0);
 
             for (int index = 0; index < length; index ++)
-                counts[bucket(values[index], shift, flip)] ++;
+                COUNTS[bucket(values[index], shift, flip)] ++;
 
-            if (counts[bucket(values[0], shift, flip)] == length)
+            if (COUNTS[bucket(values[0], shift, flip)] == length)
                 continue;
 
             int sum = 0;
 
             for (int bucket = 0; bucket < BUCKETS; bucket ++) {
-                int count = counts[bucket];
+                int count = COUNTS[bucket];
 
-                counts[bucket]  = sum;
+                COUNTS[bucket]  = sum;
                 sum            += count;
             }
 
             for (int index = 0; index < length; index ++) {
                 long value = values[index];
 
-                other[counts[bucket(value, shift, flip)] ++] = value;
+                other[COUNTS[bucket(value, shift, flip)] ++] = value;
             }
 
             long[] swap = values;
@@ -151,6 +167,120 @@ public final class QuadSort {
 
     private static int bucket(long value, int shift, int flip) {
         return ((int) (value >>> shift) & BUCKETS - 1) ^ flip;
+    }
+
+    private static void sort(long[] values, int from, int to) {
+        sort(values, from, to, 2 * (Integer.SIZE - 1 - Integer.numberOfLeadingZeros(to - from)));
+    }
+
+    private static void sort(long[] values, int from, int to, int depth) {
+        while (to - from > INSERTION_LIMIT) {
+            if (depth == 0) {
+                heapSort(values, from, to);
+                return;
+            }
+
+            depth --;
+
+            int split = partition(values, from, to);
+
+            if (split - from < to - split) {
+                sort(values, from, split, depth);
+                from = split;
+            } else {
+                sort(values, split, to, depth);
+                to = split;
+            }
+        }
+
+        insertionSort(values, from, to);
+    }
+
+    private static int partition(long[] values, int from, int to) {
+        long pivot = median(values[from], values[from + to >>> 1], values[to - 1]);
+        int  low   = from - 1;
+        int  high  = to;
+
+        while (true) {
+            do {
+                low ++;
+            } while (values[low] < pivot);
+
+            do {
+                high --;
+            } while (values[high] > pivot);
+
+            if (low >= high)
+                return high + 1;
+
+            long value = values[low];
+
+            values[low]  = values[high];
+            values[high] = value;
+        }
+    }
+
+    private static long median(long first, long second, long third) {
+        if (first < second) {
+            if (second < third)
+                return second;
+
+            return first < third ? third : first;
+        }
+
+        if (first < third)
+            return first;
+
+        return second < third ? third : second;
+    }
+
+    private static void insertionSort(long[] values, int from, int to) {
+        for (int next = from + 1; next < to; next ++) {
+            long value = values[next];
+            int  index = next - 1;
+
+            while (index >= from && values[index] > value) {
+                values[index + 1] = values[index];
+                index --;
+            }
+
+            values[index + 1] = value;
+        }
+    }
+
+    private static void heapSort(long[] values, int from, int to) {
+        int size = to - from;
+
+        for (int root = size / 2 - 1; root >= 0; root --)
+            siftDown(values, from, root, size);
+
+        for (int end = size - 1; end > 0; end --) {
+            long value = values[from];
+
+            values[from]       = values[from + end];
+            values[from + end] = value;
+
+            siftDown(values, from, 0, end);
+        }
+    }
+
+    private static void siftDown(long[] values, int from, int root, int size) {
+        long value = values[from + root];
+        int  child = 2 * root + 1;
+
+        while (child < size) {
+            if (child + 1 < size && values[from + child + 1] > values[from + child])
+                child ++;
+
+            if (values[from + child] <= value)
+                break;
+
+            values[from + root] = values[from + child];
+            root                = child;
+            child               = 2 * root + 1;
+        }
+
+        values[from + root] = value;
     }
 
     private static int nextSlot() {

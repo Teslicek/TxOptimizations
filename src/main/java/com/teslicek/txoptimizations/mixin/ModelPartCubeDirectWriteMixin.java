@@ -9,6 +9,7 @@ import com.teslicek.txoptimizations.VertexBytes;
 import net.minecraft.client.model.geom.ModelPart;
 import org.joml.Matrix4f;
 import org.joml.Vector3f;
+import org.lwjgl.system.MemoryUtil;
 import org.spongepowered.asm.mixin.Final;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Overwrite;
@@ -25,8 +26,14 @@ public abstract class ModelPartCubeDirectWriteMixin {
     public void compile(PoseStack.Pose pose, VertexConsumer builder, int lightCoords, int overlayCoords, int color) {
         Matrix4f matrix        = pose.pose();
         Vector3f scratchVector = new Vector3f();
+        int      vertices      = 0;
 
-        if (!(builder instanceof DirectVertexBuffer direct) || !direct.txoptimizations$writesFormat(DefaultVertexFormat.ENTITY) || !NormalCache.usable()) {
+        for (ModelPart.Polygon polygon : this.polygons)
+            vertices += polygon.vertices().length;
+
+        long pointer = vertices > 0 && builder instanceof DirectVertexBuffer direct && NormalCache.usable() ? direct.txoptimizations$tryReserveVertices(DefaultVertexFormat.ENTITY, vertices) : MemoryUtil.NULL;
+
+        if (pointer == MemoryUtil.NULL) {
             for (ModelPart.Polygon polygon : this.polygons) {
                 Vector3f normal = pose.transformNormal(polygon.normal(), scratchVector);
                 float    nx     = normal.x();
@@ -43,17 +50,7 @@ public abstract class ModelPartCubeDirectWriteMixin {
             return;
         }
 
-        int vertices = 0;
-
-        for (ModelPart.Polygon polygon : this.polygons)
-            vertices += polygon.vertices().length;
-
-        if (vertices == 0)
-            return;
-
         NormalCache.select(pose);
-
-        long pointer = direct.txoptimizations$reserveVertices(vertices);
 
         for (ModelPart.Polygon polygon : this.polygons) {
             int normal = NormalCache.packed(pose, polygon.normal());

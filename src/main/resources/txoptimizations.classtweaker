@@ -86,3 +86,5 @@ accessible field net/minecraft/client/renderer/block/BlockModelLighter CACHE Lja
 # Block tint layer memo
 accessible class net/minecraft/client/color/block/BlockTintCache$LatestCacheInfo
 accessible class net/minecraft/client/color/block/BlockTintCache$CacheData
+# Glyph effect quads
+accessible class net/minecraft/client/gui/font/glyphs/BakedSheetGlyph$EffectInstance

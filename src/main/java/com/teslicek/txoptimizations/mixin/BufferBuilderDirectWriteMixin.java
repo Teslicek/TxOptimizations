@@ -9,9 +9,14 @@ import org.lwjgl.system.MemoryUtil;
 import org.spongepowered.asm.mixin.Final;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
+import org.spongepowered.asm.mixin.Unique;
 
 @Mixin(BufferBuilder.class)
 public abstract class BufferBuilderDirectWriteMixin implements DirectVertexBuffer {
+
+    @Shadow
+    @Final
+    private static int MAX_VERTEX_COUNT;
 
     @Shadow
     private int vertices;
@@ -39,30 +44,34 @@ public abstract class BufferBuilderDirectWriteMixin implements DirectVertexBuffe
     private PrimitiveTopology primitiveTopology;
 
     @Shadow
+    private boolean building;
+
+    @Shadow
     private void endLastVertex() {
         throw new AssertionError();
     }
 
     @Override
-    public boolean txoptimizations$writesFormat(VertexFormat format) {
-        return format == this.format;
-    }
-
-    @Override
-    public long txoptimizations$reserveVertices(int count) {
-        int  length      = count * this.vertexSize;
-        long destination = this.buffer.reserve(length);
-
-        this.vertices      += count;
-        this.vertexPointer  = destination + length - this.vertexSize;
-        this.elementsToFill = 0;
-
-        return destination;
-    }
-
-    @Override
     public VertexFormat txoptimizations$format() {
         return this.format;
+    }
+
+    @Override
+    public long txoptimizations$tryReserveVertices(VertexFormat format, int count) {
+        if (count <= 0)
+            throw new IllegalArgumentException("Cannot reserve " + count + " vertices");
+
+        if (format != this.format || !this.building || this.primitiveTopology == PrimitiveTopology.LINES || this.vertices > MAX_VERTEX_COUNT - count || ((Object) this).getClass() != BufferBuilder.class)
+            return MemoryUtil.NULL;
+
+        ByteBufferBuilderAccessor buffer = (ByteBufferBuilderAccessor) this.buffer;
+
+        if (buffer.txoptimizations$writeOffset() + (long) count * this.vertexSize > buffer.txoptimizations$capacity())
+            return MemoryUtil.NULL;
+
+        this.endLastVertex();
+
+        return this.txoptimizations$reserve(count);
     }
 
     @Override
@@ -78,7 +87,7 @@ public abstract class BufferBuilderDirectWriteMixin implements DirectVertexBuffe
         if (this.vertices == 0 || this.elementsToFill != 0 || this.primitiveTopology != PrimitiveTopology.LINES || buffer.txoptimizations$writeOffset() + length > buffer.txoptimizations$capacity()) {
             this.endLastVertex();
 
-            return this.txoptimizations$reserveVertices(count);
+            return this.txoptimizations$reserve(count);
         }
 
         long duplicate = this.buffer.reserve(length);
@@ -90,5 +99,17 @@ public abstract class BufferBuilderDirectWriteMixin implements DirectVertexBuffe
         this.elementsToFill  = 0;
 
         return duplicate + this.vertexSize;
+    }
+
+    @Unique
+    private long txoptimizations$reserve(int count) {
+        int  length      = count * this.vertexSize;
+        long destination = this.buffer.reserve(length);
+
+        this.vertices      += count;
+        this.vertexPointer  = destination + length - this.vertexSize;
+        this.elementsToFill = 0;
+
+        return destination;
     }
 }

@@ -10,7 +10,7 @@ public record TexturedVertexLayout(VertexFormat format, int stride, int position
     private static final int         NO_ELEMENT = -1;
     private static final Set<String> ELEMENTS   = Set.of(DefaultVertexFormat.POSITION_SEMANTIC_NAME, DefaultVertexFormat.COLOR_SEMANTIC_NAME, DefaultVertexFormat.UV0_SEMANTIC_NAME, DefaultVertexFormat.UV2_SEMANTIC_NAME);
 
-    public static final TexturedVertexLayout LIT_GLYPH   = of(DefaultVertexFormat.POSITION_COLOR_TEX_LIGHTMAP);
+    public static final TexturedVertexLayout LIT_GLYPH   = of(DefaultVertexFormat.POSITION_TEX_LIGHTMAP_COLOR);
     public static final TexturedVertexLayout UNLIT_GLYPH = of(DefaultVertexFormat.POSITION_TEX_COLOR);
     public static final TexturedVertexLayout PARTICLE    = of(DefaultVertexFormat.PARTICLE);
 

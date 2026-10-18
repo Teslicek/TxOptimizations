@@ -16,12 +16,23 @@ public final class DistanceSorting implements VertexSorting, SharedQuadSorter {
 
     @Override
     public int[] sort(CompactVectorArray points) {
-        int   length = points.size();
-        int[] keys   = new int[length];
+        int      length  = points.size();
+        Vector3f scratch = new Vector3f();
 
-        this.fillKeys(points, keys, length, new Vector3f());
+        if (length < QuadSort.FEW_QUADS) {
+            int[] keys = new int[length];
 
-        return QuadSort.sorted(keys, length);
+            this.fillKeys(points, keys, length, scratch);
+
+            return QuadSort.stableOrder(keys);
+        }
+
+        long[] values = new long[length];
+
+        for (int index = 0; index < length; index ++)
+            values[index] = QuadSort.pack(this.key(points, index, scratch), index);
+
+        return QuadSort.order(values);
     }
 
     @Override
@@ -36,6 +47,10 @@ public final class DistanceSorting implements VertexSorting, SharedQuadSorter {
 
     private void fillKeys(CompactVectorArray points, int[] keys, int length, Vector3f scratch) {
         for (int index = 0; index < length; index ++)
-            keys[index] = QuadSort.key(this.function.apply(points.get(index, scratch)));
+            keys[index] = this.key(points, index, scratch);
+    }
+
+    private int key(CompactVectorArray points, int index, Vector3f scratch) {
+        return QuadSort.key(this.function.apply(points.get(index, scratch)));
     }
 }

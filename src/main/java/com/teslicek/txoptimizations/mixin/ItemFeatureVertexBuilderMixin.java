@@ -20,9 +20,12 @@ public abstract class ItemFeatureVertexBuilderMixin {
     @Unique
     private VertexConsumer txoptimizations$lastVertexBuilder;
 
+    @Unique
+    private boolean txoptimizations$lastConsolidates;
+
     @Redirect(method = "prepareMainSubmit", at = @At(value = "INVOKE", target = "Lnet/minecraft/client/renderer/feature/ItemFeatureRenderer;getVertexBuilder(Lnet/minecraft/client/renderer/rendertype/RenderType;)Lcom/mojang/blaze3d/vertex/VertexConsumer;"))
     private VertexConsumer txoptimizations$reuseVertexBuilder(ItemFeatureRenderer renderer, RenderType renderType, ItemFeatureRenderer.Submit submit) {
-        if (submit == this.txoptimizations$lastSubmit && renderType == this.txoptimizations$lastRenderType && renderType.canConsolidateConsecutiveGeometry())
+        if (submit == this.txoptimizations$lastSubmit && renderType == this.txoptimizations$lastRenderType && this.txoptimizations$lastConsolidates)
             return this.txoptimizations$lastVertexBuilder;
 
         VertexConsumer builder = renderer.getVertexBuilder(renderType);
@@ -30,6 +33,7 @@ public abstract class ItemFeatureVertexBuilderMixin {
         this.txoptimizations$lastSubmit        = submit;
         this.txoptimizations$lastRenderType    = renderType;
         this.txoptimizations$lastVertexBuilder = builder;
+        this.txoptimizations$lastConsolidates  = renderType.canConsolidateConsecutiveGeometry();
 
         return builder;
     }
