@@ -97,6 +97,7 @@
     "ItemFrameRenderOffsetMixin",
     "ItemLayerRenderStateAccessor",
     "ItemStackRenderStateBoundsMixin",
+    "ItemStackRenderStateLazyLayerMixin",
     "LivingEntityRendererCullingHeadMixin",
     "LayerLightSectionStorageQueueMixin",
     "LayerLightSectionStorageSnapshotMixin",
