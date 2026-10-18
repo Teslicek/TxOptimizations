@@ -4,6 +4,9 @@ classTweaker  v1  official
 accessible field net/minecraft/client/model/geom/ModelPart children Ljava/util/Map;
 accessible method net/minecraft/client/resources/model/cuboid/FaceBakery recalculateWinding ([Lorg/joml/Vector3fc;[JLnet/minecraft/core/Direction;)V
 
+# Cuboid normals
+accessible field com/mojang/blaze3d/vertex/PoseStack$Pose trustedNormals Z
+
 # Model block state set accessing
 accessible field net/minecraft/client/renderer/block/BlockStateModelSet modelByState Ljava/util/Map;
 

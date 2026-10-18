@@ -5,9 +5,9 @@ import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.blaze3d.vertex.QuadInstance;
 import com.mojang.blaze3d.vertex.VertexConsumer;
 import com.mojang.renderpearl.api.vertex.VertexFormat;
+import com.teslicek.txoptimizations.BakedQuadVertices;
 import com.teslicek.txoptimizations.DirectVertexBuffer;
 import com.teslicek.txoptimizations.NormalCache;
-import com.teslicek.txoptimizations.VertexBytes;
 import net.minecraft.client.model.geom.builders.UVPair;
 import net.minecraft.client.resources.model.geometry.BakedQuad;
 import net.minecraft.core.Direction;
@@ -21,9 +21,6 @@ import org.spongepowered.asm.mixin.Unique;
 
 @Mixin(BufferBuilder.class)
 public abstract class BufferBuilderBakedQuadMixin implements VertexConsumer {
-
-    @Unique
-    private static final int VERTICES = 4;
 
     @Shadow
     @Final
@@ -53,7 +50,7 @@ public abstract class BufferBuilderBakedQuadMixin implements VertexConsumer {
         Vector3f normal        = pose.transformNormal(quad.direction().getUnitVec3f(), new Vector3f());
         int      lightEmission = quad.materialInfo().lightEmission();
 
-        for (int vertex = 0; vertex < VERTICES; vertex ++) {
+        for (int vertex = 0; vertex < BakedQuadVertices.VERTICES; vertex ++) {
             Vector3f position = matrix.transformPosition(quad.position(vertex), new Vector3f());
             long     packedUv = quad.packedUV(vertex);
 
@@ -63,45 +60,24 @@ public abstract class BufferBuilderBakedQuadMixin implements VertexConsumer {
 
     @Unique
     private boolean txoptimizations$tryPutEntityQuad(PoseStack.Pose pose, BakedQuad quad, QuadInstance instance) {
-        int  normal        = txoptimizations$packedNormal(pose, quad.direction());
-        int  lightEmission = quad.materialInfo().lightEmission();
-        long pointer       = ((DirectVertexBuffer) this).txoptimizations$tryReserveVertices(this.format, VERTICES);
+        long pointer = ((DirectVertexBuffer) this).txoptimizations$tryReserveVertices(this.format, BakedQuadVertices.VERTICES);
 
         if (pointer == MemoryUtil.NULL)
             return false;
 
-        Matrix4f matrix   = pose.pose();
-        Vector3f position = new Vector3f();
-
-        for (int vertex = 0; vertex < VERTICES; vertex ++) {
-            long packedUv = quad.packedUV(vertex);
-
-            matrix.transformPosition(quad.position(vertex), position);
-            VertexBytes.putEntity(pointer, position.x(), position.y(), position.z(), instance.getColor(vertex), UVPair.unpackU(packedUv), UVPair.unpackV(packedUv), instance.overlayCoords(), instance.getLightCoordsWithEmission(vertex, lightEmission), normal);
-            pointer += this.vertexSize;
-        }
+        BakedQuadVertices.putEntity(pointer, this.vertexSize, pose, quad, instance, txoptimizations$packedNormal(pose, quad.direction()));
 
         return true;
     }
 
     @Unique
     private boolean txoptimizations$tryPutBlockQuad(PoseStack.Pose pose, BakedQuad quad, QuadInstance instance) {
-        int  lightEmission = quad.materialInfo().lightEmission();
-        long pointer       = ((DirectVertexBuffer) this).txoptimizations$tryReserveVertices(this.format, VERTICES);
+        long pointer = ((DirectVertexBuffer) this).txoptimizations$tryReserveVertices(this.format, BakedQuadVertices.VERTICES);
 
         if (pointer == MemoryUtil.NULL)
             return false;
 
-        Matrix4f matrix   = pose.pose();
-        Vector3f position = new Vector3f();
-
-        for (int vertex = 0; vertex < VERTICES; vertex ++) {
-            long packedUv = quad.packedUV(vertex);
-
-            matrix.transformPosition(quad.position(vertex), position);
-            VertexBytes.putBlock(pointer, position.x(), position.y(), position.z(), instance.getColor(vertex), UVPair.unpackU(packedUv), UVPair.unpackV(packedUv), instance.getLightCoordsWithEmission(vertex, lightEmission));
-            pointer += this.vertexSize;
-        }
+        BakedQuadVertices.putBlock(pointer, this.vertexSize, pose, quad, instance);
 
         return true;
     }

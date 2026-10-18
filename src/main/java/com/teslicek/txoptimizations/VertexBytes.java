@@ -2,7 +2,6 @@ package com.teslicek.txoptimizations;
 
 import java.nio.ByteOrder;
 import net.minecraft.util.ARGB;
-import net.minecraft.util.Mth;
 import org.lwjgl.system.MemoryUtil;
 
 public final class VertexBytes {
@@ -11,7 +10,9 @@ public final class VertexBytes {
 
     private static final boolean LITTLE_ENDIAN = ByteOrder.nativeOrder() == ByteOrder.LITTLE_ENDIAN;
     private static final int     BYTE_MASK     = 0xFF;
-    private static final int     SHORT_MASK    = 0xFFFF;
+    private static final int     HALF_BITS     = 16;
+    private static final long    INT_MASK      = 0xFFFFFFFFL;
+    private static final byte    NORMAL_SCALE  = 127;
 
     private VertexBytes() {
     }
@@ -28,34 +29,37 @@ public final class VertexBytes {
     }
 
     public static void putColor(long pointer, int argb) {
+        MemoryUtil.memPutInt(pointer, colorBits(argb));
+    }
+
+    public static int colorBits(int argb) {
         int abgr = ARGB.toABGR(argb);
 
-        MemoryUtil.memPutInt(pointer, LITTLE_ENDIAN ? abgr : Integer.reverseBytes(abgr));
+        return LITTLE_ENDIAN ? abgr : Integer.reverseBytes(abgr);
     }
 
     public static void putPacked(long pointer, int packed) {
-        if (LITTLE_ENDIAN) {
-            MemoryUtil.memPutInt(pointer, packed);
+        MemoryUtil.memPutInt(pointer, packedBits(packed));
+    }
 
-            return;
-        }
-
-        MemoryUtil.memPutShort(pointer, (short) (packed & SHORT_MASK));
-        MemoryUtil.memPutShort(pointer + 2L, (short) (packed >> 16 & SHORT_MASK));
+    public static long pairBits(int first, int second) {
+        return LITTLE_ENDIAN ? (long) second << Integer.SIZE | first & INT_MASK : (long) packedBits(first) << Integer.SIZE | packedBits(second) & INT_MASK;
     }
 
     public static void putNormal(long pointer, int packed) {
-        MemoryUtil.memPutByte(pointer, (byte) packed);
-        MemoryUtil.memPutByte(pointer + 1L, (byte) (packed >> 8));
-        MemoryUtil.memPutByte(pointer + 2L, (byte) (packed >> 16));
+        MemoryUtil.memPutShort(pointer, (short) (LITTLE_ENDIAN ? packed : (packed & BYTE_MASK) << Byte.SIZE | packed >> Byte.SIZE & BYTE_MASK));
+        MemoryUtil.memPutByte(pointer + 2L, (byte) (packed >> HALF_BITS));
     }
 
     public static void putEntity(long pointer, float x, float y, float z, int argb, float u, float v, int overlay, int light, int normal) {
+        putEntityBits(pointer, x, y, z, colorBits(argb), u, v, pairBits(overlay, light), normal);
+    }
+
+    public static void putEntityBits(long pointer, float x, float y, float z, int colorBits, float u, float v, long coordinateBits, int normal) {
         putPosition(pointer, x, y, z);
-        putColor(pointer + 12L, argb);
+        MemoryUtil.memPutInt(pointer + 12L, colorBits);
         putUv(pointer + 16L, u, v);
-        putPacked(pointer + 24L, overlay);
-        putPacked(pointer + 28L, light);
+        MemoryUtil.memPutLong(pointer + 24L, coordinateBits);
         putNormal(pointer + 32L, normal);
     }
 
@@ -67,14 +71,24 @@ public final class VertexBytes {
     }
 
     public static byte normalByte(float value) {
-        return (byte) ((int) (Mth.clamp(value, -1.0F, 1.0F) * 127.0F) & BYTE_MASK);
+        if (value < -1.0F)
+            return -NORMAL_SCALE;
+
+        if (value > 1.0F)
+            return NORMAL_SCALE;
+
+        return (byte) (int) (value * NORMAL_SCALE);
     }
 
     public static int packNormal(float x, float y, float z) {
-        return normalByte(x) & BYTE_MASK | (normalByte(y) & BYTE_MASK) << 8 | (normalByte(z) & BYTE_MASK) << 16;
+        return normalByte(x) & BYTE_MASK | (normalByte(y) & BYTE_MASK) << Byte.SIZE | (normalByte(z) & BYTE_MASK) << HALF_BITS;
     }
 
     public static int flipNormal(int packed) {
-        return -(byte) packed & BYTE_MASK | (-(byte) (packed >> 8) & BYTE_MASK) << 8 | (-(byte) (packed >> 16) & BYTE_MASK) << 16;
+        return -(byte) packed & BYTE_MASK | (-(byte) (packed >> Byte.SIZE) & BYTE_MASK) << Byte.SIZE | (-(byte) (packed >> HALF_BITS) & BYTE_MASK) << HALF_BITS;
+    }
+
+    private static int packedBits(int packed) {
+        return LITTLE_ENDIAN ? packed : Integer.rotateLeft(packed, HALF_BITS);
     }
 }

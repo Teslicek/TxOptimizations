@@ -1,15 +1,17 @@
 package com.teslicek.txoptimizations;
 
 import com.mojang.blaze3d.vertex.PoseStack;
-import com.teslicek.txoptimizations.mixin.PoseAccessor;
 import net.minecraft.core.Direction;
+import org.joml.Math;
 import org.joml.Matrix3f;
-import org.joml.Vector3f;
 import org.joml.Vector3fc;
 
 public final class NormalCache {
 
     private static final Direction[] DIRECTIONS = Direction.values();
+    private static final int[]       OPPOSITES  = opposites();
+    private static final Direction[] AXES       = {Direction.DOWN, Direction.NORTH, Direction.WEST};
+    private static final int         ALL        = (1 << DIRECTIONS.length) - 1;
     private static final int[]       MATRIX     = new int[9];
     private static final int[]       PACKED     = new int[DIRECTIONS.length];
 
@@ -27,10 +29,9 @@ public final class NormalCache {
     }
 
     public static void select(PoseStack.Pose pose) {
-        Matrix3f matrix         = pose.normal();
-        boolean  trustedNormals = ((PoseAccessor) (Object) pose).txoptimizations$trustedNormals();
+        Matrix3f matrix = pose.normal();
 
-        if (valid && trusted == trustedNormals && matches(matrix))
+        if (valid && trusted == pose.trustedNormals && matches(matrix))
             return;
 
         MATRIX[0] = Float.floatToRawIntBits(matrix.m00);
@@ -43,8 +44,32 @@ public final class NormalCache {
         MATRIX[7] = Float.floatToRawIntBits(matrix.m21);
         MATRIX[8] = Float.floatToRawIntBits(matrix.m22);
         valid     = true;
-        trusted   = trustedNormals;
+        trusted   = pose.trustedNormals;
         known     = 0;
+    }
+
+    public static void selectAll(PoseStack.Pose pose) {
+        select(pose);
+
+        if (known == ALL)
+            return;
+
+        for (Direction direction : AXES) {
+            int index  = direction.ordinal();
+            int normal = pack(pose, direction.getUnitVec3f());
+
+            PACKED[index]            = normal;
+            PACKED[OPPOSITES[index]] = VertexBytes.flipNormal(normal);
+        }
+
+        known = ALL;
+    }
+
+    public static int selected(int direction) {
+        if ((known & 1 << direction) == 0)
+            throw new IllegalStateException("No packed normal is selected for " + DIRECTIONS[direction]);
+
+        return PACKED[direction];
     }
 
     public static int packed(PoseStack.Pose pose, Vector3fc normal) {
@@ -63,7 +88,7 @@ public final class NormalCache {
         if ((known & bit) != 0)
             return PACKED[index];
 
-        int opposite = direction.getOpposite().ordinal();
+        int opposite = OPPOSITES[index];
         int normal   = (known & 1 << opposite) != 0 ? VertexBytes.flipNormal(PACKED[opposite]) : pack(pose, direction.getUnitVec3f());
 
         PACKED[index] = normal;
@@ -73,9 +98,20 @@ public final class NormalCache {
     }
 
     public static int pack(PoseStack.Pose pose, Vector3fc normal) {
-        Vector3f transformed = pose.transformNormal(normal, new Vector3f());
+        Matrix3f matrix = pose.normal();
+        float    x      = normal.x();
+        float    y      = normal.y();
+        float    z      = normal.z();
+        float    nx     = Math.fma(matrix.m00, x, Math.fma(matrix.m10, y, matrix.m20 * z));
+        float    ny     = Math.fma(matrix.m01, x, Math.fma(matrix.m11, y, matrix.m21 * z));
+        float    nz     = Math.fma(matrix.m02, x, Math.fma(matrix.m12, y, matrix.m22 * z));
 
-        return VertexBytes.packNormal(transformed.x(), transformed.y(), transformed.z());
+        if (pose.trustedNormals)
+            return VertexBytes.packNormal(nx, ny, nz);
+
+        float scalar = Math.invsqrt(Math.fma(nx, nx, Math.fma(ny, ny, nz * nz)));
+
+        return VertexBytes.packNormal(nx * scalar, ny * scalar, nz * scalar);
     }
 
     private static boolean matches(Matrix3f matrix) {
@@ -88,5 +124,14 @@ public final class NormalCache {
             && MATRIX[6] == Float.floatToRawIntBits(matrix.m20)
             && MATRIX[7] == Float.floatToRawIntBits(matrix.m21)
             && MATRIX[8] == Float.floatToRawIntBits(matrix.m22);
+    }
+
+    private static int[] opposites() {
+        int[] opposites = new int[DIRECTIONS.length];
+
+        for (Direction direction : DIRECTIONS)
+            opposites[direction.ordinal()] = direction.getOpposite().ordinal();
+
+        return opposites;
     }
 }
