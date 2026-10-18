@@ -51,24 +51,9 @@ public abstract class LevelExtractorDirtySectionsMixin {
 
         SectionUpdateTracker.SectionDirtyState state = nodes[index].value();
 
-        if (state.getSectionNode() != sectionNode || !txoptimizations$contains(storage, sectionNode))
+        if (state.getSectionNode() != sectionNode || !storage.containsSection(SectionPos.x(sectionNode), SectionPos.y(sectionNode), SectionPos.z(sectionNode)))
             return null;
 
         return state;
-    }
-
-    @Unique
-    private static boolean txoptimizations$contains(RotatingSectionStorage<?> storage, long sectionNode) {
-        int y = SectionPos.y(sectionNode);
-
-        if (y < storage.minY() || y > storage.maxY())
-            return false;
-
-        SectionPos center = storage.centerSectionPos();
-        int        radius = storage.radius();
-        int        x      = SectionPos.x(sectionNode);
-        int        z      = SectionPos.z(sectionNode);
-
-        return x >= center.x() - radius && x <= center.x() + radius && z >= center.z() - radius && z <= center.z() + radius;
     }
 }

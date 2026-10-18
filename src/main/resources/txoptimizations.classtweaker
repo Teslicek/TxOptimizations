@@ -72,3 +72,4 @@ accessible class net/minecraft/world/level/lighting/BlockLightSectionStorage$Blo
 accessible class net/minecraft/client/RotatingSectionStorage$Node
 accessible field net/minecraft/client/RotatingSectionStorage nodes [Lnet/minecraft/client/RotatingSectionStorage$Node;
 accessible field net/minecraft/client/SectionUpdateTracker storage Lnet/minecraft/client/RotatingSectionStorage;
+accessible method net/minecraft/client/RotatingSectionStorage containsSection (III)Z
