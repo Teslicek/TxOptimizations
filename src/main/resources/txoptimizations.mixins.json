@@ -164,6 +164,7 @@
     "TextureManagerVersionMixin",
     "RendererCacheMixin",
     "RotatingSectionStorageChangeMixin",
+    "RotatingSectionStorageLookupMixin",
     "ScissorStateEqualityMixin",
     "SectionRenderDispatcherSlotMixin",
     "SectionDirtyStateChangeMixin",
