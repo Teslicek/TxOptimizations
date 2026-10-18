@@ -6,7 +6,7 @@ import org.jspecify.annotations.Nullable;
 
 public interface SectionAllocations {
 
-    int SLOTS = ChunkSectionLayer.values().length * 2;
+    int SLOTS = 6;
 
     TlsfAllocator.@Nullable Allocation txoptimizations$allocation(int slot);
 
