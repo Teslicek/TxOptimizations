@@ -18,6 +18,7 @@ import org.joml.Matrix3d;
 import org.joml.Matrix4f;
 import org.joml.Matrix4fc;
 import org.joml.Vector3d;
+import org.jspecify.annotations.Nullable;
 import org.lwjgl.system.MemoryStack;
 import org.lwjgl.system.MemoryUtil;
 import org.slf4j.Logger;
@@ -31,8 +32,10 @@ public final class FacingCulling {
     private static final int    OPPOSITE              = GROUPS - 1;
     private static final int    PLANES                = GROUPS;
     private static final int    THINNESS              = GROUPS * 2;
-    private static final int    BOX                   = GROUPS * 3;
-    private static final int    RANGES                = BOX + 6;
+    private static final int    OCCUPIED              = PLANES + UNASSIGNED;
+    private static final int    RANGES                = GROUPS * 3;
+    private static final int    BOX_HALF              = 3;
+    private static final int    BOX_SIZE              = 6;
     private static final int    AXES                  = 3;
     private static final int    X                     = 0;
     private static final int    Y                     = 1;
@@ -52,18 +55,22 @@ public final class FacingCulling {
     private static final double SAFETY                = 1.0 + 0x1p-20;
     private static final double SLACK                 = 0x1p-30;
     private static final double MAX_CONDITION         = 0x1p20;
+    private static final double INNER_LIMIT           = 0x1p10;
+    private static final double INNER_FACTOR          = 1.0 + 0x1p-9;
 
-    private static final Matrix4f PROJECTION = new Matrix4f();
-    private static final Matrix3d LINEAR     = new Matrix3d();
-    private static final Matrix3d INVERSE    = new Matrix3d();
-    private static final Vector3d EYE        = new Vector3d();
-    private static final double[] CLIP       = new double[ROW * ROW];
-    private static final double[] CLIP_ABS   = new double[ROW * ROW];
-    private static final double[] ERROR_ABS  = new double[ROW * ROW];
+    private static final Matrix4f PROJECTION   = new Matrix4f();
+    private static final Matrix3d LINEAR       = new Matrix3d();
+    private static final Matrix3d INVERSE      = new Matrix3d();
+    private static final Vector3d EYE          = new Vector3d();
+    private static final double[] CLIP         = new double[ROW * ROW];
+    private static final double[] CLIP_ABS     = new double[ROW * ROW];
+    private static final double[] ERROR_SCALE  = new double[ROW];
+    private static final double[] ERROR_OFFSET = new double[ROW];
 
     private static boolean projectionCaptured;
     private static boolean backendWarned;
     private static boolean cullable;
+    private static boolean sectionCullable;
     private static int     cameraBlockX;
     private static int     cameraBlockY;
     private static int     cameraBlockZ;
@@ -81,11 +88,38 @@ public final class FacingCulling {
     private static double  normY;
     private static double  normW;
     private static double  inverseArea;
+    private static double  eyeEast;
+    private static double  eyeUp;
+    private static double  eyeSouth;
+    private static double  eyeNorth;
+    private static double  eyeDown;
+    private static double  eyeWest;
+    private static double  sectionScale;
+    private static double  sectionLinear;
+    private static double  sectionQuadratic;
 
     private FacingCulling() {
     }
 
-    public static int[] groupQuads(MeshData mesh) {
+    public static float[] emptyBounds() {
+        return new float[] {Float.POSITIVE_INFINITY, Float.POSITIVE_INFINITY, Float.POSITIVE_INFINITY, Float.NEGATIVE_INFINITY, Float.NEGATIVE_INFINITY, Float.NEGATIVE_INFINITY};
+    }
+
+    public static double @Nullable [] facingBox(float[] bounds) {
+        if (!(bounds[X] <= bounds[AXES + X]))
+            return null;
+
+        double[] box = new double[BOX_SIZE];
+
+        for (int axis = 0; axis < AXES; axis ++) {
+            box[axis]            = ((double) bounds[axis] + bounds[AXES + axis]) * 0.5;
+            box[BOX_HALF + axis] = ((double) bounds[AXES + axis] - bounds[axis]) * 0.5 + SLACK;
+        }
+
+        return box;
+    }
+
+    public static int[] groupQuads(MeshData mesh, float[] bounds) {
         MeshData.DrawState state = mesh.drawState();
 
         if (state.primitiveTopology() != PrimitiveTopology.QUADS)
@@ -110,7 +144,7 @@ public final class FacingCulling {
         if ((long) quads * vertexSize * VERTICES_PER_QUAD > vertices.remaining())
             throw new IllegalStateException(quads + " quads of " + vertexSize * VERTICES_PER_QUAD + " bytes do not fit in " + vertices.remaining() + " bytes of vertex data");
 
-        return groupVertices(MemoryUtil.memAddress(vertices), position.offset(), vertexSize, quads);
+        return groupVertices(MemoryUtil.memAddress(vertices), position.offset(), vertexSize, quads, bounds);
     }
 
     public static void captureProjection(Matrix4fc projection) {
@@ -126,40 +160,26 @@ public final class FacingCulling {
         if (!projectionCaptured)
             throw new IllegalStateException("Terrain is drawn before the level projection was set");
 
-        cullable = prepareFrame(PROJECTION, viewRotation, camera, width, height, subpixelBits());
+        sectionCullable = false;
+        cullable        = prepareFrame(PROJECTION, viewRotation, camera, width, height, subpixelBits());
     }
 
-    public static int visibleGroups(int[] ranges, int originX, int originY, int originZ) {
-        int occupied = occupiedGroups(ranges);
+    public static void prepareSection(double @Nullable [] box, int originX, int originY, int originZ) {
+        sectionCullable = false;
 
-        if (!cullable)
-            return occupied;
+        if (!cullable || box == null)
+            return;
 
-        double eyeX   = (cameraBlockX - originX) + eyeBaseX;
-        double eyeY   = (cameraBlockY - originY) + eyeBaseY;
-        double eyeZ   = (cameraBlockZ - originZ) + eyeBaseZ;
-        int    behind = 0;
-
-        for (int group = 0; group < GROUPS; group ++)
-            if (group != UNASSIGNED && (occupied & 1 << group) != 0 && heightBehind(ranges, group, eyeX, eyeY, eyeZ) > 0.0)
-                behind |= 1 << group;
-
-        if (behind == 0)
-            return occupied;
-
-        float  minX    = Float.intBitsToFloat(ranges[BOX]);
-        float  minY    = Float.intBitsToFloat(ranges[BOX + 1]);
-        float  minZ    = Float.intBitsToFloat(ranges[BOX + 2]);
-        float  maxX    = Float.intBitsToFloat(ranges[BOX + 3]);
-        float  maxY    = Float.intBitsToFloat(ranges[BOX + 4]);
-        float  maxZ    = Float.intBitsToFloat(ranges[BOX + 5]);
-        double halfX   = ((double) maxX - minX) * 0.5 + SLACK;
-        double halfY   = ((double) maxY - minY) * 0.5 + SLACK;
-        double halfZ   = ((double) maxZ - minZ) * 0.5 + SLACK;
-        double centerX = ((double) minX + maxX) * 0.5 + (originX - cameraBlockX) + cameraOffsetX;
-        double centerY = ((double) minY + maxY) * 0.5 + (originY - cameraBlockY) + cameraOffsetY;
-        double centerZ = ((double) minZ + maxZ) * 0.5 + (originZ - cameraBlockZ) + cameraOffsetZ;
-        double reach   = Math.max(Math.abs(centerX) + halfX, Math.max(Math.abs(centerY) + halfY, Math.abs(centerZ) + halfZ)) + 1.0;
+        int    blockX  = originX - cameraBlockX;
+        int    blockY  = originY - cameraBlockY;
+        int    blockZ  = originZ - cameraBlockZ;
+        double halfX   = box[BOX_HALF + X];
+        double halfY   = box[BOX_HALF + Y];
+        double halfZ   = box[BOX_HALF + Z];
+        double centerX = box[X] + blockX + cameraOffsetX;
+        double centerY = box[Y] + blockY + cameraOffsetY;
+        double centerZ = box[Z] + blockZ + cameraOffsetZ;
+        double reach   = larger(Math.abs(centerX) + halfX, larger(Math.abs(centerY) + halfY, Math.abs(centerZ) + halfZ)) + 1.0;
         double x       = clip(X, centerX, centerY, centerZ);
         double y       = clip(Y, centerX, centerY, centerZ);
         double z       = clip(Z, centerX, centerY, centerZ);
@@ -168,39 +188,46 @@ public final class FacingCulling {
         double spreadY = spread(Y, halfX, halfY, halfZ);
         double spreadZ = spread(Z, halfX, halfY, halfZ);
         double spreadW = spread(W, halfX, halfY, halfZ);
-        double errorX  = gpuError(X, reach);
-        double errorY  = gpuError(Y, reach);
-        double errorZ  = gpuError(Z, reach);
-        double errorW  = gpuError(W, reach);
+        double errorX  = Math.fma(ERROR_SCALE[X], reach, ERROR_OFFSET[X]);
+        double errorY  = Math.fma(ERROR_SCALE[Y], reach, ERROR_OFFSET[Y]);
+        double errorZ  = Math.fma(ERROR_SCALE[Z], reach, ERROR_OFFSET[Z]);
+        double errorW  = Math.fma(ERROR_SCALE[W], reach, ERROR_OFFSET[W]);
         double nearest = w - spreadW;
         double inner   = nearest - errorW;
         double extentX = Math.abs(x) + spreadX;
         double extentY = Math.abs(y) + spreadY;
 
-        if (!(inner > extentX + errorX && inner > extentY + errorY && z - spreadZ > errorZ && inner > z + spreadZ + errorZ))
+        if (!(inner > extentX + errorX & inner > extentY + errorY & z - spreadZ > errorZ & inner > z + spreadZ + errorZ & errorW * INNER_LIMIT < nearest))
+            return;
+
+        double farthest = w + spreadW;
+        double square   = nearest * nearest;
+        double shift    = Math.fma(subpixel, square, larger(halfWidth * Math.fma(Math.fma(errorX, nearest, extentX * errorW), INNER_FACTOR, VIEWPORT_ERROR * square), halfHeight * Math.fma(Math.fma(errorY, nearest, extentY * errorW), INNER_FACTOR, VIEWPORT_ERROR * square)));
+        double stretch  = Math.fma(halfWidth, Math.fma(normX, nearest, extentX * normW), halfHeight * Math.fma(normY, nearest, extentY * normW));
+        double cube     = farthest * farthest * farthest * inverseArea * SAFETY;
+        double eyeX     = -blockX + eyeBaseX;
+        double eyeY     = -blockY + eyeBaseY;
+        double eyeZ     = -blockZ + eyeBaseZ;
+
+        eyeEast          = eyeX + eyeSlack;
+        eyeUp            = eyeY + eyeSlack;
+        eyeSouth         = eyeZ + eyeSlack;
+        eyeNorth         = eyeSlack - eyeZ;
+        eyeDown          = eyeSlack - eyeY;
+        eyeWest          = eyeSlack - eyeX;
+        sectionScale     = square * square;
+        sectionLinear    = 2.0 * shift * stretch * cube;
+        sectionQuadratic = 4.0 * shift * shift * cube;
+        sectionCullable  = true;
+    }
+
+    public static int visibleGroups(int[] ranges) {
+        int occupied = ranges[OCCUPIED];
+
+        if (!sectionCullable)
             return occupied;
 
-        double farthest       = w + spreadW;
-        double inverseNearest = 1.0 / nearest;
-        double inverseInner   = 1.0 / inner;
-        double slopeX         = extentX * inverseNearest;
-        double slopeY         = extentY * inverseNearest;
-        double shift          = subpixel + Math.max(halfWidth * ((errorX + slopeX * errorW) * inverseInner + VIEWPORT_ERROR), halfHeight * ((errorY + slopeY * errorW) * inverseInner + VIEWPORT_ERROR));
-        double stretch        = halfWidth * (normX + slopeX * normW) + halfHeight * (normY + slopeY * normW);
-        double cube           = farthest * farthest * farthest * inverseArea * SAFETY;
-        double linear         = 2.0 * shift * stretch * inverseNearest * cube;
-        double quadratic      = 4.0 * shift * shift * cube;
-        int    culled         = 0;
-
-        for (int group = 0; group < GROUPS; group ++) {
-            if ((behind & 1 << group) == 0)
-                continue;
-
-            double inverseThickness = Float.intBitsToFloat(ranges[THINNESS + group]);
-
-            if (heightBehind(ranges, group, eyeX, eyeY, eyeZ) > (linear + quadratic * inverseThickness) * inverseThickness)
-                culled |= 1 << group;
-        }
+        int culled = behind(ranges, OPPOSITE - X, eyeWest) | behind(ranges, OPPOSITE - Y, eyeDown) | behind(ranges, OPPOSITE - Z, eyeNorth) | behind(ranges, X, eyeEast) | behind(ranges, Y, eyeUp) | behind(ranges, Z, eyeSouth);
 
         return occupied & ~culled;
     }
@@ -230,7 +257,7 @@ public final class FacingCulling {
             draws.add(draw(runStart, groupStart, baseVertex, sectionInfo));
     }
 
-    private static int[] groupVertices(long base, int positionOffset, int vertexSize, int quads) {
+    private static int[] groupVertices(long base, int positionOffset, int vertexSize, int quads, float[] bounds) {
         int     quadSize     = vertexSize * VERTICES_PER_QUAD;
         long    positions    = base + positionOffset;
         int[]   destinations = new int[quads];
@@ -238,7 +265,6 @@ public final class FacingCulling {
         int[]   next         = new int[GROUPS];
         float[] planes       = new float[GROUPS];
         float[] thinness     = new float[GROUPS];
-        float[] box          = {Float.POSITIVE_INFINITY, Float.POSITIVE_INFINITY, Float.POSITIVE_INFINITY, Float.NEGATIVE_INFINITY, Float.NEGATIVE_INFINITY, Float.NEGATIVE_INFINITY};
 
         Arrays.fill(planes, Float.POSITIVE_INFINITY);
 
@@ -260,12 +286,16 @@ public final class FacingCulling {
             thinness[group] = Math.max(thinness[group], roundUp(thickness));
 
             for (int vertex = 0; vertex < VERTICES_PER_QUAD; vertex ++)
-                include(box, first + (long) vertex * vertexSize);
+                include(bounds, first + (long) vertex * vertexSize);
         }
 
-        int end = 0;
+        int end      = 0;
+        int occupied = 0;
 
         for (int group = 0; group < GROUPS; group ++) {
+            if (ranges[group] != 0)
+                occupied |= 1 << group;
+
             next[group]              = end;
             end                     += ranges[group];
             ranges[group]            = end;
@@ -273,8 +303,7 @@ public final class FacingCulling {
             ranges[THINNESS + group] = Float.floatToRawIntBits(thinness[group]);
         }
 
-        for (int corner = 0; corner < box.length; corner ++)
-            ranges[BOX + corner] = Float.floatToRawIntBits(box[corner]);
+        ranges[OCCUPIED] = occupied;
 
         for (int quad = 0; quad < quads; quad ++)
             destinations[quad] = next[destinations[quad]] ++;
@@ -289,6 +318,8 @@ public final class FacingCulling {
             return false;
 
         for (int row = 0; row < ROW; row ++) {
+            double scale = 0.0;
+
             for (int column = 0; column < ROW; column ++) {
                 double value = 0.0;
                 double bound = 0.0;
@@ -301,15 +332,20 @@ public final class FacingCulling {
                     bound += Math.abs(left) * Math.abs(right);
                 }
 
-                CLIP[row * ROW + column]      = value;
-                CLIP_ABS[row * ROW + column]  = Math.abs(value);
-                ERROR_ABS[row * ROW + column] = bound;
-            }
-        }
+                CLIP[row * ROW + column]     = value;
+                CLIP_ABS[row * ROW + column] = Math.abs(value);
 
-        for (double bound : ERROR_ABS)
-            if (!Double.isFinite(bound))
+                if (column < W)
+                    scale += bound;
+                else
+                    ERROR_OFFSET[row] = GPU_ERROR * bound;
+            }
+
+            ERROR_SCALE[row] = GPU_ERROR * scale;
+
+            if (!Double.isFinite(ERROR_SCALE[row] + ERROR_OFFSET[row]))
                 return false;
+        }
 
         LINEAR.set(entry(X, 0), entry(Y, 0), entry(W, 0), entry(X, 1), entry(Y, 1), entry(W, 1), entry(X, 2), entry(Y, 2), entry(W, 2));
 
@@ -367,43 +403,27 @@ public final class FacingCulling {
         return NO_SUBPIXEL_BITS;
     }
 
-    private static int occupiedGroups(int[] ranges) {
-        int occupied   = 0;
-        int groupStart = 0;
+    private static int behind(int[] ranges, int group, double signedEye) {
+        double inverseThickness = Float.intBitsToFloat(ranges[THINNESS + group]);
+        double height           = Float.intBitsToFloat(ranges[PLANES + group]) - signedEye;
 
-        for (int group = 0; group < GROUPS; group ++) {
-            if (ranges[group] != groupStart)
-                occupied |= 1 << group;
-
-            groupStart = ranges[group];
-        }
-
-        return occupied;
+        return height * sectionScale > Math.fma(sectionQuadratic, inverseThickness, sectionLinear) * inverseThickness ? 1 << group : 0;
     }
 
-    private static double heightBehind(int[] ranges, int group, double x, double y, double z) {
-        int    axis = axis(group);
-        double eye  = axis == X ? x : axis == Y ? y : z;
-
-        return Float.intBitsToFloat(ranges[PLANES + group]) - (group < UNASSIGNED ? eye : -eye) - eyeSlack;
+    private static double larger(double first, double second) {
+        return first > second ? first : second;
     }
 
     private static double clip(int row, double x, double y, double z) {
         int start = row * ROW;
 
-        return CLIP[start] * x + CLIP[start + 1] * y + CLIP[start + 2] * z + CLIP[start + 3];
+        return Math.fma(CLIP[start], x, Math.fma(CLIP[start + 1], y, Math.fma(CLIP[start + 2], z, CLIP[start + 3])));
     }
 
     private static double spread(int row, double x, double y, double z) {
         int start = row * ROW;
 
-        return CLIP_ABS[start] * x + CLIP_ABS[start + 1] * y + CLIP_ABS[start + 2] * z;
-    }
-
-    private static double gpuError(int row, double reach) {
-        int start = row * ROW;
-
-        return GPU_ERROR * ((ERROR_ABS[start] + ERROR_ABS[start + 1] + ERROR_ABS[start + 2]) * reach + ERROR_ABS[start + 3]);
+        return Math.fma(CLIP_ABS[start], x, Math.fma(CLIP_ABS[start + 1], y, CLIP_ABS[start + 2] * z));
     }
 
     private static double entry(int row, int column) {

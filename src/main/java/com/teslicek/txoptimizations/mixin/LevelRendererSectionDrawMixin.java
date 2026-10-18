@@ -95,6 +95,8 @@ public abstract class LevelRendererSectionDrawMixin {
                 BlockPos      renderOffset         = section.getRenderOrigin();
                 int           sectionInfoDataIndex = -1;
 
+                FacingCulling.prepareSection(facing.txoptimizations$facingBox(), renderOffset.getX(), renderOffset.getY(), renderOffset.getZ());
+
                 for (int layerIndex = 0; layerIndex < layers.length; layerIndex ++) {
                     ChunkSectionLayer        layer            = layers[layerIndex];
                     TlsfAllocator.Allocation vertexAllocation = allocations.txoptimizations$allocation(SectionAllocations.vertexSlot(layer));
@@ -149,7 +151,7 @@ public abstract class LevelRendererSectionDrawMixin {
                         if (ranges == null)
                             throw new IllegalStateException(layer.label() + " geometry of the section at " + renderOffset + " was never grouped by facing");
 
-                        int visibleGroups = FacingCulling.visibleGroups(ranges, renderOffset.getX(), renderOffset.getY(), renderOffset.getZ());
+                        int visibleGroups = FacingCulling.visibleGroups(ranges);
 
                         if (visibleGroups == 0)
                             continue;

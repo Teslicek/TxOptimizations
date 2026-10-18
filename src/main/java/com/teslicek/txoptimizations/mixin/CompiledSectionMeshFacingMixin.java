@@ -22,18 +22,30 @@ public abstract class CompiledSectionMeshFacingMixin implements SectionFacing {
     @Unique
     private final int[] @Nullable [] txoptimizations$facingRanges = new int[SectionLayers.VALUES.length][];
 
+    @Unique
+    private double @Nullable [] txoptimizations$facingBox;
+
     @Inject(method = "<init>(Lnet/minecraft/client/renderer/chunk/TranslucencyPointOfView;Lnet/minecraft/client/renderer/chunk/SectionCompiler$Results;J)V", at = @At("RETURN"))
     private void txoptimizations$groupByFacing(TranslucencyPointOfView translucencyPointOfView, SectionCompiler.Results results, long compileTaskStartTimeNs, CallbackInfo ci) {
+        float[] bounds = FacingCulling.emptyBounds();
+
         for (Map.Entry<ChunkSectionLayer, MeshData> layer : results.renderedLayers.entrySet()) {
             if (layer.getKey().translucent())
                 continue;
 
-            this.txoptimizations$facingRanges[layer.getKey().ordinal()] = FacingCulling.groupQuads(layer.getValue());
+            this.txoptimizations$facingRanges[layer.getKey().ordinal()] = FacingCulling.groupQuads(layer.getValue(), bounds);
         }
+
+        this.txoptimizations$facingBox = FacingCulling.facingBox(bounds);
     }
 
     @Override
     public int @Nullable [] txoptimizations$facingRanges(ChunkSectionLayer layer) {
         return this.txoptimizations$facingRanges[layer.ordinal()];
+    }
+
+    @Override
+    public double @Nullable [] txoptimizations$facingBox() {
+        return this.txoptimizations$facingBox;
     }
 }

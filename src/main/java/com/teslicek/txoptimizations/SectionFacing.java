@@ -6,4 +6,6 @@ import org.jspecify.annotations.Nullable;
 public interface SectionFacing {
 
     int @Nullable [] txoptimizations$facingRanges(ChunkSectionLayer layer);
+
+    double @Nullable [] txoptimizations$facingBox();
 }
