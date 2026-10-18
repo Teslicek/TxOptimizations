@@ -60,6 +60,7 @@
     "DynamicTransformEqualsMixin",
     "EntityEquipmentCullingHeadMixin",
     "EntityHitboxDebugRendererMixin",
+    "EntityLookupValuesMixin",
     "EntityRenderDispatcherCacheMixin",
     "EntityPlayerPassengersMixin",
     "EntityRenderDispatcherSkinCacheMixin",
