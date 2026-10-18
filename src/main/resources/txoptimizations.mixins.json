@@ -28,6 +28,8 @@
     "BrushableBlockExtractSkipMixin",
     "BufferBuilderDirectWriteMixin",
     "BufferBuilderElementCacheMixin",
+    "BufferBuilderAccessor",
+    "BufferBuilderQuadMixin",
     "ByteBufferBuilderAccessor",
     "ByteBufferResultAccessor",
     "CameraFluidCacheMixin",

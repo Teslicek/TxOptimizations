@@ -561,6 +561,10 @@ Before registering blocks, the game builds its data fixers (the rules that upgra
 
 Every launch, vanilla builds the shape and lighting cache of all 35,723 block states one after another on the main thread, which took 840 ms in a test run. The states are still registered in the same order, but their caches are now built on all cores right after the block classes finish loading, before anything reads them; in the same test it took 517 ms. Building them inside the block class setup deadlocks, because copper and flower pot blocks read other blocks while their cache is built, so the build waits until that setup is done. A check that rebuilt all 35,723 caches one at a time afterwards found no difference in any cached value.
 
+### Item quads
+
+Every item model quad drawn in the world or the GUI goes through `VertexConsumer.putBakedQuad`, which transforms each of its four corners into a new vector and hands them to the buffer builder one vertex at a time. Each of those calls checks the builder state, validates the previous vertex, reserves its own space and converts the face normal to bytes again, although the normal is the same for all four corners. `putBakedQuad` took 5.6% of the render thread in an entity-heavy benchmark scene without Sodium. When the buffer builder uses vanilla's entity or block vertex format and the quad fits into the memory it already has, the four vertices are now reserved together after the same state and previous-vertex checks and written straight into the buffer. The corners are transformed with the same JOML arithmetic, including its shortcuts for identity and translation-only matrices, the normal bytes are converted once per quad, and color, UV, overlay and light go through the buffer builder's own encoders at the same offsets. Other formats, line buffers, a buffer that would have to grow, a builder close to its vertex limit and subclasses of the buffer builder keep the vanilla path, so the bytes, the vertex count and the last vertex pointer are identical.
+
 ### Memory
 
 Less live memory means shorter and rarer garbage collections.
