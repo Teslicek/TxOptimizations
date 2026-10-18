@@ -80,3 +80,9 @@ accessible class net/minecraft/client/RotatingSectionStorage$Node
 accessible field net/minecraft/client/RotatingSectionStorage nodes [Lnet/minecraft/client/RotatingSectionStorage$Node;
 accessible field net/minecraft/client/SectionUpdateTracker storage Lnet/minecraft/client/RotatingSectionStorage;
 accessible method net/minecraft/client/RotatingSectionStorage containsSection (III)Z
+# Section light window
+accessible field net/minecraft/client/renderer/block/BlockModelLighter CACHE Ljava/lang/ThreadLocal;
+
+# Block tint layer memo
+accessible class net/minecraft/client/color/block/BlockTintCache$LatestCacheInfo
+accessible class net/minecraft/client/color/block/BlockTintCache$CacheData
