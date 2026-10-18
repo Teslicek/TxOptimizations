@@ -96,6 +96,7 @@
     "ItemLayerRenderStateAccessor",
     "ItemStackRenderStateBoundsMixin",
     "LayerLightSectionStorageSnapshotMixin",
+    "LayerLightSectionStorageWriteMixin",
     "LevelRendererDeferredSkyMixin",
     "LevelExtractorEntityVisibilityMixin",
     "LevelExtractorRegionCacheMixin",
