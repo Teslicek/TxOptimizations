@@ -1,5 +1,6 @@
 package com.teslicek.txoptimizations.mixin;
 
+import com.teslicek.txoptimizations.LightSectionTree;
 import com.teslicek.txoptimizations.LightSnapshotMap;
 import it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap;
 import net.minecraft.world.level.chunk.DataLayer;
@@ -21,7 +22,12 @@ public abstract class DataLayerStorageMapSnapshotMixin implements LightSnapshotM
     }
 
     @Override
-    public DataLayerStorageMap<?> txoptimizations$snapshotWith(Long2ObjectOpenHashMap<DataLayer> sections) {
+    public int txoptimizations$top(long zeroNode) {
+        throw new IllegalStateException("No light snapshot support for " + this.getClass().getName());
+    }
+
+    @Override
+    public DataLayerStorageMap<?> txoptimizations$snapshotWith(LightSectionTree tree) {
         throw new IllegalStateException("No light snapshot support for " + this.getClass().getName());
     }
 }

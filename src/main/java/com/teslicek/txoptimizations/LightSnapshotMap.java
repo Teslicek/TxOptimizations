@@ -8,5 +8,7 @@ public interface LightSnapshotMap {
 
     Long2ObjectOpenHashMap<DataLayer> txoptimizations$sections();
 
-    DataLayerStorageMap<?> txoptimizations$snapshotWith(Long2ObjectOpenHashMap<DataLayer> sections);
+    int txoptimizations$top(long zeroNode);
+
+    DataLayerStorageMap<?> txoptimizations$snapshotWith(LightSectionTree tree);
 }
