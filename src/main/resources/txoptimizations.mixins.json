@@ -164,6 +164,7 @@
     "TextureManagerVersionMixin",
     "RendererCacheMixin",
     "ScissorStateEqualityMixin",
+    "SectionCompilerEnclosedFluidMixin",
     "SectionCompilerMeshingWindowMixin",
     "ShapeOutlineEdgeCacheMixin",
     "SimpleFeatureRenderPhaseEmptyMixin",
