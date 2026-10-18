@@ -133,7 +133,6 @@
     "ParticleLightCacheMixin",
     "ParticleRotationMixin",
     "PatchedDataComponentMapEmptyPatchMixin",
-    "PoseAccessor",
     "PreparedRenderTypeEqualsMixin",
     "PreparedRenderTypeDrawMixin",
     "ProjectionMatrixBufferSkipMixin",
