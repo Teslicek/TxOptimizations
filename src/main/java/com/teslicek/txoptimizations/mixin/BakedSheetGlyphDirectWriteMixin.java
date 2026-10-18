@@ -3,14 +3,10 @@ package com.teslicek.txoptimizations.mixin;
 import com.llamalad7.mixinextras.injector.v2.WrapWithCondition;
 import com.mojang.blaze3d.vertex.VertexConsumer;
 import com.teslicek.txoptimizations.DirectVertexBuffer;
-import com.teslicek.txoptimizations.TextVertex;
-import net.caffeinemc.mods.sodium.api.math.MatrixHelper;
-import net.caffeinemc.mods.sodium.api.util.ColorARGB;
-import net.caffeinemc.mods.sodium.api.vertex.buffer.VertexBufferWriter;
-import net.caffeinemc.mods.sodium.api.vertex.format.common.GlyphVertex;
+import com.teslicek.txoptimizations.TexturedVertexLayout;
 import net.minecraft.client.gui.font.glyphs.BakedSheetGlyph;
 import org.joml.Matrix4fc;
-import org.lwjgl.system.MemoryStack;
+import org.joml.Vector3f;
 import org.spongepowered.asm.mixin.Final;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
@@ -57,62 +53,35 @@ public abstract class BakedSheetGlyphDirectWriteMixin {
 
     @WrapWithCondition(method = "renderChar", at = @At(value = "INVOKE", target = "Lnet/minecraft/client/gui/font/glyphs/BakedSheetGlyph;render(ZFFFLorg/joml/Matrix4fc;Lcom/mojang/blaze3d/vertex/VertexConsumer;IZI)V"))
     private boolean txoptimizations$writeGlyphDirectly(BakedSheetGlyph glyph, boolean italic, float x, float y, float z, Matrix4fc pose, VertexConsumer builder, int color, boolean bold, int light) {
-        if (builder instanceof DirectVertexBuffer direct) {
-            if (direct.txoptimizations$writesFormat(GlyphVertex.FORMAT)) {
-                this.txoptimizations$writeQuad(direct.txoptimizations$reserveVertices(VERTICES), true, italic, x, y, z, pose, color, bold, light);
-
-                return false;
-            }
-
-            if (direct.txoptimizations$writesFormat(TextVertex.FORMAT)) {
-                this.txoptimizations$writeQuad(direct.txoptimizations$reserveVertices(VERTICES), false, italic, x, y, z, pose, color, bold, light);
-
-                return false;
-            }
-        }
-
-        VertexBufferWriter writer = VertexBufferWriter.tryOf(builder);
-
-        if (writer == null)
+        if (!(builder instanceof DirectVertexBuffer direct))
             return true;
 
-        try (MemoryStack stack = MemoryStack.stackPush()) {
-            long buffer = stack.nmalloc(VERTICES * GlyphVertex.STRIDE);
+        TexturedVertexLayout layout = TexturedVertexLayout.glyph(direct.txoptimizations$format());
 
-            this.txoptimizations$writeQuad(buffer, true, italic, x, y, z, pose, color, bold, light);
-            writer.push(stack, buffer, VERTICES, GlyphVertex.FORMAT);
-        }
+        if (layout == null)
+            return true;
+
+        float    x0             = x + this.left;
+        float    x1             = x + this.right;
+        float    y0             = y + this.up;
+        float    y1             = y + this.down;
+        float    shearY0        = italic ? 1.0F - 0.25F * this.up : 0.0F;
+        float    shearY1        = italic ? 1.0F - 0.25F * this.down : 0.0F;
+        float    extraThickness = bold ? 0.1F : 0.0F;
+        long     pointer        = direct.txoptimizations$reserveVertices(VERTICES);
+        Vector3f position       = new Vector3f();
+
+        txoptimizations$put(pointer, layout, pose, position, x0 + shearY0 - extraThickness, y0 - extraThickness, z, color, this.u0, this.v0, light);
+        txoptimizations$put(pointer + layout.stride(), layout, pose, position, x0 + shearY1 - extraThickness, y1 + extraThickness, z, color, this.u0, this.v1, light);
+        txoptimizations$put(pointer + 2L * layout.stride(), layout, pose, position, x1 + shearY1 + extraThickness, y1 + extraThickness, z, color, this.u1, this.v1, light);
+        txoptimizations$put(pointer + 3L * layout.stride(), layout, pose, position, x1 + shearY0 + extraThickness, y0 - extraThickness, z, color, this.u1, this.v0, light);
 
         return false;
     }
 
     @Unique
-    private void txoptimizations$writeQuad(long buffer, boolean lit, boolean italic, float x, float y, float z, Matrix4fc pose, int color, boolean bold, int light) {
-        float x1     = x + this.left;
-        float x2     = x + this.right;
-        float h1     = y + this.up;
-        float h2     = y + this.down;
-        float w1     = italic ? 1.0F - 0.25F * this.up : 0.0F;
-        float w2     = italic ? 1.0F - 0.25F * this.down : 0.0F;
-        float offset = bold ? 0.1F : 0.0F;
-        int   abgr   = ColorARGB.toABGR(color);
-        long  stride = lit ? GlyphVertex.STRIDE : TextVertex.STRIDE;
-
-        txoptimizations$put(buffer, lit, pose, x1 + w1 - offset, h1 - offset, z, abgr, this.u0, this.v0, light);
-        txoptimizations$put(buffer + stride, lit, pose, x1 + w2 - offset, h2 + offset, z, abgr, this.u0, this.v1, light);
-        txoptimizations$put(buffer + 2L * stride, lit, pose, x2 + w2 + offset, h2 + offset, z, abgr, this.u1, this.v1, light);
-        txoptimizations$put(buffer + 3L * stride, lit, pose, x2 + w1 + offset, h1 - offset, z, abgr, this.u1, this.v0, light);
-    }
-
-    @Unique
-    private static void txoptimizations$put(long pointer, boolean lit, Matrix4fc pose, float x, float y, float z, int color, float u, float v, int light) {
-        float xt = MatrixHelper.transformPositionX(pose, x, y, z);
-        float yt = MatrixHelper.transformPositionY(pose, x, y, z);
-        float zt = MatrixHelper.transformPositionZ(pose, x, y, z);
-
-        if (lit)
-            GlyphVertex.put(pointer, xt, yt, zt, color, u, v, light);
-        else
-            TextVertex.put(pointer, xt, yt, zt, color, u, v);
+    private static void txoptimizations$put(long pointer, TexturedVertexLayout layout, Matrix4fc pose, Vector3f position, float x, float y, float z, int color, float u, float v, int light) {
+        pose.transformPosition(x, y, z, position);
+        layout.put(pointer, position.x(), position.y(), position.z(), color, u, v, light);
     }
 }

@@ -49,8 +49,6 @@ public final class GpuPassProfiler {
     private static long                  startNanos;
     private static long                  measuredFrom;
     private static double                nanosPerTick;
-    private static long                  terrainDraws;
-    private static long                  terrainIndices;
     private static long[]                frameTimes = new long[1 << 16];
     private static long[]                frameEnds  = new long[1 << 16];
     private static int                   frameTimeCount;
@@ -67,12 +65,10 @@ public final class GpuPassProfiler {
         PASSES.clear();
         COPY_LABELS.clear();
         PIPELINE_LABELS.clear();
-        recording      = true;
-        framesRead     = 0;
-        gpuNanos       = 0L;
-        terrainDraws   = 0L;
-        terrainIndices = 0L;
-        startNanos     = System.nanoTime();
+        recording  = true;
+        framesRead = 0;
+        gpuNanos   = 0L;
+        startNanos = System.nanoTime();
         Arrays.fill(SLOW_NANOS, 0L);
         Arrays.fill(SLOW_TEXTS, null);
         FramePath.resetCounts();
@@ -111,11 +107,6 @@ public final class GpuPassProfiler {
         frameTimes[frameTimeCount] = frameNanos;
         frameEnds[frameTimeCount]  = now;
         frameTimeCount ++;
-    }
-
-    public static void countTerrainDraws(int draws, long indices) {
-        terrainDraws   += draws;
-        terrainIndices += indices;
     }
 
     public static void mark(VulkanDevice frameDevice, CommandEncoderBackend frameEncoder, String label) {
@@ -322,7 +313,6 @@ public final class GpuPassProfiler {
         report.append(String.format(Locale.ROOT, "%d frames in %.1f s (%.0f fps), GPU %.3f ms per frame, GPU busy %.0f%% of the time%n", framesRead, seconds, framesRead / seconds, frameMs, gpuNanos / 1.0e7 / seconds));
         report.append(String.format(Locale.ROOT, "Present thread used for %.0f%% of frames%n", FramePath.workerShare() * 100.0));
         report.append(frameTimeReport());
-        report.append(String.format(Locale.ROOT, "Terrain %.0f draws and %.3f million triangles per frame%n", (double) terrainDraws / framesRead, terrainIndices / 3.0 / 1.0e6 / framesRead));
         report.append(ProfileCounters.report(framesRead));
         report.append(context);
 

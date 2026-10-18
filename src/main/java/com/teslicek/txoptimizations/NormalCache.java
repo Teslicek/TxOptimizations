@@ -1,19 +1,21 @@
 package com.teslicek.txoptimizations;
 
-import net.caffeinemc.mods.sodium.api.math.MatrixHelper;
+import com.mojang.blaze3d.vertex.PoseStack;
+import com.teslicek.txoptimizations.mixin.PoseAccessor;
+import net.minecraft.core.Direction;
 import org.joml.Matrix3f;
+import org.joml.Vector3f;
+import org.joml.Vector3fc;
 
 public final class NormalCache {
 
-    private static final int   ENTRIES = 8;
-    private static final int[] MATRIX  = new int[9];
-    private static final int[] NORMALS = new int[ENTRIES];
-    private static final int[] RESULTS = new int[ENTRIES];
+    private static final Direction[] DIRECTIONS = Direction.values();
+    private static final int[]       MATRIX     = new int[9];
+    private static final int[]       PACKED     = new int[DIRECTIONS.length];
 
     private static boolean valid;
     private static boolean trusted;
-    private static int     count;
-    private static int     next;
+    private static int     known;
 
     private NormalCache() {
     }
@@ -24,7 +26,10 @@ public final class NormalCache {
         return owner != null && owner.thread() == Thread.currentThread();
     }
 
-    public static void select(Matrix3f matrix, boolean trustedNormals) {
+    public static void select(PoseStack.Pose pose) {
+        Matrix3f matrix         = pose.normal();
+        boolean  trustedNormals = ((PoseAccessor) (Object) pose).txoptimizations$trustedNormals();
+
         if (valid && trusted == trustedNormals && matches(matrix))
             return;
 
@@ -39,26 +44,38 @@ public final class NormalCache {
         MATRIX[8] = Float.floatToRawIntBits(matrix.m22);
         valid     = true;
         trusted   = trustedNormals;
-        count     = 0;
-        next      = 0;
+        known     = 0;
     }
 
-    public static int transform(Matrix3f matrix, int normal) {
-        for (int index = 0; index < count; index ++) {
-            if (NORMALS[index] == normal)
-                return RESULTS[index];
+    public static int packed(PoseStack.Pose pose, Vector3fc normal) {
+        for (Direction direction : DIRECTIONS) {
+            if (direction.getUnitVec3f() == normal)
+                return packed(pose, direction);
         }
 
-        int result = MatrixHelper.transformNormal(matrix, trusted, normal);
+        return pack(pose, normal);
+    }
 
-        NORMALS[next] = normal;
-        RESULTS[next] = result;
-        next          = (next + 1) % ENTRIES;
+    public static int packed(PoseStack.Pose pose, Direction direction) {
+        int index = direction.ordinal();
+        int bit   = 1 << index;
 
-        if (count < ENTRIES)
-            count ++;
+        if ((known & bit) != 0)
+            return PACKED[index];
 
-        return result;
+        int opposite = direction.getOpposite().ordinal();
+        int normal   = (known & 1 << opposite) != 0 ? VertexBytes.flipNormal(PACKED[opposite]) : pack(pose, direction.getUnitVec3f());
+
+        PACKED[index] = normal;
+        known        |= bit;
+
+        return normal;
+    }
+
+    public static int pack(PoseStack.Pose pose, Vector3fc normal) {
+        Vector3f transformed = pose.transformNormal(normal, new Vector3f());
+
+        return VertexBytes.packNormal(transformed.x(), transformed.y(), transformed.z());
     }
 
     private static boolean matches(Matrix3f matrix) {
