@@ -577,6 +577,10 @@ Every frame, level extraction walked all visible chunk sections and looked up ea
 
 Every frame, block entity extraction walked all visible chunk sections and fetched each one's mesh to see whether it holds any block entities, although most sections hold none. A section only gains block entities when a mesh that has some is installed on it after it compiles. Each frame now remembers, in visible order, the sections whose mesh had block entities when it checked them. While no mesh with block entities has been installed and the list of visible sections has not been cleared or refilled since, the next frame checks only those remembered sections, with the same fade test and extraction in the same order; every other visible section had no block entities at the last check and still has none. Meshes are also installed from the section compile threads, so each install is counted when it starts and when it ends, and a frame that starts while one is still running is followed by a full walk. Any install of a mesh with block entities and any change to the visible list makes the next frame walk all visible sections as before.
 
+### Display entity view range
+
+Every frame, each block, item and text display read its view range from its synced entity data to decide whether it is close enough to draw, which goes through the data table, the data entry and a boxed float. The view range only changes through the synced data, and every change to synced data calls the entity's update hook right after the new value is stored, so each display now keeps its view range in a plain field that is read when the display is created and again whenever that hook reports the view range. The distance check uses that field with the same arithmetic, so it gives the same answer.
+
 ### Memory
 
 Less live memory means shorter and rarer garbage collections.
