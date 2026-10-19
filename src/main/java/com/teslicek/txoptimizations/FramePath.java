@@ -33,6 +33,10 @@ public final class FramePath {
         return frameUsesWorker;
     }
 
+    public static boolean nextFrameAcquiresEarly(boolean eligible) {
+        return eligible && !worker;
+    }
+
     public static void recordGpuWait(long nanos) {
         windowWaitNanos += nanos;
     }
