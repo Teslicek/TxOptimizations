@@ -195,6 +195,7 @@
     "RotatingSectionStorageLookupMixin",
     "RotatingSectionStorageRepositionMixin",
     "ScissorStateEqualityMixin",
+    "SectionRenderDispatcherCameraMixin",
     "SectionRenderDispatcherSlotMixin",
     "SectionDirtyStateChangeMixin",
     "SectionOcclusionGraphVisibleSectionsMixin",

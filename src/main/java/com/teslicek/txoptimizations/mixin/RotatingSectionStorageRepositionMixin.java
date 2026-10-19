@@ -1,5 +1,7 @@
 package com.teslicek.txoptimizations.mixin;
 
+import com.teslicek.txoptimizations.SectionGridRecenter;
+import com.teslicek.txoptimizations.SectionSubset;
 import net.minecraft.client.RotatingSectionStorage;
 import net.minecraft.core.SectionPos;
 import org.spongepowered.asm.mixin.Final;
@@ -46,12 +48,16 @@ public abstract class RotatingSectionStorageRepositionMixin<T extends RotatingSe
         int        lowestX  = newCenterSectionPos.x() - this.radius;
         int        lowestZ  = newCenterSectionPos.z() - this.radius;
 
+        SectionSubset.DIRTY.beginChange();
+
         if (Math.abs((long) newCenterSectionPos.x() - previous.x()) < this.sectionGridSizeXZ && Math.abs((long) newCenterSectionPos.z() - previous.z()) < this.sectionGridSizeXZ)
             this.txoptimizations$moveShifted(lowestX, lowestZ, previous.x() - this.radius, previous.z() - this.radius);
         else
             this.txoptimizations$moveAll(lowestX, lowestZ);
 
         this.centerSectionPos = newCenterSectionPos;
+        ((SectionGridRecenter) (Object) this).txoptimizations$recenterWindow();
+        SectionSubset.DIRTY.endChange();
 
         return true;
     }

@@ -1,5 +1,6 @@
 package com.teslicek.txoptimizations.mixin;
 
+import com.teslicek.txoptimizations.SectionGridRecenter;
 import com.teslicek.txoptimizations.SectionGridWindow;
 import net.minecraft.client.RotatingSectionStorage;
 import net.minecraft.core.SectionPos;
@@ -12,10 +13,9 @@ import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
-import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 @Mixin(RotatingSectionStorage.class)
-public abstract class RotatingSectionStorageLookupMixin<T extends RotatingSectionStorage.Value> {
+public abstract class RotatingSectionStorageLookupMixin<T extends RotatingSectionStorage.Value> implements SectionGridRecenter {
 
     @Shadow
     @Final
@@ -52,10 +52,9 @@ public abstract class RotatingSectionStorageLookupMixin<T extends RotatingSectio
         this.txoptimizations$window = SectionGridWindow.around(this.centerSectionPos, this.radius, this.sectionGridSizeXZ);
     }
 
-    @Inject(method = "repositionCenter", at = @At("RETURN"))
-    private void txoptimizations$moveWindow(SectionPos newCenterSectionPos, CallbackInfoReturnable<Boolean> cir) {
-        if (cir.getReturnValueZ())
-            this.txoptimizations$window = SectionGridWindow.around(this.centerSectionPos, this.radius, this.sectionGridSizeXZ);
+    @Override
+    public void txoptimizations$recenterWindow() {
+        this.txoptimizations$window = SectionGridWindow.around(this.centerSectionPos, this.radius, this.sectionGridSizeXZ);
     }
 
     @Overwrite
