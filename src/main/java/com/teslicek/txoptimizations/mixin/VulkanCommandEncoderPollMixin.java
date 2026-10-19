@@ -3,6 +3,7 @@ package com.teslicek.txoptimizations.mixin;
 import com.mojang.renderpearl.backend.vulkan.VulkanCommandEncoder;
 import com.mojang.renderpearl.backend.vulkan.VulkanDevice;
 import com.mojang.renderpearl.backend.vulkan.VulkanUtils;
+import com.teslicek.txoptimizations.FrameSpin;
 import com.teslicek.txoptimizations.RecyclePolling;
 import org.lwjgl.vulkan.VK12;
 import org.spongepowered.asm.mixin.Final;
@@ -35,14 +36,48 @@ public abstract class VulkanCommandEncoderPollMixin {
 
     @Inject(method = "awaitSubmitCompletion", at = @At("HEAD"), cancellable = true)
     private void txoptimizations$pollSubmitCounter(long submitIndex, long timeout, CallbackInfoReturnable<Boolean> cir) {
-        if (timeout != 0L || submitIndex <= this.completedSubmitIndex || submitIndex >= this.currentSubmitIndex)
+        if (submitIndex <= this.completedSubmitIndex || submitIndex >= this.currentSubmitIndex)
             return;
+
+        if (timeout != 0L) {
+            if (this.txoptimizations$spinUntil(submitIndex))
+                cir.setReturnValue(true);
+
+            return;
+        }
 
         if (RecyclePolling.isActive() && RecyclePolling.isKnownPending(submitIndex)) {
             cir.setReturnValue(false);
             return;
         }
 
+        boolean completed = this.txoptimizations$readCounter() >= submitIndex;
+
+        if (!completed && RecyclePolling.isActive())
+            RecyclePolling.markPending(submitIndex);
+
+        cir.setReturnValue(completed);
+    }
+
+    @Unique
+    private boolean txoptimizations$spinUntil(long submitIndex) {
+        if (!FrameSpin.isFastFrames())
+            return false;
+
+        long deadline = System.nanoTime() + FrameSpin.SPIN_NANOS;
+
+        do {
+            if (this.txoptimizations$readCounter() >= submitIndex)
+                return true;
+
+            Thread.onSpinWait();
+        } while (System.nanoTime() < deadline);
+
+        return false;
+    }
+
+    @Unique
+    private long txoptimizations$readCounter() {
         int result = VK12.vkGetSemaphoreCounterValue(this.device.vkDevice(), this.submitSemaphore, this.txoptimizations$counterValue);
         VulkanUtils.crashIfFailure(this.device, result, "Failed to read submit semaphore counter");
 
@@ -51,11 +86,6 @@ public abstract class VulkanCommandEncoderPollMixin {
         if (signaled > this.completedSubmitIndex)
             this.completedSubmitIndex = signaled;
 
-        boolean completed = signaled >= submitIndex;
-
-        if (!completed && RecyclePolling.isActive())
-            RecyclePolling.markPending(submitIndex);
-
-        cir.setReturnValue(completed);
+        return signaled;
     }
 }

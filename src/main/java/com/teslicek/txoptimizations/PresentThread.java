@@ -129,7 +129,12 @@ public final class PresentThread {
             Runnable next = job;
 
             if (next == null) {
-                LockSupport.park(PresentThread.class);
+                if (FrameSpin.isFastFrames())
+                    awaitJob(System.nanoTime() + FrameSpin.SPIN_NANOS);
+
+                if (job == null)
+                    LockSupport.park(PresentThread.class);
+
                 continue;
             }
 
@@ -142,5 +147,10 @@ public final class PresentThread {
             job = null;
             LockSupport.unpark(waiting);
         }
+    }
+
+    private static void awaitJob(long deadline) {
+        while (job == null && System.nanoTime() < deadline)
+            Thread.onSpinWait();
     }
 }

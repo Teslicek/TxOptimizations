@@ -77,6 +77,7 @@ public final class FramePath {
 
         lastSubmit = now;
         GpuPassProfiler.recordFrameTime(frameNanos);
+        FrameSpin.recordFrame(frameNanos);
 
         if (!frameEligible) {
             resetWindow();
