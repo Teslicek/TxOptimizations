@@ -29,6 +29,10 @@ public final class FacingCulling {
     private static final int    SEGMENT_FIELD      = (1 << SEGMENT_FIELD_BITS) - 1;
     private static final int    VERTICES_PER_QUAD  = PrimitiveTopology.QUADS.primitiveLength;
     private static final int    INDICES_PER_QUAD   = PrimitiveTopology.QUADS.indexCount(VERTICES_PER_QUAD);
+    private static final int    QUAD_BITS          = 28;
+    private static final int    QUAD_MASK          = (1 << QUAD_BITS) - 1;
+    private static final int    GROUP_SHIFT        = QUAD_BITS + Integer.SIZE;
+    private static final float  PLANE_STEPS        = 1024.0F;
     private static final double MARGIN             = 3.0;
     private static final double OFF_AXIS           = 0.5 / 127.0;
 
@@ -118,11 +122,14 @@ public final class FacingCulling {
     }
 
     private static void groupVertices(long base, int positionOffset, int vertexSize, int quads, int[] target, int offset) {
+        if (quads > QUAD_MASK + 1)
+            throw new IllegalStateException(quads + " quads do not fit the " + QUAD_BITS + " bit quad numbers of the face direction order");
+
         int     quadSize     = vertexSize * VERTICES_PER_QUAD;
         long    positions    = base + positionOffset;
+        long[]  order        = new long[quads];
         int[]   destinations = new int[quads];
         int[]   ranges       = new int[RANGES];
-        int[]   next         = new int[GROUPS];
         float[] planes       = new float[GROUPS];
 
         Arrays.fill(planes, Float.POSITIVE_INFINITY);
@@ -130,12 +137,18 @@ public final class FacingCulling {
         for (int quad = 0; quad < quads; quad ++) {
             long first = positions + (long) quad * quadSize;
             int  group = classify(first, vertexSize);
+            int  depth = 0;
 
-            destinations[quad] = group;
             ranges[group] ++;
 
-            if (group != UNASSIGNED)
-                planes[group] = Math.min(planes[group], signedPlane(first, vertexSize, group));
+            if (group != UNASSIGNED) {
+                float plane = signedPlane(first, vertexSize, group);
+
+                planes[group] = Math.min(planes[group], plane);
+                depth         = Math.round(plane * PLANE_STEPS) ^ Integer.MAX_VALUE;
+            }
+
+            order[quad] = (long) group << GROUP_SHIFT | (depth & 0xFFFFFFFFL) << QUAD_BITS | quad;
         }
 
         int end      = 0;
@@ -145,7 +158,6 @@ public final class FacingCulling {
             if (ranges[group] != 0)
                 occupied |= 1 << group;
 
-            next[group]            = end;
             end                   += ranges[group];
             ranges[group]          = end;
             ranges[PLANES + group] = Float.floatToRawIntBits(planes[group]);
@@ -153,8 +165,10 @@ public final class FacingCulling {
 
         ranges[OCCUPIED] = occupied;
 
-        for (int quad = 0; quad < quads; quad ++)
-            destinations[quad] = next[destinations[quad]] ++;
+        Arrays.sort(order);
+
+        for (int position = 0; position < quads; position ++)
+            destinations[(int) (order[position] & QUAD_MASK)] = position;
 
         permute(base, quadSize, destinations);
         System.arraycopy(ranges, 0, target, offset, RANGES);
