@@ -1,15 +1,12 @@
 package com.teslicek.txoptimizations;
 
 import com.mojang.blaze3d.systems.RenderSystem;
-import com.mojang.blaze3d.vertex.DefaultVertexFormat;
-import com.mojang.blaze3d.vertex.MeshData;
 import com.mojang.renderpearl.api.buffers.GpuBufferSlice;
 import com.mojang.renderpearl.api.commands.RenderPass;
 import com.mojang.renderpearl.api.pipeline.RenderPipeline;
 import com.teslicek.txoptimizations.mixin.FeaturePreparedGroupAccessor;
 import com.teslicek.txoptimizations.mixin.PostChainPassesAccessor;
 import com.teslicek.txoptimizations.mixin.RenderTypeFeatureRendererGroupsAccessor;
-import java.nio.ByteBuffer;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -35,11 +32,8 @@ import org.joml.Matrix4d;
 import org.joml.Matrix4f;
 import org.joml.Matrix4fc;
 import org.joml.Vector4d;
-import org.lwjgl.system.MemoryUtil;
 
 public final class OutlineScissor {
-
-    public static final int BOX_VALUES = 6;
 
     private static final int    RASTER_REACH = 2;
     private static final int    SOBEL_REACH  = 2;
@@ -120,11 +114,13 @@ public final class OutlineScissor {
         state = UNMEASURED;
     }
 
-    public static void measure(SubmitNodeStorage storage, Map<FeatureRenderPhase<?>, ? extends List<?>> groupsByPhase, FeatureRendererMap renderers) {
+    public static void measure(SubmitNodeStorage storage, Map<FeatureRenderPhase<?>, ? extends List<?>> groupsByPhase, FeatureRendererMap renderers, StagedVertexBuffer vertices) {
         state = UNBOUNDED;
 
         if (!vanilla || RenderSystem.getProjectionMatrixBuffer() != projectionSlice)
             return;
+
+        ((BackgroundVertexCopy) vertices).txoptimizations$finishVertexCopy();
 
         minX = Double.POSITIVE_INFINITY;
         minY = Double.POSITIVE_INFINITY;
@@ -144,54 +140,6 @@ public final class OutlineScissor {
         }
 
         state = BOUNDED;
-    }
-
-    public static void measureVertices(MeshData mesh, float[] boxes, int offset) {
-        MeshData.DrawState drawState = mesh.drawState();
-
-        if (drawState.format() != DefaultVertexFormat.POSITION_TEX_COLOR)
-            throw new IllegalStateException("Outline geometry uses vertex format " + drawState.format() + " instead of " + DefaultVertexFormat.POSITION_TEX_COLOR);
-
-        ByteBuffer buffer = mesh.vertexBuffer();
-        int        stride = drawState.format().getVertexSize();
-        int        count  = drawState.vertexCount();
-
-        if (buffer.remaining() != count * stride)
-            throw new IllegalStateException("Outline mesh holds " + buffer.remaining() + " bytes for " + count + " vertices of " + stride + " bytes");
-
-        long  address = MemoryUtil.memAddress(buffer);
-        long  end     = address + (long) count * stride;
-        float lowX    = Float.POSITIVE_INFINITY;
-        float lowY    = Float.POSITIVE_INFINITY;
-        float lowZ    = Float.POSITIVE_INFINITY;
-        float highX   = Float.NEGATIVE_INFINITY;
-        float highY   = Float.NEGATIVE_INFINITY;
-        float highZ   = Float.NEGATIVE_INFINITY;
-        float sum     = 0.0F;
-
-        for (long vertex = address; vertex < end; vertex += stride) {
-            float x = MemoryUtil.memGetFloat(vertex);
-            float y = MemoryUtil.memGetFloat(vertex + 4L);
-            float z = MemoryUtil.memGetFloat(vertex + 8L);
-
-            lowX  = x < lowX ? x : lowX;
-            lowY  = y < lowY ? y : lowY;
-            lowZ  = z < lowZ ? z : lowZ;
-            highX = x > highX ? x : highX;
-            highY = y > highY ? y : highY;
-            highZ = z > highZ ? z : highZ;
-            sum  += x + y + z;
-        }
-
-        if (!Float.isFinite(sum))
-            lowX = Float.NaN;
-
-        boxes[offset]     = lowX;
-        boxes[offset + 1] = lowY;
-        boxes[offset + 2] = lowZ;
-        boxes[offset + 3] = highX;
-        boxes[offset + 4] = highY;
-        boxes[offset + 5] = highZ;
     }
 
     public static boolean isOutlineChain(PostChain current) {
@@ -263,18 +211,15 @@ public final class OutlineScissor {
         if (pipeline != RenderPipelines.OUTLINE_CULL && pipeline != RenderPipelines.OUTLINE_NO_CULL)
             return false;
 
-        OutlineDraw outline   = (OutlineDraw) draw;
-        float[]     boxes     = outline.txoptimizations$outlineBoxes();
-        Matrix4fc   modelView = ((OutlineModelView) (Object) type).txoptimizations$modelView();
+        float[]   boxes     = ((OutlineDraw) draw).txoptimizations$outlineBoxes();
+        Matrix4fc modelView = ((OutlineModelView) (Object) type).txoptimizations$modelView();
 
         if (boxes == null || modelView == null)
             return false;
 
         CLIP.set(PROJECTION).mul(MODEL_VIEW.set(modelView));
 
-        int values = outline.txoptimizations$outlineBoxValues();
-
-        for (int offset = 0; offset < values; offset += BOX_VALUES) {
+        for (int offset = 0; offset < boxes.length; offset += PositionBounds.VALUES) {
             if (!includeBox(boxes, offset))
                 return false;
         }
@@ -283,7 +228,7 @@ public final class OutlineScissor {
     }
 
     private static boolean includeBox(float[] boxes, int offset) {
-        for (int value = offset; value < offset + BOX_VALUES; value ++) {
+        for (int value = offset; value < offset + PositionBounds.VALUES; value ++) {
             if (!Float.isFinite(boxes[value]))
                 return false;
         }

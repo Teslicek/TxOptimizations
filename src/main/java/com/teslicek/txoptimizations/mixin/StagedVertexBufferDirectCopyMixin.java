@@ -2,11 +2,14 @@ package com.teslicek.txoptimizations.mixin;
 
 import com.mojang.blaze3d.vertex.ByteBufferBuilder;
 import com.mojang.blaze3d.vertex.CompactVectorArray;
+import com.mojang.blaze3d.vertex.DefaultVertexFormat;
 import com.mojang.blaze3d.vertex.MeshData;
 import com.mojang.renderpearl.api.buffers.GpuBuffer;
 import com.mojang.renderpearl.api.buffers.GpuBufferSlice;
 import com.mojang.renderpearl.api.device.GpuDevice;
 import com.teslicek.txoptimizations.BackgroundVertexCopy;
+import com.teslicek.txoptimizations.OutlineDraw;
+import com.teslicek.txoptimizations.PositionBounds;
 import com.teslicek.txoptimizations.VertexCopy;
 import java.nio.BufferOverflowException;
 import java.nio.ByteBuffer;
@@ -74,6 +77,9 @@ public abstract class StagedVertexBufferDirectCopyMixin implements BackgroundVer
 
             for (ByteBufferBuilder.Result slice : accessor.txoptimizations$vertexBufferSlices())
                 this.txoptimizations$queueCopy(slice, vertices);
+
+            if (((OutlineDraw) draw).txoptimizations$isOutlineTracked())
+                this.txoptimizations$queueOutlineBounds((OutlineDraw) draw, accessor.txoptimizations$vertexBufferSlices());
         }
 
         this.txoptimizations$vertexCopy.seal();
@@ -131,7 +137,25 @@ public abstract class StagedVertexBufferDirectCopyMixin implements BackgroundVer
     }
 
     @Unique
-    private void txoptimizations$finishVertexCopy() {
+    private void txoptimizations$queueOutlineBounds(OutlineDraw draw, List<ByteBufferBuilder.Result> slices) {
+        ByteBufferBuilderAccessor builder = (ByteBufferBuilderAccessor) this.stagingBuffer;
+        int                       stride  = DefaultVertexFormat.POSITION_TEX_COLOR.getVertexSize();
+        float[]                   boxes   = new float[slices.size() * PositionBounds.VALUES];
+
+        draw.txoptimizations$setOutlineBoxes(boxes);
+
+        for (int index = 0; index < slices.size(); index ++) {
+            ByteBufferBuilder.Result slice = slices.get(index);
+
+            if (slice.size() % stride != 0)
+                throw new IllegalStateException("Outline slice of " + slice.size() + " bytes does not hold whole vertices of " + stride + " bytes");
+
+            this.txoptimizations$vertexCopy.addBounds(builder.txoptimizations$pointer() + ((ByteBufferResultAccessor) slice).txoptimizations$offset(), slice.size() / stride, stride, boxes, index * PositionBounds.VALUES);
+        }
+    }
+
+    @Override
+    public void txoptimizations$finishVertexCopy() {
         if (this.txoptimizations$vertexView == null)
             return;
 

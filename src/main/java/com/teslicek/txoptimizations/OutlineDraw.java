@@ -4,7 +4,9 @@ public interface OutlineDraw {
 
     void txoptimizations$trackOutline();
 
+    boolean txoptimizations$isOutlineTracked();
+
     float[] txoptimizations$outlineBoxes();
 
-    int txoptimizations$outlineBoxValues();
+    void txoptimizations$setOutlineBoxes(float[] boxes);
 }
