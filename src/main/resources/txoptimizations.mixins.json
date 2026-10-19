@@ -102,6 +102,7 @@
     "HideReloadOverlayMixin",
     "HideTitleScreenFadeMixin",
     "HudFpsCounterMixin",
+    "ItemFrameRendererFrameModelMixin",
     "ItemFrameRenderOffsetMixin",
     "ItemLayerRenderStateAccessor",
     "ItemStackRenderStateBoundsMixin",
