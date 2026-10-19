@@ -140,6 +140,8 @@ Vanilla writes every glyph, particle, entity model cube and item quad one vertex
 
 Item and block model quads are written as four explicit vertices instead of a loop over the vertex index. Vanilla's baked quad and quad instance return a vertex's position, UV, color and light through a switch on that index, four switches per vertex; with constant indices they reduce to plain field reads. Writing an item quad took 11 ns instead of 15 ns in an offline benchmark on the real classes, and 8.4 million vertices of random quads, colors, lights, overlays, light emission and matrices matched vanilla's bytes in both formats.
 
+Each item and block model quad also allocated a new vector for its transformed positions, and the JIT did not remove it: in a profile of the busiest benchmark station these vectors were the largest source of render thread allocations, about 105 MB/s by the profiler's allocation sampling. Each buffer builder now creates one position vector the first time it writes a model quad and reuses it for every later quad it writes. The JOML call sets all three components of the vector before they are read, so the written bytes do not depend on what it held before.
+
 ### Attribute lookups
 
 Every attribute read, such as an entity's scale or name tag distance each frame, looked the attribute up with `computeIfAbsent` and a freshly allocated lookup function. Attribute instances are never removed from an entity's attribute map, so the lookup now reads the map first and only falls back to vanilla's `computeIfAbsent` with the same creation function when the attribute is not there yet.
