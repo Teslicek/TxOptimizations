@@ -48,7 +48,7 @@ public final class SectionSubset {
 
     public ObjectListIterator<SectionRenderDispatcher.RenderSection> iterator(ObjectArrayList<SectionRenderDispatcher.RenderSection> visibleSections) {
         long    stamp = this.settledStamp();
-        boolean reuse = stamp != UNSETTLED && stamp == this.stamp;
+        boolean reuse = this.isRecordedAt(stamp);
 
         ObjectArrayList<SectionRenderDispatcher.RenderSection> previous = this.recorded;
 
@@ -81,7 +81,7 @@ public final class SectionSubset {
         return finished == started ? started : UNSETTLED;
     }
 
-    private boolean carriesFlags(long stamp) {
+    private boolean isRecordedAt(long stamp) {
         return stamp != UNSETTLED && stamp == this.stamp;
     }
 
@@ -118,7 +118,7 @@ public final class SectionSubset {
         int  next       = nextGeneration(viewArea);
         long beStamp    = BLOCK_ENTITIES.settledStamp();
         long dirtyStamp = tracker == null ? UNSETTLED : DIRTY.settledStamp();
-        int  carried    = discarded ? 0 : (BLOCK_ENTITIES.carriesFlags(beStamp) ? BLOCK_ENTITIES.flag : 0) | (DIRTY.carriesFlags(dirtyStamp) ? DIRTY.flag : 0);
+        int  carried    = discarded ? 0 : (BLOCK_ENTITIES.isRecordedAt(beStamp) ? BLOCK_ENTITIES.flag : 0) | (DIRTY.isRecordedAt(dirtyStamp) ? DIRTY.flag : 0);
 
         ObjectArrayList<SectionRenderDispatcher.RenderSection> blockEntities = BLOCK_ENTITIES.beginCarry();
         ObjectArrayList<SectionRenderDispatcher.RenderSection> dirty         = DIRTY.beginCarry();
