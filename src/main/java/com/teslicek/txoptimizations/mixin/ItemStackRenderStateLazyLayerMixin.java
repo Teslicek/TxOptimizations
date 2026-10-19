@@ -4,13 +4,18 @@ import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
 import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
 import java.util.Arrays;
 import net.minecraft.client.renderer.item.ItemStackRenderState;
+import org.objectweb.asm.Opcodes;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Overwrite;
 import org.spongepowered.asm.mixin.Shadow;
+import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;
 
 @Mixin(ItemStackRenderState.class)
 public abstract class ItemStackRenderStateLazyLayerMixin {
+
+    @Unique
+    private static final ItemStackRenderState.LayerRenderState[] NO_LAYERS = new ItemStackRenderState.LayerRenderState[0];
 
     @Shadow
     private int activeLayerCount;
@@ -21,6 +26,14 @@ public abstract class ItemStackRenderStateLazyLayerMixin {
     @WrapOperation(method = "<init>", at = @At(value = "NEW", target = "(Lnet/minecraft/client/renderer/item/ItemStackRenderState;)Lnet/minecraft/client/renderer/item/ItemStackRenderState$LayerRenderState;"))
     private ItemStackRenderState.LayerRenderState txoptimizations$deferFirstLayer(ItemStackRenderState owner, Operation<ItemStackRenderState.LayerRenderState> original) {
         return null;
+    }
+
+    @WrapOperation(method = "<init>", at = @At(value = "FIELD", target = "Lnet/minecraft/client/renderer/item/ItemStackRenderState;layers:[Lnet/minecraft/client/renderer/item/ItemStackRenderState$LayerRenderState;", opcode = Opcodes.PUTFIELD))
+    private void txoptimizations$shareNoLayers(ItemStackRenderState owner, ItemStackRenderState.LayerRenderState[] deferred, Operation<Void> original) {
+        if ((Object) owner != this || deferred.length != 1 || deferred[0] != null)
+            throw new IllegalStateException("Expected the item render state to store its deferred first layer, got " + Arrays.toString(deferred));
+
+        this.layers = NO_LAYERS;
     }
 
     @Overwrite
@@ -37,8 +50,6 @@ public abstract class ItemStackRenderStateLazyLayerMixin {
 
     @Overwrite
     public boolean usesBlockLight() {
-        ItemStackRenderState.LayerRenderState firstLayer = this.layers[0];
-
-        return firstLayer != null && ((ItemLayerRenderStateAccessor) firstLayer).txoptimizations$usesBlockLight();
+        return this.layers.length != 0 && ((ItemLayerRenderStateAccessor) this.layers[0]).txoptimizations$usesBlockLight();
     }
 }
