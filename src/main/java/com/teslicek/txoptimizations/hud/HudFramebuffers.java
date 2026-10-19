@@ -116,13 +116,8 @@ final class HudFramebuffers {
     }
 
     void include(ScreenRectangle bounds) {
-        if (bounds == null) {
-            Window window = Minecraft.getInstance().getWindow();
-
-            this.backAreas.include(0, 0, window.getGuiScaledWidth(), window.getGuiScaledHeight());
-
+        if (bounds == null)
             return;
-        }
 
         this.backAreas.include(bounds.left(), bounds.top(), bounds.right(), bounds.bottom());
     }
