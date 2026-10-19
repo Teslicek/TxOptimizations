@@ -65,8 +65,7 @@ public abstract class ModelPartIdentityMixin {
         if (this.xRot != 0.0F || this.yRot != 0.0F || this.zRot != 0.0F)
             ModelRotation.rotateZYX(poseStack.last(), this.zRot, this.yRot, this.xRot);
 
-        if (this.xScale != 1.0F || this.yScale != 1.0F || this.zScale != 1.0F)
-            poseStack.scale(this.xScale, this.yScale, this.zScale);
+        this.txoptimizations$scale(poseStack);
     }
 
     @Overwrite
@@ -82,10 +81,8 @@ public abstract class ModelPartIdentityMixin {
 
         boolean transformed = !this.txoptimizations$isIdentity();
 
-        if (transformed) {
-            poseStack.pushPose();
-            this.translateAndRotate(poseStack);
-        }
+        if (transformed)
+            this.txoptimizations$pushTransform(poseStack);
 
         if (!this.skipDraw)
             this.compile(poseStack.last(), buffer, lightCoords, overlayCoords, color);
@@ -103,6 +100,18 @@ public abstract class ModelPartIdentityMixin {
 
         if (transformed)
             poseStack.popPose();
+    }
+
+    @Unique
+    private void txoptimizations$pushTransform(PoseStack poseStack) {
+        ModelRotation.pushTranslatedRotated(poseStack, this.x / 16.0F, this.y / 16.0F, this.z / 16.0F, this.zRot, this.yRot, this.xRot);
+        this.txoptimizations$scale(poseStack);
+    }
+
+    @Unique
+    private void txoptimizations$scale(PoseStack poseStack) {
+        if (this.xScale != 1.0F || this.yScale != 1.0F || this.zScale != 1.0F)
+            poseStack.scale(this.xScale, this.yScale, this.zScale);
     }
 
     @Unique
