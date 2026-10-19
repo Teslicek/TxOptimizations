@@ -105,6 +105,7 @@
     "HideTitleScreenFadeMixin",
     "HudFpsCounterMixin",
     "ItemFrameRendererFrameModelMixin",
+    "ItemFrameRendererFrameSubmitMixin",
     "ItemFrameRenderOffsetMixin",
     "ItemLayerRenderStateAccessor",
     "ItemStackRenderStateBoundsMixin",
