@@ -1,10 +1,12 @@
 package com.teslicek.txoptimizations.mixin;
 
+import com.mojang.blaze3d.vertex.ByteBufferBuilder;
 import com.mojang.blaze3d.vertex.CompactVectorArray;
 import com.mojang.blaze3d.vertex.MeshData;
 import com.mojang.blaze3d.vertex.VertexSorting;
 import com.mojang.renderpearl.api.pipeline.IndexType;
 import com.teslicek.txoptimizations.SharedQuadSorter;
+import com.teslicek.txoptimizations.TwinQuads;
 import java.nio.BufferOverflowException;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
@@ -18,12 +20,10 @@ import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
+import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 @Mixin(MeshData.SortState.class)
 public abstract class MeshDataSortStateIndexMixin {
-
-    @Unique
-    private static final int QUAD_INDICES = 6;
 
     @Shadow
     @Final
@@ -33,19 +33,39 @@ public abstract class MeshDataSortStateIndexMixin {
     @Final
     private IndexType indexType;
 
+    @Inject(method = "buildSortedIndexBuffer", at = @At("HEAD"), cancellable = true)
+    private void txoptimizations$buildSortedIndicesDirectly(ByteBufferBuilder target, VertexSorting sorting, CallbackInfoReturnable<ByteBufferBuilder.Result> cir) {
+        boolean shortIndices = this.txoptimizations$shortIndices();
+        int[]   quadOrder    = sorting.sort(this.centroids);
+        int     bytes        = TwinQuads.indexCount(this.centroids) * this.indexType.bytes;
+        long    pointer      = target.reserve(bytes);
+        long    end          = TwinQuads.writeIndices(pointer, quadOrder, this.centroids, shortIndices);
+
+        if (end != pointer + bytes)
+            throw new IllegalStateException("Wrote " + (end - pointer) + " bytes of sorted indices into " + bytes + " reserved bytes");
+
+        cir.setReturnValue(target.build());
+    }
+
     @Inject(method = "writeSortedIndexBuffer", at = @At("HEAD"), cancellable = true)
     private void txoptimizations$writeSortedIndicesDirectly(ByteBuffer buffer, VertexSorting sorting, CallbackInfo ci) {
+        if (this.centroids instanceof TwinQuads)
+            throw new IllegalStateException("Quads with shared twin vertices are only sorted into section index buffers");
+
         int[] quadOrder = sorting instanceof SharedQuadSorter shared ? shared.txoptimizations$sortShared(this.centroids) : sorting.sort(this.centroids);
 
         ci.cancel();
 
-        if (this.indexType != IndexType.SHORT && this.indexType != IndexType.INT)
-            throw new IllegalStateException("Unknown index type " + this.indexType);
-
-        boolean shortIndices = this.indexType == IndexType.SHORT;
+        boolean shortIndices = this.txoptimizations$shortIndices();
 
         if (buffer.isDirect() && buffer.order() == ByteOrder.nativeOrder()) {
-            txoptimizations$writeToMemory(buffer, quadOrder, shortIndices);
+            int bytes = TwinQuads.indexCount(this.centroids) * this.indexType.bytes;
+
+            if (bytes > buffer.remaining())
+                throw new BufferOverflowException();
+
+            TwinQuads.writeIndices(MemoryUtil.memAddress(buffer), quadOrder, this.centroids, shortIndices);
+            buffer.position(buffer.position() + bytes);
             return;
         }
 
@@ -84,37 +104,10 @@ public abstract class MeshDataSortStateIndexMixin {
     }
 
     @Unique
-    private static void txoptimizations$writeToMemory(ByteBuffer buffer, int[] quadOrder, boolean shortIndices) {
-        int indexBytes = shortIndices ? Short.BYTES : Integer.BYTES;
-        int bytes      = quadOrder.length * QUAD_INDICES * indexBytes;
+    private boolean txoptimizations$shortIndices() {
+        if (this.indexType != IndexType.SHORT && this.indexType != IndexType.INT)
+            throw new IllegalStateException("Unknown index type " + this.indexType);
 
-        if (bytes > buffer.remaining())
-            throw new BufferOverflowException();
-
-        long pointer = MemoryUtil.memAddress(buffer);
-
-        for (int quad : quadOrder) {
-            int first = quad * 4;
-
-            if (shortIndices) {
-                MemoryUtil.memPutShort(pointer, (short) first);
-                MemoryUtil.memPutShort(pointer + 2L, (short) (first + 1));
-                MemoryUtil.memPutShort(pointer + 4L, (short) (first + 2));
-                MemoryUtil.memPutShort(pointer + 6L, (short) (first + 2));
-                MemoryUtil.memPutShort(pointer + 8L, (short) (first + 3));
-                MemoryUtil.memPutShort(pointer + 10L, (short) first);
-            } else {
-                MemoryUtil.memPutInt(pointer, first);
-                MemoryUtil.memPutInt(pointer + 4L, first + 1);
-                MemoryUtil.memPutInt(pointer + 8L, first + 2);
-                MemoryUtil.memPutInt(pointer + 12L, first + 2);
-                MemoryUtil.memPutInt(pointer + 16L, first + 3);
-                MemoryUtil.memPutInt(pointer + 20L, first);
-            }
-
-            pointer += QUAD_INDICES * indexBytes;
-        }
-
-        buffer.position(buffer.position() + bytes);
+        return this.indexType == IndexType.SHORT;
     }
 }

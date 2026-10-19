@@ -129,6 +129,7 @@
     "MappableRingBufferPersistentMapMixin",
     "MeshDataCentroidMixin",
     "MeshDataSortStateIndexMixin",
+    "MeshDataTwinQuadsMixin",
     "MemoryStackRenderThreadMixin",
     "MinecraftAtlasFeaturesMixin",
     "MinecraftClockMixin",
