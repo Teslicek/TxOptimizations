@@ -89,7 +89,45 @@ public final class SectionTreeWalk {
         return this.cameraX > minX - CLOSE_DISTANCE && this.cameraX < maxX + CLOSE_DISTANCE && this.cameraY > minY - CLOSE_DISTANCE && this.cameraY < maxY + CLOSE_DISTANCE && this.cameraZ > minZ - CLOSE_DISTANCE && this.cameraZ < maxZ + CLOSE_DISTANCE;
     }
 
+    private void sortNearestFirst() {
+        int size = this.visible.size();
+
+        if (size < 2)
+            return;
+
+        SectionRenderDispatcher.RenderSection[] sections = this.visible.toArray(new SectionRenderDispatcher.RenderSection[0]);
+        int[]                                   keys     = new int[size];
+        int                                     cameraX  = SectionPos.blockToSectionCoord(this.cameraX);
+        int                                     cameraY  = SectionPos.blockToSectionCoord(this.cameraY);
+        int                                     cameraZ  = SectionPos.blockToSectionCoord(this.cameraZ);
+        int                                     largest  = 0;
+
+        for (int index = 0; index < size; index ++) {
+            long node = sections[index].getSectionNode();
+            int  x    = SectionPos.x(node) - cameraX;
+            int  y    = SectionPos.y(node) - cameraY;
+            int  z    = SectionPos.z(node) - cameraZ;
+
+            keys[index] = x * x + y * y + z * z;
+            largest     = Math.max(largest, keys[index]);
+        }
+
+        int[] starts = new int[largest + 2];
+
+        for (int key : keys)
+            starts[key + 1] ++;
+
+        for (int key = 1; key < starts.length; key ++)
+            starts[key] += starts[key - 1];
+
+        for (int index = 0; index < size; index ++)
+            this.visible.set(starts[keys[index]] ++, sections[index]);
+    }
+
     public static void collect(Octree octree, Frustum frustum, List<SectionRenderDispatcher.RenderSection> visible, List<SectionRenderDispatcher.RenderSection> nearby) {
-        new SectionTreeWalk(frustum, visible, nearby, octree.cameraSectionCenter).branch(octree.root, false, true);
+        SectionTreeWalk walk = new SectionTreeWalk(frustum, visible, nearby, octree.cameraSectionCenter);
+
+        walk.branch(octree.root, false, true);
+        walk.sortNearestFirst();
     }
 }
