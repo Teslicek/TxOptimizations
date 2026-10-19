@@ -137,7 +137,7 @@ public final class SectionDrawList {
         this.draws[draw + BASE_INSTANCE] = baseInstance;
         this.drawInts                    = draw + DRAW_INTS;
 
-        ProfileCounters.countTerrainDraw(indexCount);
+        ProfileCounters.countTerrainDraw(this.groupLayers[group], indexCount);
 
         int last = this.lastDraws[group];
 
