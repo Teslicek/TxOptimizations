@@ -14,6 +14,7 @@ public final class SectionTreeWalk {
     private static final int CLOSE_DISTANCE   = 32;
     private static final int SECTION_SIZE     = 16;
     private static final int LEAF_PARENT_SPAN = 32;
+    private static final int CAMERA_CUBE      = 8;
 
     private final Frustum                                      frustum;
     private final List<SectionRenderDispatcher.RenderSection> visible;
@@ -125,7 +126,7 @@ public final class SectionTreeWalk {
     }
 
     public static void collect(Octree octree, Frustum frustum, List<SectionRenderDispatcher.RenderSection> visible, List<SectionRenderDispatcher.RenderSection> nearby) {
-        SectionTreeWalk walk = new SectionTreeWalk(frustum, visible, nearby, octree.cameraSectionCenter);
+        SectionTreeWalk walk = new SectionTreeWalk(new Frustum(frustum).offsetToFullyIncludeCameraCube(CAMERA_CUBE), visible, nearby, octree.cameraSectionCenter);
 
         walk.branch(octree.root, false, true);
         walk.sortNearestFirst();
