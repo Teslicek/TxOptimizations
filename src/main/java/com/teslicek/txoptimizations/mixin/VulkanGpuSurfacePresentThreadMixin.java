@@ -5,10 +5,13 @@ import com.mojang.renderpearl.api.device.GpuSurface;
 import com.mojang.renderpearl.api.device.SurfaceException;
 import com.mojang.renderpearl.backend.vulkan.VulkanDevice;
 import com.mojang.renderpearl.backend.vulkan.VulkanGpuSurface;
+import com.mojang.renderpearl.backend.vulkan.VulkanQueue;
 import com.mojang.renderpearl.backend.vulkan.VulkanUtils;
+import com.teslicek.txoptimizations.AcquiredImageDiscard;
 import com.teslicek.txoptimizations.PresentThread;
 import org.lwjgl.system.MemoryStack;
 import org.lwjgl.vulkan.KHRSwapchain;
+import org.lwjgl.vulkan.VK13;
 import org.lwjgl.vulkan.VkPresentInfoKHR;
 import org.lwjgl.vulkan.VkQueue;
 import org.lwjgl.vulkan.VkSurfaceCapabilitiesKHR;
@@ -23,7 +26,7 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 @Mixin(VulkanGpuSurface.class)
-public abstract class VulkanGpuSurfacePresentThreadMixin {
+public abstract class VulkanGpuSurfacePresentThreadMixin implements AcquiredImageDiscard {
 
     @Shadow
     @Final
@@ -35,6 +38,13 @@ public abstract class VulkanGpuSurfacePresentThreadMixin {
 
     @Shadow
     private long swapchain;
+
+    @Shadow
+    @Final
+    private long[] acquireSemaphores;
+
+    @Shadow
+    private int currentAcquireSemaphore;
 
     @Shadow
     private long[] presentSemaphores;
@@ -92,6 +102,18 @@ public abstract class VulkanGpuSurfacePresentThreadMixin {
         this.currentImageIndex = -1;
         PresentThread.capture(() -> this.txoptimizations$queuePresent(semaphore, frameChain, imageIndex));
         ci.cancel();
+    }
+
+    @Override
+    public void txoptimizations$discardAcquired() {
+        if (this.currentImageIndex == -1)
+            throw new IllegalStateException("No swapchain image is acquired");
+
+        try (VulkanQueue.Submission submission = this.device.graphicsQueue().beginSubmit()) {
+            submission.waitSemaphore(this.acquireSemaphores[this.currentAcquireSemaphore], 0L, VK13.VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT);
+        }
+
+        this.currentImageIndex = -1;
     }
 
     @Unique
