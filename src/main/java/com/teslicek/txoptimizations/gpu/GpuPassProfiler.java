@@ -167,7 +167,7 @@ public final class GpuPassProfiler {
 
     public static String copyLabel() {
         return "copy from " + StackWalker.getInstance().walk(frames -> frames
-            .filter(frame -> !frame.getClassName().startsWith("com.mojang.renderpearl.") && !frame.getClassName().startsWith("com.teslicek.txoptimizations.") && !frame.getClassName().contains("$$Lambda"))
+            .filter(frame -> !frame.getClassName().startsWith("com.mojang.renderpearl.") && !frame.getClassName().startsWith("com.teslicek.txoptimizations.") && !frame.getClassName().startsWith("java.") && !frame.getClassName().contains("$$Lambda"))
             .findFirst()
             .map(frame -> frame.getClassName().substring(frame.getClassName().lastIndexOf('.') + 1) + "." + frame.getMethodName())
             .orElseThrow(() -> new IllegalStateException("A GPU copy has no caller outside the renderer")));

@@ -70,6 +70,8 @@
     "EntityRendererLeashHolderMixin",
     "FeaturePreparedFrameOutlineMixin",
     "GameRendererOutlineProjectionMixin",
+    "GameRendererLevelProjectionRingMixin",
+    "GlobalSettingsUniformRingMixin",
     "LeashDataAccessor",
     "EntityVisibilityMemoMixin",
     "EntityNameTagMemoMixin",

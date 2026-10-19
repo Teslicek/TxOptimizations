@@ -1,16 +1,20 @@
 package com.teslicek.txoptimizations;
 
+import com.mojang.blaze3d.pipeline.RenderTarget;
 import com.mojang.blaze3d.vertex.DefaultVertexFormat;
 import com.mojang.renderpearl.api.buffers.GpuBufferSlice;
+import com.mojang.renderpearl.api.commands.RenderPass;
 import com.mojang.renderpearl.api.pipeline.BlendFunction;
 import com.mojang.renderpearl.api.pipeline.ColorTargetState;
 import com.mojang.renderpearl.api.pipeline.CompareOp;
 import com.mojang.renderpearl.api.pipeline.DepthStencilState;
 import com.mojang.renderpearl.api.pipeline.PrimitiveTopology;
 import com.mojang.renderpearl.api.pipeline.RenderPipeline;
+import com.mojang.renderpearl.api.textures.GpuTextureView;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import net.fabricmc.loader.api.FabricLoader;
+import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.BindGroupLayouts;
 import net.minecraft.client.renderer.SkyRenderer;
 import net.minecraft.client.renderer.state.level.SkyRenderState;
@@ -87,6 +91,7 @@ public final class SkyFarPlane {
     private static SkyRenderer    deferredRenderer;
     private static GpuBufferSlice deferredFog;
     private static SkyRenderState deferredState;
+    private static RenderPass     hostPass;
     private static boolean        drawing;
 
     private SkyFarPlane() {
@@ -124,7 +129,7 @@ public final class SkyFarPlane {
         return deferredState != null;
     }
 
-    public static void drawDeferred() {
+    public static void drawDeferred(RenderPass mainPass) {
         SkyRenderer    renderer = deferredRenderer;
         GpuBufferSlice fog      = deferredFog;
         SkyRenderState state    = deferredState;
@@ -132,11 +137,25 @@ public final class SkyFarPlane {
         deferredRenderer = null;
         deferredFog      = null;
         deferredState    = null;
+        hostPass         = mainPass;
         drawing          = true;
 
         renderer.render(fog, state);
 
-        drawing = false;
+        drawing  = false;
+        hostPass = null;
+    }
+
+    public static RenderPass hostPass(GpuTextureView color, GpuTextureView depth) {
+        RenderTarget main = Minecraft.getInstance().gameRenderer.mainRenderTarget();
+
+        if (hostPass == null)
+            throw new IllegalStateException("The deferred sky asked for the main pass while it was not being drawn");
+
+        if (color != main.getColorTextureView() || depth != main.getDepthTextureView())
+            throw new IllegalStateException("The deferred sky draws into another target than the main pass");
+
+        return hostPass;
     }
 
     public static boolean isDrawing() {
