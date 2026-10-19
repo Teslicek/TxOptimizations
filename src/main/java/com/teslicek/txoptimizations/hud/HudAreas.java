@@ -6,7 +6,7 @@ import net.minecraft.client.gui.navigation.ScreenRectangle;
 
 final class HudAreas {
 
-    private static final int MAX_AREAS = 8;
+    private static final int MAX_AREAS = 32;
     private static final int PADDING   = 2;
 
     private final int[] left   = new int[MAX_AREAS];
