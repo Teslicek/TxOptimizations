@@ -194,6 +194,10 @@ public final class OutlineScissor {
         boxes[offset + 5] = highZ;
     }
 
+    public static boolean isOutlineChain(PostChain current) {
+        return vanilla && current == chain;
+    }
+
     public static boolean isOutlinePass(PostPass pass) {
         return vanilla && passes.contains(pass);
     }

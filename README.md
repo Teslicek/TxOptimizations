@@ -458,6 +458,10 @@ The rectangle is only used when the post effect file and every shader of the cha
 
 An in-game check alternated frames with and without the rectangle, read the outline target back after the outline pass and after the chain, and compared the final outline images of every two consecutive frames whose outline geometry was identical: more than 6,200 pairs, all bitwise equal. In more than 6,200 frames of that run every lit pixel of the outline geometry lay inside the projected rectangle before widening. In the benchmark station the passes and the blend dropped from 0.088 to 0.028 ms of GPU time per frame. Measuring the boxes costs about 0.4% of the render thread there.
 
+### Outline chain depth
+
+Every post chain creates its intermediate targets with a 32-bit depth texture next to the color texture. The entity outline chain never tests or writes depth, yet its intermediate target's depth texture was cleared every frame when the target was taken from the resource pool and attached to the two passes that draw into it. For the vanilla outline chain the intermediate target is now created without depth, so those passes use the pipeline variant without a depth attachment, which has the same shaders and the same color state. This saves the depth clear and one screen-sized depth texture (8 MB at 1920x1080). The same in-game check, now alternating vanilla frames against frames with the scissor rectangle and no intermediate depth, found more than 6,400 pairs with identical outline geometry, all with bitwise equal final outline images.
+
 ### Breaking overlay rotation
 
 The block breaking crack overlay computes its texture coordinates per vertex and called `Direction.getRotation()` for every vertex, which allocates a new quaternion and evaluates its sines and cosines (1.3% of the render thread in a CubeCraft lobby). The six rotations are now built once by that same method and reused. The overlay only reads them, so every vertex gets the same values.
