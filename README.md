@@ -430,6 +430,10 @@ With hitboxes shown (F3+B), every visible entity built its boxes and its view ar
 
 Every frame, vanilla's level extraction created a new region cache with its own hash map for the visible sections that need rebuilding, although most frames have none. The cache is now created when the first section of the frame asks it for a region, and that one cache serves every later section of the same frame, so every section gets the same region as before.
 
+### Block entity copies of empty chunks
+
+Every section that level extraction sends to be compiled gets a copy of itself and its 26 neighbours, and each of those copies also copied its chunk's block entity map into an immutable map. Most chunks hold no block entities, and Guava still walked an empty map's entries into an array before returning its shared empty map. In the first turn of the motion benchmark 80,358 of 88,077 section copies had no block entities, at about 40 ns each for the copy alone. An empty map now gives Guava's shared empty map directly, the same map the copy returned for it. That made a region copy about 10% cheaper (9.8 µs against 8.8 µs on average in one run each); copying the block states is untouched and remains the largest part.
+
 ### GUI texture setups
 
 Every GUI glyph described its textures with a new texture setup record: its glyph texture and sampler plus the lightmap and its sampler. Text in the HUD and menus uses the same few textures over and over, so the last setup is now kept and returned again when the glyph texture, its sampler, the lightmap and the lightmap sampler are all the same objects. The record is immutable, so callers get an equal value either way.

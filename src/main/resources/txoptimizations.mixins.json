@@ -186,6 +186,7 @@
     "OctreeBranchSectionLeafMixin",
     "SectionCompilerEnclosedFluidMixin",
     "SectionCompilerMeshingWindowMixin",
+    "SectionCopyEmptyBlockEntitiesMixin",
     "ShapeOutlineEdgeCacheMixin",
     "SimpleFeatureRenderPhaseEmptyMixin",
     "RenderTypeDefaultTexturingMixin",
