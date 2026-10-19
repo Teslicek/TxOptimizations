@@ -97,7 +97,7 @@
     "GizmosCollectorCacheMixin",
     "GizmosTemporaryCollectionCacheMixin",
     "GlyphRendererVertexBuilderMixin",
-    "ItemFeatureVertexBuilderMixin",
+    "ItemFeatureQuadLoopMixin",
     "EnchantmentHelperEmptyIterationMixin",
     "GpuBufferPoolRecycleMixin",
     "GuiGraphicsExtractorMapAtlasMixin",
