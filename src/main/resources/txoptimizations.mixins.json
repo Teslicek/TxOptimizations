@@ -184,6 +184,7 @@
     "RenderSectionBlockEntityMeshMixin",
     "RenderSetupTextureCacheMixin",
     "StagedVertexBufferDrawOutlineMixin",
+    "TextDisplayRendererSplitterMixin",
     "TextureManagerVersionMixin",
     "RendererCacheMixin",
     "RotatingSectionStorageChangeMixin",
