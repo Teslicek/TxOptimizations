@@ -196,6 +196,7 @@
     "RenderSetupTextureCacheMixin",
     "RenderPipelineFormatArrayMixin",
     "EnvironmentAttributeSamplerLayersMixin",
+    "EntityViewVectorMemoMixin",
     "StagedVertexBufferDrawOutlineMixin",
     "TextDisplayRendererSplitterMixin",
     "TextureManagerVersionMixin",

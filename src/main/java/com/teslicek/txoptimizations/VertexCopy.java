@@ -151,7 +151,7 @@ public final class VertexCopy {
         private static void queue(VertexCopy copy) {
             JOB.set(copy);
 
-            if (!PresentThread.isSpinning())
+            if (!FrameSpin.isFastFrames())
                 LockSupport.unpark(THREAD);
         }
 

@@ -13,7 +13,6 @@ public final class PresentThread {
     private static volatile Runnable  job;
     private static volatile Thread    waiting;
     private static volatile Throwable failure;
-    private static volatile boolean   spinning;
     private static GpuSurface         armed;
     private static Runnable           captured;
     private static boolean            capturing;
@@ -75,10 +74,6 @@ public final class PresentThread {
             present.run();
         };
         LockSupport.unpark(WORKER);
-    }
-
-    public static boolean isSpinning() {
-        return spinning;
     }
 
     public static boolean isCapturing() {
@@ -155,14 +150,9 @@ public final class PresentThread {
     }
 
     private static void awaitJob(long deadline) {
-        spinning = true;
-
         while (job == null && System.nanoTime() < deadline) {
             VertexCopy.runQueuedCopy();
             Thread.onSpinWait();
         }
-
-        spinning = false;
-        VertexCopy.runQueuedCopy();
     }
 }
