@@ -1,6 +1,5 @@
 package com.teslicek.txoptimizations.mixin;
 
-import com.mojang.blaze3d.pipeline.RenderTarget;
 import com.mojang.blaze3d.systems.RenderSystem;
 import com.mojang.renderpearl.api.buffers.GpuBuffer;
 import com.mojang.renderpearl.api.buffers.GpuBufferSlice;
@@ -19,13 +18,11 @@ import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
 import net.minecraft.client.renderer.DynamicGpuData;
-import net.minecraft.client.renderer.GameRenderer;
 import net.minecraft.client.renderer.LevelRenderer;
 import net.minecraft.client.renderer.chunk.ChunkSectionLayer;
 import net.minecraft.client.renderer.chunk.ChunkSectionsToRender;
 import net.minecraft.client.renderer.chunk.SectionRenderDispatcher;
 import net.minecraft.client.renderer.state.OptionsRenderState;
-import net.minecraft.client.renderer.state.level.CameraRenderState;
 import net.minecraft.client.renderer.state.level.LevelRenderState;
 import net.minecraft.client.renderer.texture.TextureAtlas;
 import net.minecraft.client.renderer.texture.TextureManager;
@@ -57,10 +54,6 @@ public abstract class LevelRendererSectionDrawMixin {
     @Shadow
     @Final
     private TextureManager textureManager;
-
-    @Shadow
-    @Final
-    private GameRenderer gameRenderer;
 
     @Shadow
     private @Nullable SectionRenderDispatcher sectionRenderDispatcher;
@@ -163,10 +156,7 @@ public abstract class LevelRendererSectionDrawMixin {
         if (dispatcher == null)
             return draws.finish();
 
-        CameraRenderState camera       = this.levelRenderState.cameraRenderState;
-        RenderTarget      renderTarget = this.gameRenderer.mainRenderTarget();
-
-        FacingCulling.beginFrame(camera.pos, camera.viewRotationMatrix, renderTarget.width, renderTarget.height);
+        FacingCulling.beginFrame(this.levelRenderState.cameraRenderState.pos);
         dispatcher.lock();
 
         long fadeDuration = Util.toMillis(this.optionsRenderState.chunkSectionFadeInTime);
@@ -248,7 +238,7 @@ public abstract class LevelRendererSectionDrawMixin {
                 draws.shareIndexBuffer(indexCount);
 
                 if (!prepared) {
-                    FacingCulling.prepareSection(record, originX, originY, originZ);
+                    FacingCulling.prepareSection(originX, originY, originZ);
                     prepared = true;
                 }
 

@@ -52,9 +52,7 @@ public abstract class CompiledSectionMeshDrawRecordMixin implements SectionAlloc
         if (rendered == 0)
             return;
 
-        int[]   record = DrawRecords.create(rendered, SectionLayers.TRANSLUCENT);
-        float[] bounds = FacingCulling.emptyBounds();
-        boolean opaque = false;
+        int[] record = DrawRecords.create(rendered, SectionLayers.TRANSLUCENT);
 
         for (Map.Entry<ChunkSectionLayer, MeshData> entry : results.renderedLayers.entrySet()) {
             ChunkSectionLayer       layer = entry.getKey();
@@ -68,12 +66,8 @@ public abstract class CompiledSectionMeshDrawRecordMixin implements SectionAlloc
             if (layer.translucent())
                 continue;
 
-            FacingCulling.groupQuads(entry.getValue(), bounds, record, DrawRecords.facing(record, layer.ordinal()));
-            opaque = true;
+            FacingCulling.groupQuads(entry.getValue(), record, DrawRecords.facing(record, layer.ordinal()));
         }
-
-        if (opaque)
-            DrawRecords.setBounds(record, bounds);
 
         this.txoptimizations$drawRecord = record;
     }

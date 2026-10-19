@@ -12,12 +12,10 @@ public final class DrawRecords {
     public static final int FIRST_INDEX   = 5;
 
     private static final int FLAGS            = 0;
-    private static final int BOUNDS           = 1;
-    private static final int BOUND_COUNT      = 6;
+    private static final int HEADER           = 1;
     private static final int MAX_LAYERS       = 3;
     private static final int LAYER_MASK       = (1 << MAX_LAYERS) - 1;
     private static final int DRAWABLE_SHIFT   = MAX_LAYERS;
-    private static final int BOUNDED          = 1 << MAX_LAYERS * 2;
     private static final int OFFSET_SHIFT     = 8;
     private static final int OFFSET_BITS      = 8;
     private static final int OFFSET_MASK      = (1 << OFFSET_BITS) - 1;
@@ -33,15 +31,8 @@ public final class DrawRecords {
         if (translucent.length > MAX_LAYERS || (rendered & ~LAYER_MASK) != 0 || rendered == 0)
             throw new IllegalStateException("A draw record holds up to " + MAX_LAYERS + " layers but got layers " + Integer.toBinaryString(rendered) + " of " + translucent.length);
 
-        int size  = BOUNDS;
+        int size  = HEADER;
         int flags = rendered;
-
-        for (int layer = 0; layer < translucent.length; layer ++) {
-            if ((rendered & 1 << layer) != 0 && !translucent[layer]) {
-                size += BOUND_COUNT;
-                break;
-            }
-        }
 
         for (int layer = 0; layer < translucent.length; layer ++) {
             if ((rendered & 1 << layer) == 0)
@@ -77,14 +68,6 @@ public final class DrawRecords {
         return flags >>> OFFSET_SHIFT + layer * OFFSET_BITS & OFFSET_MASK;
     }
 
-    public static boolean bounded(int[] record) {
-        return (record[FLAGS] & BOUNDED) != 0;
-    }
-
-    public static float bound(int[] record, int index) {
-        return Float.intBitsToFloat(record[BOUNDS + index]);
-    }
-
     public static boolean customIndex(int format) {
         return (format & CUSTOM_INDEX) != 0;
     }
@@ -95,17 +78,6 @@ public final class DrawRecords {
 
     public static int facing(int[] record, int layer) {
         return requireBlock(record, layer) + FACING;
-    }
-
-    public static void setBounds(int[] record, float[] bounds) {
-        if (bounds.length != BOUND_COUNT)
-            throw new IllegalArgumentException("Expected " + BOUND_COUNT + " bounds but got " + bounds.length);
-
-        for (int index = 0; index < BOUND_COUNT; index ++)
-            record[BOUNDS + index] = Float.floatToRawIntBits(bounds[index]);
-
-        if (bounds[0] <= bounds[BOUND_COUNT / 2])
-            record[FLAGS] |= BOUNDED;
     }
 
     public static void setDraw(int[] record, int layer, boolean translucent, int indexCount, boolean customIndex, int indexType) {
