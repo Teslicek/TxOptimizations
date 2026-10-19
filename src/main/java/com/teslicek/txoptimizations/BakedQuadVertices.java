@@ -14,9 +14,8 @@ public final class BakedQuadVertices {
     private BakedQuadVertices() {
     }
 
-    public static void putEntity(long pointer, int stride, PoseStack.Pose pose, BakedQuad quad, QuadInstance instance, int normal) {
+    public static void putEntity(long pointer, int stride, PoseStack.Pose pose, BakedQuad quad, QuadInstance instance, int normal, Vector3f position) {
         Matrix4f matrix        = pose.pose();
-        Vector3f position      = new Vector3f();
         int      lightEmission = quad.materialInfo().lightEmission();
         int      overlay       = instance.overlayCoords();
 
@@ -26,9 +25,8 @@ public final class BakedQuadVertices {
         putEntity(pointer + 3L * stride, matrix.transformPosition(quad.position3(), position), quad.packedUV3(), instance.getColor(3), overlay, instance.getLightCoordsWithEmission(3, lightEmission), normal);
     }
 
-    public static void putBlock(long pointer, int stride, PoseStack.Pose pose, BakedQuad quad, QuadInstance instance) {
+    public static void putBlock(long pointer, int stride, PoseStack.Pose pose, BakedQuad quad, QuadInstance instance, Vector3f position) {
         Matrix4f matrix        = pose.pose();
-        Vector3f position      = new Vector3f();
         int      lightEmission = quad.materialInfo().lightEmission();
 
         putBlock(pointer, matrix.transformPosition(quad.position0(), position), quad.packedUV0(), instance.getColor(0), instance.getLightCoordsWithEmission(0, lightEmission));

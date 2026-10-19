@@ -17,17 +17,41 @@ public final class VertexCopy {
     private final AtomicInteger state = new AtomicInteger();
 
     private volatile Throwable failure;
-    private long[]             sources = new long[64];
-    private long[]             targets = new long[64];
-    private int[]              sizes   = new int[64];
+    private long[]             sources       = new long[64];
+    private long[]             targets       = new long[64];
+    private int[]              sizes         = new int[64];
+    private long[]             boundsSources = new long[8];
+    private int[]              boundsCounts  = new int[8];
+    private int[]              boundsStrides = new int[8];
+    private float[][]          boundsBoxes   = new float[8][];
+    private int[]              boundsOffsets = new int[8];
     private int                count;
+    private int                bounds;
     private boolean            pending;
 
     public void begin() {
         if (this.pending)
             throw new IllegalStateException("The previous vertex copies have not finished");
 
-        this.count = 0;
+        this.count  = 0;
+        this.bounds = 0;
+    }
+
+    public void addBounds(long source, int vertices, int stride, float[] boxes, int offset) {
+        if (this.bounds == this.boundsCounts.length) {
+            this.boundsSources = Arrays.copyOf(this.boundsSources, this.bounds * 2);
+            this.boundsCounts  = Arrays.copyOf(this.boundsCounts, this.bounds * 2);
+            this.boundsStrides = Arrays.copyOf(this.boundsStrides, this.bounds * 2);
+            this.boundsBoxes   = Arrays.copyOf(this.boundsBoxes, this.bounds * 2);
+            this.boundsOffsets = Arrays.copyOf(this.boundsOffsets, this.bounds * 2);
+        }
+
+        this.boundsSources[this.bounds] = source;
+        this.boundsCounts[this.bounds]  = vertices;
+        this.boundsStrides[this.bounds] = stride;
+        this.boundsBoxes[this.bounds]   = boxes;
+        this.boundsOffsets[this.bounds] = offset;
+        this.bounds ++;
     }
 
     public void add(long source, long target, int size) {
@@ -49,7 +73,7 @@ public final class VertexCopy {
         if (this.pending)
             throw new IllegalStateException("The previous vertex copies have not finished");
 
-        if (this.count == 0)
+        if (this.count == 0 && this.bounds == 0)
             return;
 
         this.next.set(0);
@@ -78,6 +102,7 @@ public final class VertexCopy {
             Thread.onSpinWait();
 
         this.pending = false;
+        Arrays.fill(this.boundsBoxes, 0, this.bounds, null);
 
         Throwable thrown = this.failure;
 
@@ -103,10 +128,15 @@ public final class VertexCopy {
     }
 
     private void copyClaimed() {
-        int count = this.count;
+        int bounds = this.bounds;
+        int jobs   = bounds + this.count;
 
-        for (int job = this.next.getAndIncrement(); job < count; job = this.next.getAndIncrement())
-            MemoryUtil.memCopy(this.sources[job], this.targets[job], this.sizes[job]);
+        for (int job = this.next.getAndIncrement(); job < jobs; job = this.next.getAndIncrement()) {
+            if (job < bounds)
+                PositionBounds.measure(this.boundsSources[job], this.boundsCounts[job], this.boundsStrides[job], this.boundsBoxes[job], this.boundsOffsets[job]);
+            else
+                MemoryUtil.memCopy(this.sources[job - bounds], this.targets[job - bounds], this.sizes[job - bounds]);
+        }
     }
 
     private static final class Worker {

@@ -94,3 +94,10 @@ accessible class net/minecraft/client/gui/font/glyphs/BakedSheetGlyph$EffectInst
 
 # Culling head check
 accessible field net/minecraft/world/item/ItemStack item Lnet/minecraft/core/Holder;
+
+# Shared item frame models
+mutable field net/minecraft/client/renderer/entity/state/ItemFrameRenderState frameModel Lnet/minecraft/client/renderer/block/BlockModelRenderState;
+accessible field net/minecraft/client/renderer/block/BlockModelResolver modelManager Lnet/minecraft/client/resources/model/ModelManager;
+accessible field net/minecraft/client/renderer/block/model/BlockStateModelWrapper model Lnet/minecraft/client/renderer/block/dispatch/BlockStateModel;
+accessible field net/minecraft/client/renderer/block/model/BlockStateModelWrapper tints Ljava/util/List;
+accessible field net/minecraft/client/renderer/block/dispatch/SingleVariant model Lnet/minecraft/client/renderer/block/dispatch/BlockStateModelPart;

@@ -38,6 +38,9 @@ public abstract class BufferBuilderBakedQuadMixin implements VertexConsumer {
     @Final
     private int vertexSize;
 
+    @Unique
+    private Vector3f txoptimizations$position;
+
     @Override
     public void putBakedQuad(PoseStack.Pose pose, BakedQuad quad, QuadInstance instance) {
         if (this.entityFormat && this.txoptimizations$tryPutEntityQuad(pose, quad, instance))
@@ -65,7 +68,7 @@ public abstract class BufferBuilderBakedQuadMixin implements VertexConsumer {
         if (pointer == MemoryUtil.NULL)
             return false;
 
-        BakedQuadVertices.putEntity(pointer, this.vertexSize, pose, quad, instance, txoptimizations$packedNormal(pose, quad.direction()));
+        BakedQuadVertices.putEntity(pointer, this.vertexSize, pose, quad, instance, txoptimizations$packedNormal(pose, quad.direction()), this.txoptimizations$position());
 
         return true;
     }
@@ -77,9 +80,17 @@ public abstract class BufferBuilderBakedQuadMixin implements VertexConsumer {
         if (pointer == MemoryUtil.NULL)
             return false;
 
-        BakedQuadVertices.putBlock(pointer, this.vertexSize, pose, quad, instance);
+        BakedQuadVertices.putBlock(pointer, this.vertexSize, pose, quad, instance, this.txoptimizations$position());
 
         return true;
+    }
+
+    @Unique
+    private Vector3f txoptimizations$position() {
+        if (this.txoptimizations$position == null)
+            this.txoptimizations$position = new Vector3f();
+
+        return this.txoptimizations$position;
     }
 
     @Unique
