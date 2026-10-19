@@ -18,6 +18,9 @@ public interface FeaturePreparedGroupAccessor {
     @Accessor("featureType")
     FeatureRendererType<?> txoptimizations$featureType();
 
+    @Accessor("featureGroupIndex")
+    int txoptimizations$featureGroupIndex();
+
     @Invoker("execute")
     void txoptimizations$execute(FeatureFrameContext context, @Nullable OitStage stage, RenderPass renderPass, FeatureRendererMap featureRenderers, List<SubmitNode> submits);
 }
