@@ -30,6 +30,7 @@ public final class FacingCulling {
     private static final int    VERTICES_PER_QUAD  = PrimitiveTopology.QUADS.primitiveLength;
     private static final int    INDICES_PER_QUAD   = PrimitiveTopology.QUADS.indexCount(VERTICES_PER_QUAD);
     private static final double MARGIN             = 3.0;
+    private static final double OFF_AXIS           = 0.5 / 127.0;
 
     private static final int[] SEGMENTS = segments();
 
@@ -134,7 +135,7 @@ public final class FacingCulling {
             ranges[group] ++;
 
             if (group != UNASSIGNED)
-                planes[group] = Math.min(planes[group], signedPlane(first, group));
+                planes[group] = Math.min(planes[group], signedPlane(first, vertexSize, group));
         }
 
         int end      = 0;
@@ -194,54 +195,48 @@ public final class FacingCulling {
     }
 
     private static int classify(long first, int vertexSize) {
-        long second = first + vertexSize;
-        long third  = second + vertexSize;
-        long fourth = third + vertexSize;
+        long   second = first + vertexSize;
+        long   third  = second + vertexSize;
+        long   fourth = third + vertexSize;
+        double ax     = coordinate(third, X) - coordinate(first, X);
+        double ay     = coordinate(third, Y) - coordinate(first, Y);
+        double az     = coordinate(third, Z) - coordinate(first, Z);
+        double bx     = coordinate(fourth, X) - coordinate(second, X);
+        double by     = coordinate(fourth, Y) - coordinate(second, Y);
+        double bz     = coordinate(fourth, Z) - coordinate(second, Z);
+        double nx     = ay * bz - az * by;
+        double ny     = az * bx - ax * bz;
+        double nz     = ax * by - ay * bx;
+        double length = Math.sqrt(nx * nx + ny * ny + nz * nz);
 
-        for (int axis = 0; axis < AXES; axis ++) {
-            float plane = coordinate(first, axis);
-
-            if (plane != coordinate(second, axis) || plane != coordinate(third, axis) || plane != coordinate(fourth, axis))
-                continue;
-
-            if (!Float.isFinite(plane))
-                return UNASSIGNED;
-
-            int    u              = (axis + 1) % AXES;
-            int    v              = (axis + 2) % AXES;
-            double firstTriangle  = normal(first, second, third, u, v);
-            double secondTriangle = normal(third, fourth, first, u, v);
-
-            if (!Double.isFinite(firstTriangle) || !Double.isFinite(secondTriangle))
-                return UNASSIGNED;
-
-            if (firstTriangle > 0.0 && secondTriangle > 0.0)
-                return axis;
-
-            if (firstTriangle < 0.0 && secondTriangle < 0.0)
-                return OPPOSITE - axis;
-
+        if (!(length > 0.0))
             return UNASSIGNED;
-        }
+
+        double limit = OFF_AXIS * length;
+
+        if (Math.abs(ny) < limit && Math.abs(nz) < limit)
+            return nx > 0.0 ? X : OPPOSITE - X;
+
+        if (Math.abs(nx) < limit && Math.abs(nz) < limit)
+            return ny > 0.0 ? Y : OPPOSITE - Y;
+
+        if (Math.abs(nx) < limit && Math.abs(ny) < limit)
+            return nz > 0.0 ? Z : OPPOSITE - Z;
 
         return UNASSIGNED;
     }
 
-    private static double normal(long first, long second, long third, int u, int v) {
-        double originU = coordinate(first, u);
-        double originV = coordinate(first, v);
-        double edgeU   = coordinate(second, u) - originU;
-        double edgeV   = coordinate(second, v) - originV;
-        double otherU  = coordinate(third, u) - originU;
-        double otherV  = coordinate(third, v) - originV;
+    private static float signedPlane(long first, int vertexSize, int group) {
+        int   axis  = axis(group);
+        float plane = Float.POSITIVE_INFINITY;
 
-        return edgeU * otherV - edgeV * otherU;
-    }
+        for (int vertex = 0; vertex < VERTICES_PER_QUAD; vertex ++) {
+            float value = coordinate(first + (long) vertex * vertexSize, axis);
 
-    private static float signedPlane(long first, int group) {
-        float plane = coordinate(first, axis(group));
+            plane = Math.min(plane, group < UNASSIGNED ? value : -value);
+        }
 
-        return group < UNASSIGNED ? plane : -plane;
+        return plane;
     }
 
     private static int axis(int group) {
