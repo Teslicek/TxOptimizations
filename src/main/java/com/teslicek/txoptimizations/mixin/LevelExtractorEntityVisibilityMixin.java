@@ -16,7 +16,7 @@ import org.spongepowered.asm.mixin.Overwrite;
 import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.Unique;
 
-@Mixin(LevelExtractor.class)
+@Mixin(value = LevelExtractor.class, priority = 999)
 public abstract class LevelExtractorEntityVisibilityMixin {
 
     @Shadow
@@ -56,7 +56,13 @@ public abstract class LevelExtractorEntityVisibilityMixin {
         if (keyed && memo.txoptimizations$hasVisibility(this.txoptimizations$keyFrame, partialTicks))
             return memo.txoptimizations$isVisible();
 
-        boolean visible = this.txoptimizations$computeVisibility(entity, frustum, camX, camY, camZ, partialTicks, chunkFadeDuration) && !Baking.isEntityMeshed(entity);
+        boolean visible = false;
+
+        if (this.txoptimizations$passesRendererCulling(entity, frustum, camX, camY, camZ, partialTicks)) {
+            BlockPos blockPos = entity.blockPosition();
+
+            visible = (this.level.isOutsideBuildHeight(blockPos.getY()) || this.levelRenderer.isSectionCompiledAndVisible(blockPos, chunkFadeDuration)) && !Baking.isEntityMeshed(entity);
+        }
 
         if (keyed)
             memo.txoptimizations$setVisibility(this.txoptimizations$keyFrame, partialTicks, visible);
@@ -65,16 +71,11 @@ public abstract class LevelExtractorEntityVisibilityMixin {
     }
 
     @Unique
-    private boolean txoptimizations$computeVisibility(Entity entity, Frustum frustum, double camX, double camY, double camZ, float partialTicks, long chunkFadeDuration) {
+    private boolean txoptimizations$passesRendererCulling(Entity entity, Frustum frustum, double camX, double camY, double camZ, float partialTicks) {
         if (this.level == null)
             return false;
 
-        if (!this.levelRenderer.entityRenderDispatcher().getRenderer(entity).shouldRender(entity, frustum, camX, camY, camZ, partialTicks) && (this.minecraft.player == null || !entity.hasIndirectPassenger(this.minecraft.player)))
-            return false;
-
-        BlockPos blockPos = entity.blockPosition();
-
-        return this.level.isOutsideBuildHeight(blockPos.getY()) || this.levelRenderer.isSectionCompiledAndVisible(blockPos, chunkFadeDuration);
+        return this.levelRenderer.entityRenderDispatcher().getRenderer(entity).shouldRender(entity, frustum, camX, camY, camZ, partialTicks) || this.minecraft.player != null && entity.hasIndirectPassenger(this.minecraft.player);
     }
 
     @Unique

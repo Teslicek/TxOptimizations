@@ -288,6 +288,7 @@
     "gpu.VulkanGpuSurfaceGpuProfilerMixin",
     "hud.GameRendererHudCacheMixin",
     "hud.GpuBufferPoolHudCacheMixin",
+    "hud.GuiRendererHudFlushMixin",
     "hud.GuiRenderStateHudCacheMixin",
     "hud.HudCacheMixin",
     "hud.HudElementRegistryAccessor",

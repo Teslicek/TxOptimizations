@@ -14,7 +14,7 @@ import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Overwrite;
 import org.spongepowered.asm.mixin.Unique;
 
-@Mixin(EntityHitboxDebugRenderer.class)
+@Mixin(value = EntityHitboxDebugRenderer.class, priority = 999)
 public abstract class EntityHitboxDebugRendererMixin {
 
     @Unique

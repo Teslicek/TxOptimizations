@@ -173,7 +173,7 @@ public final class HudCache {
 
     private static void flush() {
         flushing = true;
-        Minecraft.getInstance().gameRenderer.guiRenderer.render();
+        ((HudCacheRenderer) Minecraft.getInstance().gameRenderer.guiRenderer).txoptimizations$renderHudCache();
         flushing = false;
     }
 
