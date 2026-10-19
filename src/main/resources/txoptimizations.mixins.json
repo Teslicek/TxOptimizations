@@ -176,6 +176,7 @@
     "RendererCacheMixin",
     "RotatingSectionStorageChangeMixin",
     "RotatingSectionStorageLookupMixin",
+    "RotatingSectionStorageRepositionMixin",
     "ScissorStateEqualityMixin",
     "SectionRenderDispatcherSlotMixin",
     "SectionDirtyStateChangeMixin",
