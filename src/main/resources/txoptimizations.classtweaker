@@ -97,12 +97,12 @@ accessible field net/minecraft/world/item/ItemStack item Lnet/minecraft/core/Hol
 
 # Section tree walk
 accessible class net/minecraft/client/renderer/Octree$Branch
-accessible class net/minecraft/client/renderer/Octree$Leaf
+accessible class net/minecraft/client/renderer/Octree$AxisSorting
 accessible field net/minecraft/client/renderer/Octree root Lnet/minecraft/client/renderer/Octree$Branch;
 accessible field net/minecraft/client/renderer/Octree cameraSectionCenter Lnet/minecraft/core/BlockPos;
 accessible field net/minecraft/client/renderer/Octree$Branch nodes [Lnet/minecraft/client/renderer/Octree$Node;
 accessible field net/minecraft/client/renderer/Octree$Branch boundingBox Lnet/minecraft/world/level/levelgen/structure/BoundingBox;
-accessible field net/minecraft/client/renderer/Octree$Leaf section Lnet/minecraft/client/renderer/chunk/SectionRenderDispatcher$RenderSection;
+accessible method net/minecraft/client/renderer/Octree isClose (DDDDDDI)Z
 
 # Section subsets across visible section walks
 accessible field net/minecraft/client/renderer/ViewArea sections Lnet/minecraft/client/RotatingSectionStorage;
