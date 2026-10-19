@@ -178,6 +178,7 @@
     "SectionRenderDispatcherSlotMixin",
     "SectionDirtyStateChangeMixin",
     "SectionOcclusionGraphVisibleSectionsMixin",
+    "SectionOcclusionGraphTreeWalkMixin",
     "SectionCompilerEnclosedFluidMixin",
     "SectionCompilerMeshingWindowMixin",
     "ShapeOutlineEdgeCacheMixin",
