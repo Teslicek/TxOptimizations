@@ -73,6 +73,7 @@ public final class GpuPassProfiler {
         Arrays.fill(SLOW_TEXTS, null);
         FramePath.resetCounts();
         ProfileCounters.reset();
+        FragmentCounts.reset();
         context        = ProfileContext.capture(Minecraft.getInstance());
         frameTimeCount = 0;
         screenFormats  = null;
@@ -194,6 +195,7 @@ public final class GpuPassProfiler {
             recording = System.nanoTime() - startNanos < DURATION;
         }
 
+        FragmentCounts.drain();
         slot = (slot + 1) % SLOTS;
 
         if (COUNTS[slot] > 0) {
@@ -326,7 +328,7 @@ public final class GpuPassProfiler {
             .sorted((first, second) -> Long.compare(second.getValue().nanos, first.getValue().nanos))
             .forEach(entry -> report.append(String.format(Locale.ROOT, "%6.2f%%  %7.3f ms  %6.1fx  %s%n", entry.getValue().nanos * 100.0 / gpuNanos, entry.getValue().nanos / 1.0e6 / framesRead, (double) entry.getValue().calls / framesRead, entry.getKey())));
 
-        report.append(System.lineSeparator()).append(slowFrameReport());
+        report.append(System.lineSeparator()).append(FragmentCounts.report(framesRead)).append(slowFrameReport());
 
         return report.toString();
     }

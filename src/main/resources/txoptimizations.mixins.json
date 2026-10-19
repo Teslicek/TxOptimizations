@@ -283,6 +283,7 @@
     "cull.WardenHeartbeatAccessor",
     "gpu.FrontendRenderPassGpuProfilerMixin",
     "gpu.VulkanQueryPoolAccessor",
+    "gpu.VulkanRenderPassProfilerAccessor",
     "gpu.VulkanCommandEncoderGpuProfilerMixin",
     "gpu.VulkanGpuSurfaceGpuProfilerMixin",
     "hud.GameRendererHudCacheMixin",
