@@ -14,15 +14,10 @@ import org.spongepowered.asm.mixin.Shadow;
 public abstract class SectionOcclusionGraphTreeWalkMixin {
 
     @Shadow
-    private static Frustum offsetFrustum(Frustum frustum) {
-        throw new AssertionError();
-    }
-
-    @Shadow
     public abstract Octree getOctree();
 
     @Overwrite
     public void addSectionsInFrustum(Frustum frustum, List<SectionRenderDispatcher.RenderSection> visibleSections, List<SectionRenderDispatcher.RenderSection> nearbyVisibleSection) {
-        SectionTreeWalk.collect(this.getOctree(), offsetFrustum(frustum), visibleSections, nearbyVisibleSection);
+        SectionTreeWalk.collect(this.getOctree(), frustum, visibleSections, nearbyVisibleSection);
     }
 }
