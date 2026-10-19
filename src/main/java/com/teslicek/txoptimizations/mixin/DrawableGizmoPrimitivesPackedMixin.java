@@ -39,6 +39,17 @@ public abstract class DrawableGizmoPrimitivesPackedMixin implements PackedGizmoL
     }
 
     @Override
+    public void txoptimizations$addBox(double x0, double y0, double z0, double x1, double y1, double z1, int color, int xColor, int yColor, int zColor, float width) {
+        DrawableGizmoPrimitives.Group group = this.getGroup(color);
+
+        if (this.getGroup(xColor) != group || this.getGroup(yColor) != group || this.getGroup(zColor) != group)
+            throw new IllegalStateException("Box edge colors " + Integer.toHexString(xColor) + ", " + Integer.toHexString(yColor) + " and " + Integer.toHexString(zColor) + " do not share the transparency of " + Integer.toHexString(color));
+
+        ((GizmoLineList) group.lines()).addBox(x0, y0, z0, x1, y1, z1, color, xColor, yColor, zColor, width);
+        this.isEmpty = false;
+    }
+
+    @Override
     public void txoptimizations$clear() {
         txoptimizations$clear(this.opaque);
         txoptimizations$clear(this.translucent);

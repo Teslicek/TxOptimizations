@@ -40,21 +40,9 @@ public abstract class CuboidGizmoSharedCornersMixin {
             if (!this.style.hasStroke())
                 return;
 
-            int   color = this.style.multipliedStroke(alphaMultiplier);
-            float width = this.style.strokeWidth();
+            int color = this.style.multipliedStroke(alphaMultiplier);
 
-            packed.txoptimizations$addLine(x0, y0, z0, x1, y0, z0, this.coloredCornerStroke ? ARGB.multiply(color, -34953) : color, width);
-            packed.txoptimizations$addLine(x0, y0, z0, x0, y1, z0, this.coloredCornerStroke ? ARGB.multiply(color, -8913033) : color, width);
-            packed.txoptimizations$addLine(x0, y0, z0, x0, y0, z1, this.coloredCornerStroke ? ARGB.multiply(color, -8947713) : color, width);
-            packed.txoptimizations$addLine(x1, y0, z0, x1, y1, z0, color, width);
-            packed.txoptimizations$addLine(x1, y1, z0, x0, y1, z0, color, width);
-            packed.txoptimizations$addLine(x0, y1, z0, x0, y1, z1, color, width);
-            packed.txoptimizations$addLine(x0, y1, z1, x0, y0, z1, color, width);
-            packed.txoptimizations$addLine(x0, y0, z1, x1, y0, z1, color, width);
-            packed.txoptimizations$addLine(x1, y0, z1, x1, y0, z0, color, width);
-            packed.txoptimizations$addLine(x0, y1, z1, x1, y1, z1, color, width);
-            packed.txoptimizations$addLine(x1, y0, z1, x1, y1, z1, color, width);
-            packed.txoptimizations$addLine(x1, y1, z0, x1, y1, z1, color, width);
+            packed.txoptimizations$addBox(x0, y0, z0, x1, y1, z1, color, this.coloredCornerStroke ? ARGB.multiply(color, -34953) : color, this.coloredCornerStroke ? ARGB.multiply(color, -8913033) : color, this.coloredCornerStroke ? ARGB.multiply(color, -8947713) : color, this.style.strokeWidth());
 
             return;
         }

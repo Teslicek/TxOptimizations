@@ -117,12 +117,15 @@ public abstract class QuadParticleCornerCacheMixin {
             return;
 
         ROTATION.set(x, y, z, w);
+        txoptimizations$rotateCorner(0);
+        txoptimizations$rotateCorner(1);
 
-        for (int corner = 0; corner < VERTICES; corner ++) {
-            VERTEX.set(CORNER_X[corner], CORNER_Y[corner], 0.0F).rotate(ROTATION);
-            ROTATED[corner * 3]     = VERTEX.x;
-            ROTATED[corner * 3 + 1] = VERTEX.y;
-            ROTATED[corner * 3 + 2] = VERTEX.z;
+        if (txoptimizations$negatable(0) && txoptimizations$negatable(1)) {
+            for (int component = 0; component < 6; component ++)
+                ROTATED[6 + component] = -ROTATED[component];
+        } else {
+            txoptimizations$rotateCorner(2);
+            txoptimizations$rotateCorner(3);
         }
 
         cached  = true;
@@ -130,6 +133,26 @@ public abstract class QuadParticleCornerCacheMixin {
         cachedY = yBits;
         cachedZ = zBits;
         cachedW = wBits;
+    }
+
+    @Unique
+    private static void txoptimizations$rotateCorner(int corner) {
+        VERTEX.set(CORNER_X[corner], CORNER_Y[corner], 0.0F).rotate(ROTATION);
+        ROTATED[corner * 3]     = VERTEX.x;
+        ROTATED[corner * 3 + 1] = VERTEX.y;
+        ROTATED[corner * 3 + 2] = VERTEX.z;
+    }
+
+    @Unique
+    private static boolean txoptimizations$negatable(int corner) {
+        for (int component = corner * 3; component < corner * 3 + 3; component ++) {
+            float value = ROTATED[component];
+
+            if (value != value || value == 0.0F)
+                return false;
+        }
+
+        return true;
     }
 
     @Unique
