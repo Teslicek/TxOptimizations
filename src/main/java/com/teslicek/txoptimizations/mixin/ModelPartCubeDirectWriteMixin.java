@@ -6,6 +6,7 @@ import com.mojang.blaze3d.vertex.VertexConsumer;
 import com.teslicek.txoptimizations.CubeVertices;
 import com.teslicek.txoptimizations.DirectVertexBuffer;
 import com.teslicek.txoptimizations.NormalCache;
+import com.teslicek.txoptimizations.PositionTransform;
 import com.teslicek.txoptimizations.VertexBytes;
 import net.minecraft.client.model.geom.ModelPart;
 import org.joml.Matrix4f;
@@ -61,8 +62,8 @@ public abstract class ModelPartCubeDirectWriteMixin {
         if (pointer == MemoryUtil.NULL)
             return false;
 
-        Matrix4f matrix        = pose.pose();
-        Vector3f scratchVector = new Vector3f();
+        Matrix4f matrix     = pose.pose();
+        int      properties = matrix.properties();
 
         NormalCache.select(pose);
 
@@ -70,9 +71,11 @@ public abstract class ModelPartCubeDirectWriteMixin {
             int normal = NormalCache.packed(pose, polygon.normal());
 
             for (ModelPart.Vertex vertex : polygon.vertices()) {
-                Vector3f position = matrix.transformPosition(vertex.worldX(), vertex.worldY(), vertex.worldZ(), scratchVector);
+                float x = vertex.worldX();
+                float y = vertex.worldY();
+                float z = vertex.worldZ();
 
-                VertexBytes.putEntity(pointer, position.x(), position.y(), position.z(), color, vertex.u(), vertex.v(), overlayCoords, lightCoords, normal);
+                VertexBytes.putEntity(pointer, PositionTransform.x(matrix, properties, x, y, z), PositionTransform.y(matrix, properties, x, y, z), PositionTransform.z(matrix, properties, x, y, z), color, vertex.u(), vertex.v(), overlayCoords, lightCoords, normal);
                 pointer += VertexBytes.ENTITY_STRIDE;
             }
         }

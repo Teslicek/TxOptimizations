@@ -1,8 +1,8 @@
 package com.teslicek.txoptimizations.mixin;
 
+import com.mojang.blaze3d.vertex.DefaultVertexFormat;
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.blaze3d.vertex.VertexConsumer;
-import com.mojang.renderpearl.api.vertex.VertexFormat;
 import com.teslicek.txoptimizations.DirectVertexBuffer;
 import com.teslicek.txoptimizations.GizmoLineList;
 import com.teslicek.txoptimizations.VertexBytes;
@@ -15,7 +15,6 @@ import net.minecraft.client.renderer.state.level.CameraRenderState;
 import net.minecraft.util.Mth;
 import org.joml.Math;
 import org.joml.Matrix4fc;
-import org.lwjgl.system.MemoryUtil;
 import org.spongepowered.asm.mixin.Final;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Overwrite;
@@ -33,18 +32,6 @@ public abstract class GizmoLineIdentityPoseMixin extends RenderTypeFeatureRender
 
     @Unique
     private static final int LINE_VERTICES = 3;
-
-    @Unique
-    private static final String POSITION = "Position";
-
-    @Unique
-    private static final String COLOR = "Color";
-
-    @Unique
-    private static final String NORMAL = "Normal";
-
-    @Unique
-    private static final String LINE_WIDTH = "LineWidth";
 
     @Shadow
     @Final
@@ -69,13 +56,10 @@ public abstract class GizmoLineIdentityPoseMixin extends RenderTypeFeatureRender
         float          viewY   = modelViewMatrix.m12();
         float          viewZ   = modelViewMatrix.m22();
         float          viewW   = modelViewMatrix.m32();
-        VertexFormat   format  = builder instanceof DirectVertexBuffer buffer && buffer.txoptimizations$duplicatesVertices() ? buffer.txoptimizations$format() : null;
-        boolean        direct  = format != null && format.contains(POSITION) && format.contains(COLOR) && format.contains(NORMAL) && format.contains(LINE_WIDTH);
-        int            stride  = direct ? format.getVertexSize() : 0;
-        int            color   = direct ? format.getElement(COLOR).offset() : 0;
-        int            normal  = direct ? format.getElement(NORMAL).offset() : 0;
-        int            width   = direct ? format.getElement(LINE_WIDTH).offset() : 0;
-        int            origin  = direct ? format.getElement(POSITION).offset() : 0;
+        boolean        direct  = VertexBytes.LITTLE_ENDIAN && builder instanceof DirectVertexBuffer buffer && buffer.txoptimizations$duplicatesVertices() && buffer.txoptimizations$format() == DefaultVertexFormat.POSITION_COLOR_NORMAL_LINE_WIDTH;
+
+        if (direct)
+            VertexBytes.requireLineLayout(DefaultVertexFormat.POSITION_COLOR_NORMAL_LINE_WIDTH);
 
         for (int index = 0; index < packed.size(); index ++) {
             float startX     = (float) (packed.coordinate(index, 0) - camX);
@@ -127,19 +111,13 @@ public abstract class GizmoLineIdentityPoseMixin extends RenderTypeFeatureRender
                 continue;
             }
 
-            long pointer = ((DirectVertexBuffer) builder).txoptimizations$reserveAfterLastVertex(LINE_VERTICES);
+            long pointer   = ((DirectVertexBuffer) builder).txoptimizations$reserveAfterLastVertex(LINE_VERTICES);
+            int  colorBits = VertexBytes.colorBits(lineColor);
+            long tail      = VertexBytes.lineTail(VertexBytes.packNormal(normalX, normalY, normalZ), lineWidth);
 
-            txoptimizations$putVertex(pointer, origin, color, normal, width, startX, startY, startZ, lineColor, normalX, normalY, normalZ, lineWidth);
-            MemoryUtil.memCopy(pointer, pointer + stride, stride);
-            txoptimizations$putVertex(pointer + 2L * stride, origin, color, normal, width, endX, endY, endZ, lineColor, normalX, normalY, normalZ, lineWidth);
+            VertexBytes.putLine(pointer, startX, startY, startZ, colorBits, tail);
+            VertexBytes.putLine(pointer + VertexBytes.LINE_STRIDE, startX, startY, startZ, colorBits, tail);
+            VertexBytes.putLine(pointer + 2L * VertexBytes.LINE_STRIDE, endX, endY, endZ, colorBits, tail);
         }
-    }
-
-    @Unique
-    private static void txoptimizations$putVertex(long pointer, int origin, int color, int normal, int width, float x, float y, float z, int argb, float normalX, float normalY, float normalZ, float lineWidth) {
-        VertexBytes.putPosition(pointer + origin, x, y, z);
-        VertexBytes.putColor(pointer + color, argb);
-        VertexBytes.putNormal(pointer + normal, VertexBytes.packNormal(normalX, normalY, normalZ));
-        MemoryUtil.memPutFloat(pointer + width, lineWidth);
     }
 }

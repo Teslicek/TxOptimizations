@@ -1,18 +1,27 @@
 package com.teslicek.txoptimizations;
 
+import com.mojang.renderpearl.api.vertex.VertexFormat;
 import java.nio.ByteOrder;
 import net.minecraft.util.ARGB;
 import org.lwjgl.system.MemoryUtil;
 
 public final class VertexBytes {
 
-    public static final int ENTITY_STRIDE = 36;
+    public static final int     ENTITY_STRIDE = 36;
+    public static final int     LINE_STRIDE   = 24;
+    public static final boolean LITTLE_ENDIAN = ByteOrder.nativeOrder() == ByteOrder.LITTLE_ENDIAN;
 
-    private static final boolean LITTLE_ENDIAN = ByteOrder.nativeOrder() == ByteOrder.LITTLE_ENDIAN;
-    private static final int     BYTE_MASK     = 0xFF;
-    private static final int     HALF_BITS     = 16;
-    private static final long    INT_MASK      = 0xFFFFFFFFL;
-    private static final byte    NORMAL_SCALE  = 127;
+    private static final String POSITION           = "Position";
+    private static final String COLOR              = "Color";
+    private static final String NORMAL             = "Normal";
+    private static final String LINE_WIDTH         = "LineWidth";
+    private static final int    LINE_COLOR_OFFSET  = 12;
+    private static final int    LINE_NORMAL_OFFSET = 16;
+    private static final int    LINE_WIDTH_OFFSET  = 20;
+    private static final int    BYTE_MASK          = 0xFF;
+    private static final int    HALF_BITS          = 16;
+    private static final long   INT_MASK           = 0xFFFFFFFFL;
+    private static final byte   NORMAL_SCALE       = 127;
 
     private VertexBytes() {
     }
@@ -78,6 +87,24 @@ public final class VertexBytes {
             return NORMAL_SCALE;
 
         return (byte) (int) (value * NORMAL_SCALE);
+    }
+
+    public static void putLine(long pointer, float x, float y, float z, int colorBits, long tail) {
+        if (!LITTLE_ENDIAN)
+            throw new IllegalStateException("Line vertices are only packed into words on little-endian CPUs");
+
+        MemoryUtil.memPutLong(pointer, (long) Float.floatToRawIntBits(y) << Integer.SIZE | Float.floatToRawIntBits(x) & INT_MASK);
+        MemoryUtil.memPutLong(pointer + 8L, (long) colorBits << Integer.SIZE | Float.floatToRawIntBits(z) & INT_MASK);
+        MemoryUtil.memPutLong(pointer + 16L, tail);
+    }
+
+    public static void requireLineLayout(VertexFormat format) {
+        if (format.getVertexSize() != LINE_STRIDE || format.getElement(POSITION).offset() != 0 || format.getElement(COLOR).offset() != LINE_COLOR_OFFSET || format.getElement(NORMAL).offset() != LINE_NORMAL_OFFSET || format.getElement(LINE_WIDTH).offset() != LINE_WIDTH_OFFSET)
+            throw new IllegalStateException("Line vertex format " + format + " no longer has the position, color, normal and line width layout line vertices are packed in");
+    }
+
+    public static long lineTail(int packedNormal, float width) {
+        return (long) Float.floatToRawIntBits(width) << Integer.SIZE | packedNormal & INT_MASK;
     }
 
     public static int packNormal(float x, float y, float z) {
