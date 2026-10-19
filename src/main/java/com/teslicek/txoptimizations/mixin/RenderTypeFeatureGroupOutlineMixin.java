@@ -1,12 +1,8 @@
 package com.teslicek.txoptimizations.mixin;
 
-import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
-import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
+import com.llamalad7.mixinextras.injector.ModifyExpressionValue;
 import com.llamalad7.mixinextras.sugar.Local;
 import com.mojang.blaze3d.vertex.DefaultVertexFormat;
-import com.mojang.blaze3d.vertex.VertexSorting;
-import com.mojang.renderpearl.api.pipeline.PrimitiveTopology;
-import com.mojang.renderpearl.api.vertex.VertexFormat;
 import com.teslicek.txoptimizations.OutlineDraw;
 import com.teslicek.txoptimizations.OutlineDrawGroup;
 import java.util.List;
@@ -39,11 +35,9 @@ public abstract class RenderTypeFeatureGroupOutlineMixin implements OutlineDrawG
         return this.drawRenderTypes;
     }
 
-    @WrapOperation(method = "getOrAddDraw", at = @At(value = "INVOKE", target = "Lnet/minecraft/client/renderer/StagedVertexBuffer;appendDraw(Lcom/mojang/renderpearl/api/vertex/VertexFormat;Lcom/mojang/renderpearl/api/pipeline/PrimitiveTopology;Lcom/mojang/blaze3d/vertex/VertexSorting;)Lnet/minecraft/client/renderer/StagedVertexBuffer$Draw;"))
-    private StagedVertexBuffer.Draw txoptimizations$trackOutlineDraw(StagedVertexBuffer buffer, VertexFormat format, PrimitiveTopology topology, VertexSorting sorting, Operation<StagedVertexBuffer.Draw> original, @Local(argsOnly = true) RenderType renderType) {
-        StagedVertexBuffer.Draw draw = original.call(buffer, format, topology, sorting);
-
-        if (renderType.isOutline() && format == DefaultVertexFormat.POSITION_TEX_COLOR)
+    @ModifyExpressionValue(method = "getOrAddDraw", at = @At(value = "INVOKE", target = "Lnet/minecraft/client/renderer/StagedVertexBuffer;appendDraw(Lcom/mojang/renderpearl/api/vertex/VertexFormat;Lcom/mojang/renderpearl/api/pipeline/PrimitiveTopology;Lcom/mojang/blaze3d/vertex/VertexSorting;)Lnet/minecraft/client/renderer/StagedVertexBuffer$Draw;"))
+    private StagedVertexBuffer.Draw txoptimizations$trackOutlineDraw(StagedVertexBuffer.Draw draw, @Local(argsOnly = true) RenderType renderType) {
+        if (renderType.isOutline() && renderType.format() == DefaultVertexFormat.POSITION_TEX_COLOR)
             ((OutlineDraw) draw).txoptimizations$trackOutline();
 
         return draw;
