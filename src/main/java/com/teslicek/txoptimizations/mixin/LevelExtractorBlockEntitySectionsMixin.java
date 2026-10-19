@@ -23,8 +23,7 @@ public abstract class LevelExtractorBlockEntitySectionsMixin {
 
     @ModifyExpressionValue(method = "extractVisibleBlockEntities", at = @At(value = "INVOKE", target = "Lnet/minecraft/client/renderer/chunk/SectionMesh;getRenderableBlockEntities()Ljava/util/List;"))
     private List<BlockEntity> txoptimizations$recordBlockEntitySection(List<BlockEntity> blockEntities, @Local SectionRenderDispatcher.RenderSection section) {
-        if (!blockEntities.isEmpty())
-            SectionSubset.BLOCK_ENTITIES.record(section);
+        SectionSubset.BLOCK_ENTITIES.note(section, !blockEntities.isEmpty());
 
         return blockEntities;
     }

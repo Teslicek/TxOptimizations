@@ -103,3 +103,6 @@ accessible field net/minecraft/client/renderer/Octree cameraSectionCenter Lnet/m
 accessible field net/minecraft/client/renderer/Octree$Branch nodes [Lnet/minecraft/client/renderer/Octree$Node;
 accessible field net/minecraft/client/renderer/Octree$Branch boundingBox Lnet/minecraft/world/level/levelgen/structure/BoundingBox;
 accessible field net/minecraft/client/renderer/Octree$Leaf section Lnet/minecraft/client/renderer/chunk/SectionRenderDispatcher$RenderSection;
+
+# Section subsets across visible section walks
+accessible field net/minecraft/client/renderer/ViewArea sections Lnet/minecraft/client/RotatingSectionStorage;
