@@ -56,7 +56,6 @@
     "DynamicChunkSectionWriteMixin",
     "DynamicGpuDataSectionDrawMixin",
     "DynamicGpuDataStoragePersistentWriteMixin",
-    "DynamicGpuDataStorageSectionInfoMixin",
     "DynamicTransformEqualsMixin",
     "EntityEquipmentCullingHeadMixin",
     "EntityHitboxDebugRendererMixin",

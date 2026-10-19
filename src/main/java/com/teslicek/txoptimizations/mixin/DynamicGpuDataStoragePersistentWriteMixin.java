@@ -7,7 +7,9 @@ import com.teslicek.txoptimizations.NativeWrites;
 import com.teslicek.txoptimizations.PersistentRingBuffer;
 import com.teslicek.txoptimizations.SectionCommandStorage;
 import com.teslicek.txoptimizations.SectionDrawList;
+import com.teslicek.txoptimizations.SectionInfoStorage;
 import java.nio.ByteBuffer;
+import java.util.function.LongConsumer;
 import net.minecraft.client.renderer.DynamicGpuDataStorage;
 import net.minecraft.client.renderer.DynamicGpuDataStorageMapped;
 import net.minecraft.client.renderer.MappableRingBuffer;
@@ -21,7 +23,7 @@ import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.Unique;
 
 @Mixin(DynamicGpuDataStorageMapped.class)
-public abstract class DynamicGpuDataStoragePersistentWriteMixin<T extends DynamicGpuDataStorage.DynamicGpuData> implements SectionCommandStorage {
+public abstract class DynamicGpuDataStoragePersistentWriteMixin<T extends DynamicGpuDataStorage.DynamicGpuData> implements SectionCommandStorage, SectionInfoStorage {
 
     @Shadow
     @Final
@@ -106,22 +108,11 @@ public abstract class DynamicGpuDataStoragePersistentWriteMixin<T extends Dynami
         if (lists == 0)
             return new GpuBufferSlice[0];
 
-        if (this.blockSize != SectionDrawList.COMMAND_BYTES)
-            throw new IllegalStateException(this.label + " holds blocks of " + this.blockSize + " bytes but a section draw command is " + SectionDrawList.COMMAND_BYTES);
-
-        int totalCount = draws.commandCount();
-
-        if (this.nextBlock + totalCount > this.capacity) {
-            int newCapacity = Mth.smallestEncompassingPowerOfTwo(Math.max(this.capacity + 1, totalCount));
-
-            LOGGER.info("Resizing {}, capacity limit of {} reached during a single frame. New capacity will be {}.", this.label, this.capacity, newCapacity);
-            this.resizeBuffers(newCapacity);
-        }
-
-        int              offset = this.nextBlock * this.blockSize;
-        int              bytes  = totalCount * this.blockSize;
-        GpuBuffer        buffer = this.ringBuffer.currentBuffer();
-        GpuBufferSlice[] result = new GpuBufferSlice[lists];
+        int              totalCount = draws.commandCount();
+        int              offset     = this.txoptimizations$reserve(totalCount, SectionDrawList.COMMAND_BYTES, "section draw command");
+        int              bytes      = totalCount * this.blockSize;
+        GpuBuffer        buffer     = this.ringBuffer.currentBuffer();
+        GpuBufferSlice[] result     = new GpuBufferSlice[lists];
 
         for (int list = 0, listOffset = offset; list < lists; list ++) {
             int listBytes = draws.drawCount(draws.outputGroup(list)) * this.blockSize;
@@ -130,17 +121,57 @@ public abstract class DynamicGpuDataStoragePersistentWriteMixin<T extends Dynami
             listOffset   += listBytes;
         }
 
-        if (buffer instanceof VulkanGpuBuffer.Direct) {
-            draws.writeCommands(NativeWrites.at(((PersistentRingBuffer) this.ringBuffer).txoptimizations$mapCurrent(), offset, bytes));
-        } else {
-            try (GpuBufferSlice.MappedView view = buffer.slice(offset, bytes).map(false, true)) {
-                draws.writeCommands(NativeWrites.at(view.data(), 0, bytes));
-            }
-        }
-
+        this.txoptimizations$write(buffer, offset, bytes, draws::writeCommands);
         this.nextBlock += totalCount;
         this.lastData   = (T) draws.lastCommand();
 
         return result;
+    }
+
+    @Override
+    @SuppressWarnings("unchecked")
+    public GpuBufferSlice txoptimizations$writeSectionInfos(SectionDrawList draws) {
+        int count = draws.sectionCount();
+
+        if (count == 0)
+            return new GpuBufferSlice(null, 0L, 0L);
+
+        int       offset = this.txoptimizations$reserve(count, SectionDrawList.SECTION_BYTES, "section info");
+        int       bytes  = count * this.blockSize;
+        GpuBuffer buffer = this.ringBuffer.currentBuffer();
+
+        this.txoptimizations$write(buffer, offset, bytes, draws::writeSectionInfos);
+        this.nextBlock += count;
+        this.lastData   = (T) draws.sectionInfo(count - 1);
+
+        return buffer.slice(offset, bytes);
+    }
+
+    @Unique
+    private int txoptimizations$reserve(int count, int blockBytes, String kind) {
+        if (this.blockSize != blockBytes)
+            throw new IllegalStateException(this.label + " holds blocks of " + this.blockSize + " bytes but a " + kind + " is " + blockBytes);
+
+        if (this.nextBlock + count > this.capacity) {
+            int newCapacity = Mth.smallestEncompassingPowerOfTwo(Math.max(this.capacity + 1, count));
+
+            LOGGER.info("Resizing {}, capacity limit of {} reached during a single frame. New capacity will be {}.", this.label, this.capacity, newCapacity);
+            this.resizeBuffers(newCapacity);
+        }
+
+        return this.nextBlock * this.blockSize;
+    }
+
+    @Unique
+    private void txoptimizations$write(GpuBuffer buffer, int offset, int bytes, LongConsumer writer) {
+        if (buffer instanceof VulkanGpuBuffer.Direct) {
+            writer.accept(NativeWrites.at(((PersistentRingBuffer) this.ringBuffer).txoptimizations$mapCurrent(), offset, bytes));
+
+            return;
+        }
+
+        try (GpuBufferSlice.MappedView view = buffer.slice(offset, bytes).map(false, true)) {
+            writer.accept(NativeWrites.at(view.data(), 0, bytes));
+        }
     }
 }

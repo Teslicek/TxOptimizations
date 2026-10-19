@@ -9,7 +9,6 @@ import com.teslicek.txoptimizations.SectionInfoStorage;
 import net.minecraft.client.renderer.DynamicGpuData;
 import net.minecraft.client.renderer.DynamicGpuDataStorage;
 import net.minecraft.client.renderer.DynamicGpuDataStorageMapped;
-import net.minecraft.client.renderer.DynamicGpuDataStorageNonMapped;
 import org.jspecify.annotations.Nullable;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
@@ -33,13 +32,13 @@ public abstract class DynamicGpuDataSectionDrawMixin implements SectionDrawUnifo
 
     @Override
     public GpuBufferSlice txoptimizations$writeSectionInfos(SectionDrawList draws) {
-        if (this.chunkSections != null && (this.chunkSections.usage() & GpuBuffer.USAGE_VERTEX) == 0) {
+        if (this.chunkSections != null && (!(this.chunkSections instanceof DynamicGpuDataStorageMapped) || (this.chunkSections.usage() & GpuBuffer.USAGE_VERTEX) == 0)) {
             this.chunkSections.close();
             this.chunkSections = null;
         }
 
         if (this.chunkSections == null)
-            this.chunkSections = new DynamicGpuDataStorageNonMapped<>("Chunk Sections Instanced", DynamicGpuData.CHUNK_SECTION_UBO_SIZE, GpuBuffer.USAGE_VERTEX, 2);
+            this.chunkSections = new DynamicGpuDataStorageMapped<>("Chunk Sections Instanced", DynamicGpuData.CHUNK_SECTION_UBO_SIZE, GpuBuffer.USAGE_VERTEX, 2);
 
         if (!(this.chunkSections instanceof SectionInfoStorage storage))
             throw new IllegalStateException("Chunk section infos are stored in " + this.chunkSections + ", which cannot take raw section infos");
