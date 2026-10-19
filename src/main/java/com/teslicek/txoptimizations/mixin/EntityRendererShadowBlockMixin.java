@@ -11,7 +11,7 @@ import net.minecraft.world.level.chunk.ChunkAccess;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Overwrite;
 
-@Mixin(EntityRenderer.class)
+@Mixin(value = EntityRenderer.class, priority = 999)
 public abstract class EntityRendererShadowBlockMixin {
 
     @Overwrite

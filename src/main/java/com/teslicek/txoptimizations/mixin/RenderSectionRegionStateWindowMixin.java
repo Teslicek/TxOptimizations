@@ -12,7 +12,7 @@ import org.spongepowered.asm.mixin.Overwrite;
 import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.Unique;
 
-@Mixin(RenderSectionRegion.class)
+@Mixin(value = RenderSectionRegion.class, priority = 999)
 public abstract class RenderSectionRegionStateWindowMixin implements SectionStateAccess {
 
     @Unique

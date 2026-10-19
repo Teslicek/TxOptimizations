@@ -5,7 +5,7 @@ import com.teslicek.txoptimizations.DistanceSorting;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Overwrite;
 
-@Mixin(VertexSorting.class)
+@Mixin(value = VertexSorting.class, priority = 999)
 public interface VertexSortingDistanceMixin {
 
     @Overwrite

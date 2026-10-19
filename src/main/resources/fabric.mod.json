@@ -32,6 +32,7 @@
     "entityculling": "*",
     "ferritecore": "*",
     "gnetum": "*",
+    "iris": "*",
     "moreculling": "*",
     "sodium": "*"
   }

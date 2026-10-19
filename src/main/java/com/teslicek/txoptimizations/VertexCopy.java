@@ -114,6 +114,10 @@ public final class VertexCopy {
         throw new IllegalStateException("Copying vertices on the vertex copy thread failed", thrown);
     }
 
+    public static void runQueuedCopy() {
+        Worker.runQueuedCopy();
+    }
+
     private void runQueued() {
         if (!this.state.compareAndSet(QUEUED, RUNNING))
             return;
@@ -146,19 +150,29 @@ public final class VertexCopy {
 
         private static void queue(VertexCopy copy) {
             JOB.set(copy);
-            LockSupport.unpark(THREAD);
+
+            if (!PresentThread.isSpinning())
+                LockSupport.unpark(THREAD);
+        }
+
+        private static void runQueuedCopy() {
+            if (JOB.get() == null)
+                return;
+
+            VertexCopy copy = JOB.getAndSet(null);
+
+            if (copy != null)
+                copy.runQueued();
         }
 
         private static void work() {
             while (true) {
-                VertexCopy copy = JOB.getAndSet(null);
-
-                if (copy == null) {
+                if (JOB.get() == null) {
                     LockSupport.park(Worker.class);
                     continue;
                 }
 
-                copy.runQueued();
+                runQueuedCopy();
             }
         }
     }

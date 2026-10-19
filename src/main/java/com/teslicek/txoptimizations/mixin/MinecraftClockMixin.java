@@ -3,6 +3,7 @@ package com.teslicek.txoptimizations.mixin;
 import com.teslicek.txoptimizations.ClientClock;
 import com.teslicek.txoptimizations.FpsCounter;
 import net.minecraft.client.Minecraft;
+import net.minecraft.util.Util;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
@@ -18,7 +19,7 @@ public abstract class MinecraftClockMixin {
 
     @Inject(method = "renderFrame", at = @At("HEAD"))
     private void txoptimizations$advanceFrame(boolean advanceGameTime, CallbackInfo ci) {
-        ClientClock.advanceFrame();
+        ClientClock.advanceFrame(Util.getMillis());
         FpsCounter.countFrame();
     }
 }

@@ -4,8 +4,8 @@ import com.mojang.blaze3d.vertex.VertexConsumer;
 import com.teslicek.txoptimizations.DirectVertexBuffer;
 import com.teslicek.txoptimizations.TexturedVertexLayout;
 import net.minecraft.client.gui.font.glyphs.BakedSheetGlyph;
+import org.joml.Math;
 import org.joml.Matrix4fc;
-import org.joml.Vector3f;
 import org.lwjgl.system.MemoryUtil;
 import org.spongepowered.asm.mixin.Final;
 import org.spongepowered.asm.mixin.Mixin;
@@ -13,7 +13,7 @@ import org.spongepowered.asm.mixin.Overwrite;
 import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.Unique;
 
-@Mixin(BakedSheetGlyph.class)
+@Mixin(value = BakedSheetGlyph.class, priority = 999)
 public abstract class BakedSheetGlyphDirectWriteMixin {
 
     @Unique
@@ -122,19 +122,47 @@ public abstract class BakedSheetGlyphDirectWriteMixin {
         if (pointer == MemoryUtil.NULL)
             return false;
 
-        Vector3f position = new Vector3f();
+        long second     = pointer + layout.stride();
+        long third      = pointer + 2L * layout.stride();
+        long fourth     = pointer + 3L * layout.stride();
+        int  properties = pose.properties();
 
-        txoptimizations$put(pointer, layout, pose, position, x0, y0, z, color, u0, v0, light);
-        txoptimizations$put(pointer + layout.stride(), layout, pose, position, x1, y1, z, color, u0, v1, light);
-        txoptimizations$put(pointer + 2L * layout.stride(), layout, pose, position, x2, y2, z, color, u1, v1, light);
-        txoptimizations$put(pointer + 3L * layout.stride(), layout, pose, position, x3, y3, z, color, u1, v0, light);
+        if ((properties & Matrix4fc.PROPERTY_IDENTITY) != 0) {
+            layout.put(pointer, x0, y0, z, color, u0, v0, light);
+            layout.put(second, x1, y1, z, color, u0, v1, light);
+            layout.put(third, x2, y2, z, color, u1, v1, light);
+            layout.put(fourth, x3, y3, z, color, u1, v0, light);
+
+            return true;
+        }
+
+        if ((properties & Matrix4fc.PROPERTY_TRANSLATION) != 0) {
+            float tx = pose.m30();
+            float ty = pose.m31();
+            float tz = z + pose.m32();
+
+            layout.put(pointer, x0 + tx, y0 + ty, tz, color, u0, v0, light);
+            layout.put(second, x1 + tx, y1 + ty, tz, color, u0, v1, light);
+            layout.put(third, x2 + tx, y2 + ty, tz, color, u1, v1, light);
+            layout.put(fourth, x3 + tx, y3 + ty, tz, color, u1, v0, light);
+
+            return true;
+        }
+
+        float zx = Math.fma(pose.m20(), z, pose.m30());
+        float zy = Math.fma(pose.m21(), z, pose.m31());
+        float zz = Math.fma(pose.m22(), z, pose.m32());
+
+        txoptimizations$put(pointer, layout, pose, zx, zy, zz, x0, y0, color, u0, v0, light);
+        txoptimizations$put(second, layout, pose, zx, zy, zz, x1, y1, color, u0, v1, light);
+        txoptimizations$put(third, layout, pose, zx, zy, zz, x2, y2, color, u1, v1, light);
+        txoptimizations$put(fourth, layout, pose, zx, zy, zz, x3, y3, color, u1, v0, light);
 
         return true;
     }
 
     @Unique
-    private static void txoptimizations$put(long pointer, TexturedVertexLayout layout, Matrix4fc pose, Vector3f position, float x, float y, float z, int color, float u, float v, int light) {
-        pose.transformPosition(x, y, z, position);
-        layout.put(pointer, position.x(), position.y(), position.z(), color, u, v, light);
+    private static void txoptimizations$put(long pointer, TexturedVertexLayout layout, Matrix4fc pose, float zx, float zy, float zz, float x, float y, int color, float u, float v, int light) {
+        layout.put(pointer, Math.fma(pose.m00(), x, Math.fma(pose.m10(), y, zx)), Math.fma(pose.m01(), x, Math.fma(pose.m11(), y, zy)), Math.fma(pose.m02(), x, Math.fma(pose.m12(), y, zz)), color, u, v, light);
     }
 }

@@ -10,7 +10,6 @@ import com.teslicek.txoptimizations.mixin.RenderTypeFeatureRendererGroupsAccesso
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import net.fabricmc.loader.api.FabricLoader;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.PostChain;
 import net.minecraft.client.renderer.PostPass;
@@ -44,8 +43,6 @@ public final class OutlineScissor {
     private static final int    UNMEASURED   = 0;
     private static final int    UNBOUNDED    = 1;
     private static final int    BOUNDED      = 2;
-
-    private static final boolean IRIS = FabricLoader.getInstance().isModLoaded("iris");
 
     private static final String[] VANILLA_FILES = {
         "post_effect/entity_outline.json",
@@ -107,7 +104,7 @@ public final class OutlineScissor {
         }
 
         passes  = ((PostChainPassesAccessor) current).txoptimizations$passes();
-        vanilla = !IRIS && passes.size() == PASSES && isVanillaChain();
+        vanilla = passes.size() == PASSES && isVanillaChain();
     }
 
     public static void beginFrame() {

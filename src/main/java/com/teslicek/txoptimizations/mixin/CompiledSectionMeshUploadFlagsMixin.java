@@ -14,7 +14,7 @@ import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Redirect;
 
-@Mixin(CompiledSectionMesh.class)
+@Mixin(value = CompiledSectionMesh.class, priority = 999)
 public abstract class CompiledSectionMeshUploadFlagsMixin {
 
     @Unique

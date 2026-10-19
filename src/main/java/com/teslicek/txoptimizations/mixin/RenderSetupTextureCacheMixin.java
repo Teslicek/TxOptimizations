@@ -18,7 +18,7 @@ import org.spongepowered.asm.mixin.Overwrite;
 import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.Unique;
 
-@Mixin(RenderSetup.class)
+@Mixin(value = RenderSetup.class, priority = 999)
 public abstract class RenderSetupTextureCacheMixin {
 
     @Shadow

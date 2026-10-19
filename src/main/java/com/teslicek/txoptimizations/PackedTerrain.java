@@ -10,7 +10,6 @@ import com.mojang.renderpearl.api.vertex.VertexFormatElement;
 import com.teslicek.txoptimizations.mixin.PipelineCacheAccessor;
 import com.teslicek.txoptimizations.mixin.RenderSystemPipelineCacheAccessor;
 import java.util.Optional;
-import net.fabricmc.loader.api.FabricLoader;
 import net.minecraft.client.renderer.chunk.ChunkSectionLayer;
 import net.minecraft.resources.Identifier;
 import org.jspecify.annotations.Nullable;
@@ -25,7 +24,6 @@ public final class PackedTerrain {
     private static final int        SLOTS          = 16;
     private static final int        BLOCK_ELEMENTS = 4;
     private static final int        CHUNK_ELEMENTS = 2;
-    private static final boolean    IRIS           = FabricLoader.getInstance().isModLoaded("iris");
 
     private static @Nullable PipelineCache checkedCache;
     private static boolean                 packedSource;
@@ -41,9 +39,6 @@ public final class PackedTerrain {
     }
 
     public static RenderPipeline multiDrawPipeline(ChunkSectionLayer layer, RenderPipeline vanilla) {
-        if (IRIS)
-            return vanilla;
-
         PipelineCache cache = RenderSystemPipelineCacheAccessor.txoptimizations$currentPipelineCache();
 
         if (cache == null)

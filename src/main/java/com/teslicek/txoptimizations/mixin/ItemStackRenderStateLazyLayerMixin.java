@@ -11,7 +11,7 @@ import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;
 
-@Mixin(ItemStackRenderState.class)
+@Mixin(value = ItemStackRenderState.class, priority = 999)
 public abstract class ItemStackRenderStateLazyLayerMixin {
 
     @Unique

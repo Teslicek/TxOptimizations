@@ -12,7 +12,7 @@ import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Overwrite;
 import org.spongepowered.asm.mixin.Shadow;
 
-@Mixin(ClipContext.class)
+@Mixin(value = ClipContext.class, priority = 999)
 public abstract class ClipContextAirMixin {
 
     @Shadow

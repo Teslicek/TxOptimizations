@@ -4,6 +4,7 @@ public final class ClientClock {
 
     private static long tick;
     private static long frame;
+    private static long frameMillis;
 
     private ClientClock() {
     }
@@ -16,11 +17,16 @@ public final class ClientClock {
         return frame;
     }
 
+    public static long frameMillis() {
+        return frameMillis;
+    }
+
     public static void advanceTick() {
         tick ++;
     }
 
-    public static void advanceFrame() {
+    public static void advanceFrame(long millis) {
         frame ++;
+        frameMillis = millis;
     }
 }

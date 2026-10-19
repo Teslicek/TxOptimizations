@@ -11,7 +11,7 @@ import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Overwrite;
 import org.spongepowered.asm.mixin.Shadow;
 
-@Mixin(AttributeMap.class)
+@Mixin(value = AttributeMap.class, priority = 999)
 public abstract class AttributeMapLookupMixin {
 
     @Shadow

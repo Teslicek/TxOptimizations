@@ -14,7 +14,7 @@ import org.spongepowered.asm.mixin.Overwrite;
 import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.Unique;
 
-@Mixin(ItemStackRenderState.class)
+@Mixin(value = ItemStackRenderState.class, priority = 999)
 public abstract class ItemStackRenderStateBoundsMixin {
 
     @Shadow

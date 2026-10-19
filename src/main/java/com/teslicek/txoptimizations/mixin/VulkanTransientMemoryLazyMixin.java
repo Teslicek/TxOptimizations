@@ -15,7 +15,7 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
-@Mixin(VulkanTransientMemory.class)
+@Mixin(value = VulkanTransientMemory.class, priority = 999)
 public abstract class VulkanTransientMemoryLazyMixin {
 
     @Shadow

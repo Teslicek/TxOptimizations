@@ -17,7 +17,7 @@ import org.spongepowered.asm.mixin.Overwrite;
 import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.Unique;
 
-@Mixin(ModelPart.Cube.class)
+@Mixin(value = ModelPart.Cube.class, priority = 999)
 public abstract class ModelPartCubeDirectWriteMixin {
 
     @Shadow

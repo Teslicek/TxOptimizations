@@ -8,7 +8,7 @@ import net.minecraft.world.level.lighting.SkyLightSectionStorage;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Overwrite;
 
-@Mixin(SkyLightSectionStorage.class)
+@Mixin(value = SkyLightSectionStorage.class, priority = 999)
 public abstract class SkyLightSectionStorageLookupMixin extends LayerLightSectionStorage<SkyLightSectionStorage.SkyDataLayerStorageMap> {
 
     protected SkyLightSectionStorageLookupMixin(LightLayer layer, LightChunkGetter chunkSource, SkyLightSectionStorage.SkyDataLayerStorageMap initialMap) {

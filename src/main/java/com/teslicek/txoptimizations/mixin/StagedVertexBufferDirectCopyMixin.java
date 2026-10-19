@@ -29,7 +29,7 @@ import org.spongepowered.asm.mixin.injection.ModifyConstant;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
-@Mixin(StagedVertexBuffer.class)
+@Mixin(value = StagedVertexBuffer.class, priority = 999)
 public abstract class StagedVertexBufferDirectCopyMixin implements BackgroundVertexCopy {
 
     @Shadow

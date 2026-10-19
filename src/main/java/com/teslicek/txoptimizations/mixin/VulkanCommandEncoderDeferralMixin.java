@@ -36,7 +36,7 @@ import org.spongepowered.asm.mixin.injection.Redirect;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
-@Mixin(VulkanCommandEncoder.class)
+@Mixin(value = VulkanCommandEncoder.class, priority = 999)
 public abstract class VulkanCommandEncoderDeferralMixin {
 
     @Shadow

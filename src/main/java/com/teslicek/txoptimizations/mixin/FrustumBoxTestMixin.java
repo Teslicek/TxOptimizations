@@ -9,7 +9,7 @@ import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Overwrite;
 import org.spongepowered.asm.mixin.Shadow;
 
-@Mixin(Frustum.class)
+@Mixin(value = Frustum.class, priority = 999)
 public abstract class FrustumBoxTestMixin implements FrustumBoxTest {
 
     @Shadow

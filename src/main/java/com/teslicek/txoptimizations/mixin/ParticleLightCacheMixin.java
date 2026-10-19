@@ -11,7 +11,7 @@ import org.spongepowered.asm.mixin.Overwrite;
 import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.Unique;
 
-@Mixin(Particle.class)
+@Mixin(value = Particle.class, priority = 999)
 public abstract class ParticleLightCacheMixin {
 
     @Unique

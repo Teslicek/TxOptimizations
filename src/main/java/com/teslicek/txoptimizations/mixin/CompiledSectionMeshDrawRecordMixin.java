@@ -24,7 +24,7 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
-@Mixin(CompiledSectionMesh.class)
+@Mixin(value = CompiledSectionMesh.class, priority = 999)
 public abstract class CompiledSectionMeshDrawRecordMixin implements SectionAllocations, DrawRecordHolder {
 
     @Shadow

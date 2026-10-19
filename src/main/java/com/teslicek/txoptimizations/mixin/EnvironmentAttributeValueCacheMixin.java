@@ -6,7 +6,7 @@ import org.spongepowered.asm.mixin.Overwrite;
 import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.Unique;
 
-@Mixin(targets = "net.minecraft.world.attribute.EnvironmentAttributeProbe$ValueProbe")
+@Mixin(targets = "net.minecraft.world.attribute.EnvironmentAttributeProbe$ValueProbe", priority = 999)
 public abstract class EnvironmentAttributeValueCacheMixin {
 
     @Shadow

@@ -13,7 +13,6 @@ import com.mojang.renderpearl.api.pipeline.RenderPipeline;
 import com.mojang.renderpearl.api.textures.GpuTextureView;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
-import net.fabricmc.loader.api.FabricLoader;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.BindGroupLayouts;
 import net.minecraft.client.renderer.SkyRenderer;
@@ -28,7 +27,6 @@ public final class SkyFarPlane {
     private static final Set<String>       SHADERS        = Set.of("shaders/core/sky.vsh", "shaders/core/stars.vsh", "shaders/core/position_color.vsh", "shaders/core/position_tex.vsh");
     private static final Set<String>       PATCHED        = ConcurrentHashMap.newKeySet();
     private static final DepthStencilState BEHIND_TERRAIN = new DepthStencilState(CompareOp.GREATER_THAN_OR_EQUAL, false);
-    private static final boolean           IRIS           = FabricLoader.getInstance().isModLoaded("iris");
 
     public static final RenderPipeline SKY = RenderPipeline.builder()
         .withBindGroupLayout(BindGroupLayouts.GLOBALS)
@@ -113,7 +111,7 @@ public final class SkyFarPlane {
     }
 
     public static boolean canDefer(SkyRenderState state, boolean improvedTransparency) {
-        return !IRIS && state.skybox == DimensionType.Skybox.OVERWORLD && !improvedTransparency && PATCHED.size() == SHADERS.size();
+        return state.skybox == DimensionType.Skybox.OVERWORLD && !improvedTransparency && PATCHED.size() == SHADERS.size();
     }
 
     public static void defer(SkyRenderer renderer, GpuBufferSlice fog, SkyRenderState state) {

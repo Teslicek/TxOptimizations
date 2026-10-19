@@ -14,7 +14,7 @@ import org.spongepowered.asm.mixin.Overwrite;
 import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.Unique;
 
-@Mixin(ArrowGizmo.class)
+@Mixin(value = ArrowGizmo.class, priority = 999)
 public abstract class ArrowGizmoPackedMixin {
 
     @Unique

@@ -22,7 +22,7 @@ import org.spongepowered.asm.mixin.Overwrite;
 import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.Unique;
 
-@Mixin(DynamicGpuDataStorageMapped.class)
+@Mixin(value = DynamicGpuDataStorageMapped.class, priority = 999)
 public abstract class DynamicGpuDataStoragePersistentWriteMixin<T extends DynamicGpuDataStorage.DynamicGpuData> implements SectionCommandStorage, SectionInfoStorage {
 
     @Shadow

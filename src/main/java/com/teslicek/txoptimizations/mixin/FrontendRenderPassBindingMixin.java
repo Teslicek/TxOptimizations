@@ -27,7 +27,7 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
-@Mixin(FrontendRenderPass.class)
+@Mixin(value = FrontendRenderPass.class, priority = 999)
 public abstract class FrontendRenderPassBindingMixin {
 
     @Shadow

@@ -8,7 +8,7 @@ import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Overwrite;
 import org.spongepowered.asm.mixin.Shadow;
 
-@Mixin(Entity.class)
+@Mixin(value = Entity.class, priority = 999)
 public abstract class EntityPlayerPassengersMixin {
 
     @Shadow

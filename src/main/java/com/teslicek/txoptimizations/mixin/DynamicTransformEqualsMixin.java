@@ -10,7 +10,7 @@ import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Overwrite;
 import org.spongepowered.asm.mixin.Shadow;
 
-@Mixin(DynamicGpuData.Transform.class)
+@Mixin(value = DynamicGpuData.Transform.class, priority = 999)
 public abstract class DynamicTransformEqualsMixin {
 
     @Shadow

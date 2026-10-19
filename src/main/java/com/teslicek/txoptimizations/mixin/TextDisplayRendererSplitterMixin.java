@@ -10,7 +10,7 @@ import org.spongepowered.asm.mixin.Overwrite;
 import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.Unique;
 
-@Mixin(DisplayRenderer.TextDisplayRenderer.class)
+@Mixin(value = DisplayRenderer.TextDisplayRenderer.class, priority = 999)
 public abstract class TextDisplayRendererSplitterMixin extends DisplayRenderer<Display.TextDisplay, Display.TextDisplay.TextRenderState, TextDisplayEntityRenderState> {
 
     @Unique

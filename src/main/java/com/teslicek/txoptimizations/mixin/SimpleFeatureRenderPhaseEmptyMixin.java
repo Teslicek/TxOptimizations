@@ -9,7 +9,7 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
-@Mixin(SimpleFeatureRenderPhase.class)
+@Mixin(value = SimpleFeatureRenderPhase.class, priority = 999)
 public abstract class SimpleFeatureRenderPhaseEmptyMixin {
 
     @Unique
