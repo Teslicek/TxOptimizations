@@ -10,17 +10,21 @@ public final class ProfileCounters {
     private static long multiDraws;
     private static long indirectDraws;
     private static long batchedDraws;
+    private static long terrainDraws;
+    private static long terrainTriangles;
 
     private ProfileCounters() {
     }
 
     static void reset() {
-        renderPasses  = 0L;
-        pipelineSets  = 0L;
-        draws         = 0L;
-        multiDraws    = 0L;
-        indirectDraws = 0L;
-        batchedDraws  = 0L;
+        renderPasses     = 0L;
+        pipelineSets     = 0L;
+        draws            = 0L;
+        multiDraws       = 0L;
+        indirectDraws    = 0L;
+        batchedDraws     = 0L;
+        terrainDraws     = 0L;
+        terrainTriangles = 0L;
     }
 
     public static void countRenderPass() {
@@ -53,7 +57,15 @@ public final class ProfileCounters {
             batchedDraws += count;
     }
 
+    public static void countTerrainDraw(int indexCount) {
+        if (!GpuPassProfiler.isRecording())
+            return;
+
+        terrainDraws ++;
+        terrainTriangles += indexCount / 3;
+    }
+
     static String report(int frames) {
-        return String.format(Locale.ROOT, "Per frame: %.1f render passes, %.1f pipeline sets, %.1f draws, %.1f multi-draw calls, %.1f indirect draws, %.1f batched draws%n", (double) renderPasses / frames, (double) pipelineSets / frames, (double) draws / frames, (double) multiDraws / frames, (double) indirectDraws / frames, (double) batchedDraws / frames);
+        return String.format(Locale.ROOT, "Per frame: %.1f render passes, %.1f pipeline sets, %.1f draws, %.1f multi-draw calls, %.1f indirect draws, %.1f batched draws%n", (double) renderPasses / frames, (double) pipelineSets / frames, (double) draws / frames, (double) multiDraws / frames, (double) indirectDraws / frames, (double) batchedDraws / frames) + String.format(Locale.ROOT, "Terrain %.0f draws and %.3f million triangles per frame%n", (double) terrainDraws / frames, terrainTriangles / 1.0e6 / frames);
     }
 }
