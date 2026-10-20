@@ -6,6 +6,8 @@ import com.mojang.renderpearl.api.buffers.GpuBuffer;
 import com.mojang.renderpearl.api.buffers.GpuBufferSlice;
 import com.mojang.renderpearl.api.commands.RenderPass;
 import com.mojang.renderpearl.api.pipeline.RenderPipeline;
+import com.teslicek.txoptimizations.TextureList;
+import com.teslicek.txoptimizations.TextureUniformBinding;
 import java.util.List;
 import net.minecraft.client.renderer.StagedVertexBuffer;
 import net.minecraft.client.renderer.rendertype.PreparedRenderType;
@@ -48,10 +50,17 @@ public abstract class PreparedRenderTypeDrawMixin {
         renderPass.setUniform("DynamicTransforms", this.dynamicTransforms);
         renderPass.setVertexBuffer(0, info.vertexBuffer().slice());
 
-        for (int index = 0; index < this.textures.size(); index ++) {
-            PreparedRenderType.Texture texture = this.textures.get(index);
+        if (this.textures instanceof TextureList list) {
+            TextureUniformBinding binding = (TextureUniformBinding) renderPass;
 
-            renderPass.setUniform(texture.name(), texture.textureView(), texture.sampler());
+            for (int index = 0; index < list.size(); index ++)
+                binding.txoptimizations$setTexture(list.get(index).name(), list.binding(index));
+        } else {
+            for (int index = 0; index < this.textures.size(); index ++) {
+                PreparedRenderType.Texture texture = this.textures.get(index);
+
+                renderPass.setUniform(texture.name(), texture.textureView(), texture.sampler());
+            }
         }
 
         renderPass.setIndexBuffer(indexBuffer, info.indexType());

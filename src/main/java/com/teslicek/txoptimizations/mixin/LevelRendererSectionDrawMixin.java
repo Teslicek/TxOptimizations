@@ -100,7 +100,7 @@ public abstract class LevelRendererSectionDrawMixin {
         EnumMap<ChunkSectionLayer, List<ChunkSectionsToRender.GpuMultiDrawIndexedIndirect>> indirectDraws = new EnumMap<>(ChunkSectionLayer.class);
 
         for (int layer = 0; layer < layers.length; layer ++) {
-            List<ChunkSectionsToRender.GpuMultiDrawIndexedIndirect> layerDraws = new ArrayList<>();
+            List<ChunkSectionsToRender.GpuMultiDrawIndexedIndirect> layerDraws = new ArrayList<>(draws.layerEnd(layer) - index);
 
             for (; index < draws.layerEnd(layer); index ++) {
                 int       group       = draws.outputGroup(index);

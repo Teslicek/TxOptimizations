@@ -2,6 +2,7 @@ package com.teslicek.txoptimizations.mixin.hud;
 
 import com.teslicek.txoptimizations.gpu.HudProfile;
 import com.teslicek.txoptimizations.hud.HudCache;
+import net.minecraft.client.gui.navigation.ScreenRectangle;
 import net.minecraft.client.renderer.state.gui.BlitRenderState;
 import net.minecraft.client.renderer.state.gui.GuiElementRenderState;
 import net.minecraft.client.renderer.state.gui.GuiItemRenderState;
@@ -47,9 +48,11 @@ public abstract class GuiRenderStateHudCacheMixin {
             return;
 
         if (!HudCache.isCurrentUncached()) {
+            ScreenRectangle bounds = element.bounds();
+
             HudCache.checkBlend(element.pipeline());
-            HudProfile.record(element, element.bounds());
-            HudCache.include(element.bounds());
+            HudProfile.record(element, bounds);
+            HudCache.include(bounds);
 
             return;
         }
@@ -63,8 +66,10 @@ public abstract class GuiRenderStateHudCacheMixin {
         if (!HudCache.isRendering())
             return blit;
 
-        HudProfile.record(blit, blit.bounds());
-        HudCache.include(blit.bounds());
+        ScreenRectangle bounds = blit.bounds();
+
+        HudProfile.record(blit, bounds);
+        HudCache.include(bounds);
 
         return blit;
     }
@@ -75,8 +80,10 @@ public abstract class GuiRenderStateHudCacheMixin {
             return;
 
         if (!HudCache.isCurrentUncached()) {
-            HudProfile.record(submission, submission.bounds());
-            HudCache.include(submission.bounds());
+            ScreenRectangle bounds = submission.bounds();
+
+            HudProfile.record(submission, bounds);
+            HudCache.include(bounds);
 
             return;
         }

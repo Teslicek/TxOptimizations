@@ -3,9 +3,11 @@ package com.teslicek.txoptimizations.mixin;
 import com.mojang.renderpearl.api.commands.RenderPass;
 import java.util.List;
 import java.util.Map;
+import java.util.function.Supplier;
 import net.minecraft.client.renderer.feature.FeatureFrameContext;
 import net.minecraft.client.renderer.feature.FeatureRenderDispatcher;
 import net.minecraft.client.renderer.feature.FeatureRendererMap;
+import net.minecraft.client.renderer.feature.FeatureRendererType;
 import net.minecraft.client.renderer.feature.phase.FeatureRenderPhase;
 import net.minecraft.client.renderer.feature.submit.SubmitNode;
 import net.minecraft.client.renderer.oit.OitStage;
@@ -43,11 +45,11 @@ public abstract class FeaturePreparedFrameIndexedMixin {
         FeatureRendererMap renderers = ((FeatureRenderDispatcherRenderersAccessor) this.this$0).txoptimizations$featureRenderers();
 
         for (int index = 0; index < groups.size(); index ++) {
-            FeaturePreparedGroupAccessor group           = (FeaturePreparedGroupAccessor) groups.get(index);
-            String                       featureTypeName = group.txoptimizations$featureType().toString();
+            FeaturePreparedGroupAccessor group       = (FeaturePreparedGroupAccessor) groups.get(index);
+            FeatureRendererType<?>       featureType = group.txoptimizations$featureType();
 
-            profiler.push(featureTypeName);
-            renderPass.pushDebugGroup(() -> featureTypeName);
+            profiler.push(featureType.toString());
+            renderPass.pushDebugGroup((Supplier<String>) (Object) featureType);
             group.txoptimizations$execute(context, stage, renderPass, renderers, this.allSubmits);
             renderPass.popDebugGroup();
             profiler.pop();

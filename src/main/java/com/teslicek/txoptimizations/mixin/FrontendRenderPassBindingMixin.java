@@ -14,6 +14,7 @@ import com.mojang.renderpearl.frontend.FrontendRenderPipeline;
 import com.mojang.renderpearl.util.TextureViewAndSampler;
 import com.teslicek.txoptimizations.PipelinePassStamp;
 import com.teslicek.txoptimizations.PipelineUniforms;
+import com.teslicek.txoptimizations.TextureUniformBinding;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Optional;
@@ -28,7 +29,7 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 @Mixin(value = FrontendRenderPass.class, priority = 999)
-public abstract class FrontendRenderPassBindingMixin {
+public abstract class FrontendRenderPassBindingMixin implements TextureUniformBinding {
 
     @Shadow
     private FrontendRenderPipeline boundPipeline;
@@ -103,6 +104,14 @@ public abstract class FrontendRenderPassBindingMixin {
         }
 
         this.constantsPushed = false;
+    }
+
+    @Override
+    public void txoptimizations$setTexture(String name, TextureViewAndSampler binding) {
+        if (this.uniforms.get(name) == binding)
+            return;
+
+        this.setUniform(name, (Object) binding);
     }
 
     @Overwrite

@@ -5,6 +5,8 @@ import com.mojang.renderpearl.backend.vulkan.VulkanDevice;
 import com.mojang.renderpearl.backend.vulkan.VulkanUtils;
 import com.teslicek.txoptimizations.FrameSpin;
 import com.teslicek.txoptimizations.RecyclePolling;
+import java.nio.LongBuffer;
+import org.lwjgl.BufferUtils;
 import org.lwjgl.vulkan.VK12;
 import org.spongepowered.asm.mixin.Final;
 import org.spongepowered.asm.mixin.Mixin;
@@ -32,7 +34,7 @@ public abstract class VulkanCommandEncoderPollMixin {
     private long completedSubmitIndex;
 
     @Unique
-    private final long[] txoptimizations$counterValue = new long[1];
+    private final LongBuffer txoptimizations$counterValue = BufferUtils.createLongBuffer(1);
 
     @Inject(method = "awaitSubmitCompletion", at = @At("HEAD"), cancellable = true)
     private void txoptimizations$pollSubmitCounter(long submitIndex, long timeout, CallbackInfoReturnable<Boolean> cir) {
@@ -81,7 +83,7 @@ public abstract class VulkanCommandEncoderPollMixin {
         int result = VK12.vkGetSemaphoreCounterValue(this.device.vkDevice(), this.submitSemaphore, this.txoptimizations$counterValue);
         VulkanUtils.crashIfFailure(this.device, result, "Failed to read submit semaphore counter");
 
-        long signaled = this.txoptimizations$counterValue[0];
+        long signaled = this.txoptimizations$counterValue.get(0);
 
         if (signaled > this.completedSubmitIndex)
             this.completedSubmitIndex = signaled;
