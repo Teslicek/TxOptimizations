@@ -2,7 +2,6 @@ package com.teslicek.txoptimizations.mixin;
 
 import com.teslicek.txoptimizations.SectionSubset;
 import com.teslicek.txoptimizations.SectionTreeWalk;
-import com.teslicek.txoptimizations.TerrainDrawChanges;
 import java.util.List;
 import net.minecraft.client.renderer.Octree;
 import net.minecraft.client.renderer.SectionOcclusionGraph;
@@ -23,6 +22,5 @@ public abstract class SectionOcclusionGraphTreeWalkMixin {
         SectionSubset.beginVisibleChange();
         SectionTreeWalk.collect(this.getOctree(), frustum, visibleSections, nearbyVisibleSection);
         SectionSubset.endVisibleChange();
-        TerrainDrawChanges.mark();
     }
 }

@@ -11,7 +11,6 @@ import com.teslicek.txoptimizations.FacingCulling;
 import com.teslicek.txoptimizations.SectionDrawList;
 import com.teslicek.txoptimizations.SectionDrawUniforms;
 import com.teslicek.txoptimizations.SectionLayers;
-import com.teslicek.txoptimizations.TerrainDrawChanges;
 import com.teslicek.txoptimizations.gpu.ProfileCounters;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import java.util.ArrayList;
@@ -30,7 +29,6 @@ import net.minecraft.client.renderer.texture.TextureAtlas;
 import net.minecraft.client.renderer.texture.TextureManager;
 import net.minecraft.core.BlockPos;
 import net.minecraft.util.Util;
-import net.minecraft.world.phys.Vec3;
 import org.joml.Matrix4fc;
 import org.jspecify.annotations.Nullable;
 import org.spongepowered.asm.mixin.Final;
@@ -87,27 +85,6 @@ public abstract class LevelRendererSectionDrawMixin {
 
     @Unique
     private final float[] txoptimizations$chunkFades = new float[CHUNK];
-
-    @Unique
-    private boolean txoptimizations$drawsReusable;
-
-    @Unique
-    private long txoptimizations$drawsChanges;
-
-    @Unique
-    private boolean txoptimizations$drawsTranslucentOrder;
-
-    @Unique
-    private long txoptimizations$drawsFadeDuration;
-
-    @Unique
-    private double txoptimizations$drawsCameraX;
-
-    @Unique
-    private double txoptimizations$drawsCameraY;
-
-    @Unique
-    private double txoptimizations$drawsCameraZ;
 
     @Overwrite
     public ChunkSectionsToRender prepareChunkRendersIndirect(Matrix4fc modelViewMatrix, boolean respectTranslucentOrder) {
@@ -174,28 +151,15 @@ public abstract class LevelRendererSectionDrawMixin {
         boolean[]       translucent = SectionLayers.TRANSLUCENT;
         SectionDrawList draws       = this.txoptimizations$draws;
 
-        if (this.sectionRenderDispatcher == null) {
-            this.txoptimizations$drawsReusable = false;
-            draws.begin(translucent.length, respectTranslucentOrder);
-
-            return draws.finish();
-        }
-
-        long changes      = TerrainDrawChanges.count();
-        long fadeDuration = Util.toMillis(this.optionsRenderState.chunkSectionFadeInTime);
-        Vec3 camera       = this.levelRenderState.cameraRenderState.pos;
-
-        if (this.txoptimizations$drawsReusable && changes == this.txoptimizations$drawsChanges && respectTranslucentOrder == this.txoptimizations$drawsTranslucentOrder && fadeDuration == this.txoptimizations$drawsFadeDuration && camera.x == this.txoptimizations$drawsCameraX && camera.y == this.txoptimizations$drawsCameraY && camera.z == this.txoptimizations$drawsCameraZ) {
-            ProfileCounters.countTerrainDraws(draws);
-
-            return draws;
-        }
-
         draws.begin(translucent.length, respectTranslucentOrder);
-        FacingCulling.beginFrame(camera);
 
-        long    now    = Util.getMillis();
-        boolean fading = false;
+        if (this.sectionRenderDispatcher == null)
+            return draws.finish();
+
+        FacingCulling.beginFrame(this.levelRenderState.cameraRenderState.pos);
+
+        long fadeDuration = Util.toMillis(this.optionsRenderState.chunkSectionFadeInTime);
+        long now          = Util.getMillis();
 
         SectionRenderDispatcher.RenderSection[] chunkSections = this.txoptimizations$chunkSections;
         int[][]                                 chunkRecords  = this.txoptimizations$chunkRecords;
@@ -231,15 +195,13 @@ public abstract class LevelRendererSectionDrawMixin {
 
                 SectionRenderDispatcher.RenderSection section      = chunkSections[index];
                 BlockPos                              renderOffset = section.getRenderOrigin();
-                float                                 visibility   = section.getVisibility(now, fadeDuration);
 
                 chunkRecords[drawn] = record;
                 chunkFlags[drawn]   = flags;
                 chunkX[drawn]       = renderOffset.getX();
                 chunkY[drawn]       = renderOffset.getY();
                 chunkZ[drawn]       = renderOffset.getZ();
-                chunkFades[drawn]   = visibility;
-                fading             |= visibility != 1.0F;
+                chunkFades[drawn]   = section.getVisibility(now, fadeDuration);
                 drawn ++;
             }
 
@@ -250,15 +212,6 @@ public abstract class LevelRendererSectionDrawMixin {
         Arrays.fill(chunkSections, null);
         Arrays.fill(chunkRecords, null);
         draws.finish();
-
-        this.txoptimizations$drawsReusable         = !fading;
-        this.txoptimizations$drawsChanges          = changes;
-        this.txoptimizations$drawsTranslucentOrder = respectTranslucentOrder;
-        this.txoptimizations$drawsFadeDuration     = fadeDuration;
-        this.txoptimizations$drawsCameraX          = camera.x;
-        this.txoptimizations$drawsCameraY          = camera.y;
-        this.txoptimizations$drawsCameraZ          = camera.z;
-
         ProfileCounters.countTerrainDraws(draws);
 
         return draws;

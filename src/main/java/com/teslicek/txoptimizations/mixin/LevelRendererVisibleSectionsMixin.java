@@ -1,7 +1,6 @@
 package com.teslicek.txoptimizations.mixin;
 
 import com.teslicek.txoptimizations.SectionSubset;
-import com.teslicek.txoptimizations.TerrainDrawChanges;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import net.minecraft.client.renderer.LevelRenderer;
 import net.minecraft.client.renderer.chunk.SectionRenderDispatcher;
@@ -27,6 +26,5 @@ public abstract class LevelRendererVisibleSectionsMixin {
         this.visibleSections.clear();
         this.nearbyVisibleSections.clear();
         SectionSubset.endVisibleChange();
-        TerrainDrawChanges.mark();
     }
 }

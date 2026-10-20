@@ -4,7 +4,6 @@ import com.teslicek.txoptimizations.SectionDrawList;
 import com.teslicek.txoptimizations.SectionLayers;
 import java.util.Arrays;
 import java.util.Locale;
-import org.jspecify.annotations.Nullable;
 
 public final class ProfileCounters {
 
@@ -16,11 +15,6 @@ public final class ProfileCounters {
     private static long batchedDraws;
     private static long[] terrainDraws     = new long[0];
     private static long[] terrainTriangles = new long[0];
-    private static long[] listDraws        = new long[0];
-    private static long[] listTriangles    = new long[0];
-
-    private static @Nullable SectionDrawList countedList;
-    private static long                      countedBuild;
 
     private ProfileCounters() {
     }
@@ -34,9 +28,6 @@ public final class ProfileCounters {
         batchedDraws     = 0L;
         terrainDraws     = new long[SectionLayers.VALUES.length];
         terrainTriangles = new long[SectionLayers.VALUES.length];
-        listDraws        = new long[SectionLayers.VALUES.length];
-        listTriangles    = new long[SectionLayers.VALUES.length];
-        countedList      = null;
     }
 
     public static void countRenderPass() {
@@ -70,22 +61,8 @@ public final class ProfileCounters {
     }
 
     public static void countTerrainDraws(SectionDrawList sectionDraws) {
-        if (!GpuPassProfiler.isRecording())
-            return;
-
-        if (sectionDraws != countedList || sectionDraws.builds() != countedBuild) {
-            Arrays.fill(listDraws, 0L);
-            Arrays.fill(listTriangles, 0L);
-            sectionDraws.countDraws(listDraws, listTriangles);
-
-            countedList  = sectionDraws;
-            countedBuild = sectionDraws.builds();
-        }
-
-        for (int layer = 0; layer < terrainDraws.length; layer ++) {
-            terrainDraws[layer]     += listDraws[layer];
-            terrainTriangles[layer] += listTriangles[layer];
-        }
+        if (GpuPassProfiler.isRecording())
+            sectionDraws.countDraws(terrainDraws, terrainTriangles);
     }
 
     static String report(int frames) {
