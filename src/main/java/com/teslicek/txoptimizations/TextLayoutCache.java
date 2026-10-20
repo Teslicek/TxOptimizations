@@ -1,10 +1,12 @@
 package com.teslicek.txoptimizations;
 
 import java.util.HashMap;
-import java.util.Iterator;
+import java.util.IdentityHashMap;
 import java.util.Map;
 import net.minecraft.client.gui.Font;
 import net.minecraft.network.chat.FontDescription;
+import net.minecraft.network.chat.FormattedText;
+import net.minecraft.network.chat.MutableComponent;
 import net.minecraft.util.FormattedCharSequence;
 
 public final class TextLayoutCache {
@@ -12,8 +14,9 @@ public final class TextLayoutCache {
     private static final int  MAX_ENTRIES   = 4096;
     private static final long UNUSED_FRAMES = 200L;
 
-    private static final Map<Key, Entry> ENTRIES = new HashMap<>();
-    private static final Key             PROBE   = new Key();
+    private static final Map<Key, Entry>              ENTRIES = new HashMap<>();
+    private static final Map<MutableComponent, Width> WIDTHS  = new IdentityHashMap<>();
+    private static final Key                          PROBE   = new Key();
 
     private static long lastEviction;
 
@@ -51,8 +54,35 @@ public final class TextLayoutCache {
         return prepared;
     }
 
+    public static int width(Font font, FormattedText text) {
+        if (!(text instanceof MutableComponent component))
+            return font.width(text);
+
+        long frame = ClientClock.frame();
+
+        evictUnused(frame);
+
+        Width cached = WIDTHS.get(component);
+
+        if (cached != null && cached.font == font) {
+            cached.frame = frame;
+
+            return cached.width;
+        }
+
+        if (WIDTHS.size() >= MAX_ENTRIES)
+            WIDTHS.clear();
+
+        int width = font.width(component);
+
+        WIDTHS.put(component, new Width(font, width, frame));
+
+        return width;
+    }
+
     public static void clear() {
         ENTRIES.clear();
+        WIDTHS.clear();
     }
 
     private static boolean isStable(FormattedCharSequence text) {
@@ -65,12 +95,8 @@ public final class TextLayoutCache {
 
         lastEviction = frame;
 
-        Iterator<Entry> iterator = ENTRIES.values().iterator();
-
-        while (iterator.hasNext()) {
-            if (frame - iterator.next().frame > UNUSED_FRAMES)
-                iterator.remove();
-        }
+        ENTRIES.values().removeIf(entry -> frame - entry.frame > UNUSED_FRAMES);
+        WIDTHS.values().removeIf(width -> frame - width.frame > UNUSED_FRAMES);
     }
 
     private static final class Key {
@@ -124,6 +150,19 @@ public final class TextLayoutCache {
 
         private Entry(Font.PreparedText text, long frame) {
             this.text  = text;
+            this.frame = frame;
+        }
+    }
+
+    private static final class Width {
+
+        private final Font font;
+        private final int  width;
+        private long       frame;
+
+        private Width(Font font, int width, long frame) {
+            this.font  = font;
+            this.width = width;
             this.frame = frame;
         }
     }
