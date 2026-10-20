@@ -7,6 +7,7 @@ import org.spongepowered.asm.mixin.Overwrite;
 import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
+import org.spongepowered.asm.mixin.injection.ModifyVariable;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 @Mixin(value = SimpleFeatureRenderPhase.class, priority = 999)
@@ -15,9 +16,11 @@ public abstract class SimpleFeatureRenderPhaseEmptyMixin {
     @Unique
     private boolean txoptimizations$hasSubmits;
 
-    @Inject(method = "submit", at = @At("HEAD"))
-    private void txoptimizations$markSubmitted(SubmitNode submit, CallbackInfo ci) {
+    @ModifyVariable(method = "submit", at = @At("HEAD"), argsOnly = true)
+    private SubmitNode txoptimizations$markSubmitted(SubmitNode submit) {
         this.txoptimizations$hasSubmits = true;
+
+        return submit;
     }
 
     @Inject(method = "clear", at = @At("TAIL"))

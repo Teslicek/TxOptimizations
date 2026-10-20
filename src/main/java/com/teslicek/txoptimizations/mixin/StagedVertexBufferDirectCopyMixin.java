@@ -26,8 +26,8 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Constant;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.ModifyConstant;
+import org.spongepowered.asm.mixin.injection.ModifyVariable;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
-import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 @Mixin(value = StagedVertexBuffer.class, priority = 999)
 public abstract class StagedVertexBufferDirectCopyMixin implements BackgroundVertexCopy {
@@ -109,9 +109,11 @@ public abstract class StagedVertexBufferDirectCopyMixin implements BackgroundVer
         this.txoptimizations$vertexCopy.startInBackground();
     }
 
-    @Inject(method = "getExecuteInfo", at = @At("HEAD"))
-    private void txoptimizations$finishBeforeDraw(StagedVertexBuffer.Draw draw, CallbackInfoReturnable<StagedVertexBuffer.ExecuteInfo> cir) {
+    @ModifyVariable(method = "getExecuteInfo", at = @At("HEAD"), argsOnly = true)
+    private StagedVertexBuffer.Draw txoptimizations$finishBeforeDraw(StagedVertexBuffer.Draw draw) {
         this.txoptimizations$finishVertexCopy();
+
+        return draw;
     }
 
     @Inject(method = {"endDraw", "close"}, at = @At("HEAD"))
