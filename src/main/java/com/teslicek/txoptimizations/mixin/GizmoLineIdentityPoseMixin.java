@@ -33,6 +33,15 @@ public abstract class GizmoLineIdentityPoseMixin extends RenderTypeFeatureRender
     @Unique
     private static final int LINE_VERTICES = 3;
 
+    @Unique
+    private static final int BOX_CORNERS = 8;
+
+    @Unique
+    private static final int CORNER_VALUES = 4;
+
+    @Unique
+    private final float[] txoptimizations$corners = new float[BOX_CORNERS * CORNER_VALUES];
+
     @Shadow
     @Final
     private PoseStack poseStack;
@@ -61,63 +70,96 @@ public abstract class GizmoLineIdentityPoseMixin extends RenderTypeFeatureRender
         if (direct)
             VertexBytes.requireLineLayout(DefaultVertexFormat.POSITION_COLOR_NORMAL_LINE_WIDTH);
 
-        for (int index = 0; index < packed.size(); index ++) {
-            float startX     = (float) (packed.coordinate(index, 0) - camX);
-            float startY     = (float) (packed.coordinate(index, 1) - camY);
-            float startZ     = (float) (packed.coordinate(index, 2) - camZ);
-            float endX       = (float) (packed.coordinate(index, 3) - camX);
-            float endY       = (float) (packed.coordinate(index, 4) - camY);
-            float endZ       = (float) (packed.coordinate(index, 5) - camZ);
-            int   lineColor  = packed.color(index);
-            float lineWidth  = packed.width(index);
-            float startDepth = Math.fma(viewX, startX, Math.fma(viewY, startY, Math.fma(viewZ, startZ, viewW * 1.0F)));
-            float endDepth   = Math.fma(viewX, endX, Math.fma(viewY, endY, Math.fma(viewZ, endZ, viewW * 1.0F)));
+        for (int entry = 0; entry < packed.entryCount(); entry ++) {
+            int   lineColor = packed.color(entry);
+            float lineWidth = packed.width(entry);
 
-            boolean startBehind = startDepth > NEAR_VIEW_Z;
-            boolean endBehind   = endDepth > NEAR_VIEW_Z;
+            if (!packed.isBox(entry)) {
+                float startX = (float) (packed.coordinate(entry, 0) - camX);
+                float startY = (float) (packed.coordinate(entry, 1) - camY);
+                float startZ = (float) (packed.coordinate(entry, 2) - camZ);
+                float endX   = (float) (packed.coordinate(entry, 3) - camX);
+                float endY   = (float) (packed.coordinate(entry, 4) - camY);
+                float endZ   = (float) (packed.coordinate(entry, 5) - camZ);
 
-            if (startBehind && endBehind)
-                continue;
-
-            if (startBehind || endBehind) {
-                float denominator = endDepth - startDepth;
-
-                if (Math.abs(denominator) < MIN_DENOMINATOR)
-                    continue;
-
-                float t     = Mth.clamp((NEAR_VIEW_Z - startDepth) / denominator, 0.0F, 1.0F);
-                float clipX = Math.fma(endX - startX, t, startX);
-                float clipY = Math.fma(endY - startY, t, startY);
-                float clipZ = Math.fma(endZ - startZ, t, startZ);
-
-                if (startBehind) {
-                    startX = clipX;
-                    startY = clipY;
-                    startZ = clipZ;
-                } else {
-                    endX = clipX;
-                    endY = clipY;
-                    endZ = clipZ;
-                }
-            }
-
-            float normalX = endX - startX;
-            float normalY = endY - startY;
-            float normalZ = endZ - startZ;
-
-            if (!direct) {
-                builder.addVertex(startX, startY, startZ).setNormal(normalX, normalY, normalZ).setColor(lineColor).setLineWidth(lineWidth);
-                builder.addVertex(endX, endY, endZ).setNormal(normalX, normalY, normalZ).setColor(lineColor).setLineWidth(lineWidth);
+                txoptimizations$emitLine(builder, direct, startX, startY, startZ, txoptimizations$depth(viewX, viewY, viewZ, viewW, startX, startY, startZ), endX, endY, endZ, txoptimizations$depth(viewX, viewY, viewZ, viewW, endX, endY, endZ), lineColor, lineWidth);
                 continue;
             }
 
-            long pointer   = ((DirectVertexBuffer) builder).txoptimizations$reserveAfterLastVertex(LINE_VERTICES);
-            int  colorBits = VertexBytes.colorBits(lineColor);
-            long tail      = VertexBytes.lineTail(VertexBytes.packNormal(normalX, normalY, normalZ), lineWidth);
+            float[] corners = this.txoptimizations$corners;
 
-            VertexBytes.putLine(pointer, startX, startY, startZ, colorBits, tail);
-            VertexBytes.putLine(pointer + VertexBytes.LINE_STRIDE, startX, startY, startZ, colorBits, tail);
-            VertexBytes.putLine(pointer + 2L * VertexBytes.LINE_STRIDE, endX, endY, endZ, colorBits, tail);
+            for (int corner = 0; corner < BOX_CORNERS; corner ++) {
+                float x    = (float) (packed.coordinate(entry, (corner & 1) == 0 ? 0 : 3) - camX);
+                float y    = (float) (packed.coordinate(entry, (corner & 2) == 0 ? 1 : 4) - camY);
+                float z    = (float) (packed.coordinate(entry, (corner & 4) == 0 ? 2 : 5) - camZ);
+                int   base = corner * CORNER_VALUES;
+
+                corners[base]     = x;
+                corners[base + 1] = y;
+                corners[base + 2] = z;
+                corners[base + 3] = txoptimizations$depth(viewX, viewY, viewZ, viewW, x, y, z);
+            }
+
+            for (int edge = 0; edge < GizmoLineList.BOX_LINES; edge ++) {
+                int from = GizmoLineList.edgeFrom(edge) * CORNER_VALUES;
+                int to   = GizmoLineList.edgeTo(edge) * CORNER_VALUES;
+
+                txoptimizations$emitLine(builder, direct, corners[from], corners[from + 1], corners[from + 2], corners[from + 3], corners[to], corners[to + 1], corners[to + 2], corners[to + 3], packed.edgeColor(entry, edge), lineWidth);
+            }
         }
+    }
+
+    @Unique
+    private static float txoptimizations$depth(float viewX, float viewY, float viewZ, float viewW, float x, float y, float z) {
+        return Math.fma(viewX, x, Math.fma(viewY, y, Math.fma(viewZ, z, viewW * 1.0F)));
+    }
+
+    @Unique
+    private static void txoptimizations$emitLine(VertexConsumer builder, boolean direct, float startX, float startY, float startZ, float startDepth, float endX, float endY, float endZ, float endDepth, int lineColor, float lineWidth) {
+        boolean startBehind = startDepth > NEAR_VIEW_Z;
+        boolean endBehind   = endDepth > NEAR_VIEW_Z;
+
+        if (startBehind && endBehind)
+            return;
+
+        if (startBehind || endBehind) {
+            float denominator = endDepth - startDepth;
+
+            if (Math.abs(denominator) < MIN_DENOMINATOR)
+                return;
+
+            float t     = Mth.clamp((NEAR_VIEW_Z - startDepth) / denominator, 0.0F, 1.0F);
+            float clipX = Math.fma(endX - startX, t, startX);
+            float clipY = Math.fma(endY - startY, t, startY);
+            float clipZ = Math.fma(endZ - startZ, t, startZ);
+
+            if (startBehind) {
+                startX = clipX;
+                startY = clipY;
+                startZ = clipZ;
+            } else {
+                endX = clipX;
+                endY = clipY;
+                endZ = clipZ;
+            }
+        }
+
+        float normalX = endX - startX;
+        float normalY = endY - startY;
+        float normalZ = endZ - startZ;
+
+        if (!direct) {
+            builder.addVertex(startX, startY, startZ).setNormal(normalX, normalY, normalZ).setColor(lineColor).setLineWidth(lineWidth);
+            builder.addVertex(endX, endY, endZ).setNormal(normalX, normalY, normalZ).setColor(lineColor).setLineWidth(lineWidth);
+            return;
+        }
+
+        long pointer   = ((DirectVertexBuffer) builder).txoptimizations$reserveAfterLastVertex(LINE_VERTICES);
+        int  colorBits = VertexBytes.colorBits(lineColor);
+        long tail      = VertexBytes.lineTail(VertexBytes.packNormal(normalX, normalY, normalZ), lineWidth);
+
+        VertexBytes.putLine(pointer, startX, startY, startZ, colorBits, tail);
+        VertexBytes.putLine(pointer + VertexBytes.LINE_STRIDE, startX, startY, startZ, colorBits, tail);
+        VertexBytes.putLine(pointer + 2L * VertexBytes.LINE_STRIDE, endX, endY, endZ, colorBits, tail);
     }
 }
