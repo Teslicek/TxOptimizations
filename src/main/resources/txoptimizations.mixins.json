@@ -228,6 +228,7 @@
     "ShaderManagerSourcePatchMixin",
     "SkyDataLayerStorageMapSnapshotMixin",
     "SkyLightSectionStorageLookupMixin",
+    "ChunkSkyLightSourcesScanMixin",
     "SkyRendererFarPlaneMixin",
     "SoundEngineChannelSpinMixin",
     "SoundEngineListenerMixin",
