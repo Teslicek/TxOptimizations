@@ -267,7 +267,7 @@
     "VulkanRenderPassBindSkipMixin",
     "VulkanRenderPassDescriptorReuseMixin",
     "VulkanRenderPassDynamicStateMixin",
-    "VulkanRenderPassTexelViewMixin",
+    "VulkanRenderPassDescriptorWriteMixin",
     "VulkanRenderPassUniformResetMixin",
     "VulkanRenderPassVertexBindMixin",
     "VulkanSubmissionDrainMixin",

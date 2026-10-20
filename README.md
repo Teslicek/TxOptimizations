@@ -256,7 +256,9 @@ Every write into a CPU-visible GPU buffer (dynamic transforms, uniforms, fog, cl
 
 ### Texel buffer views
 
-Pushing descriptors that use a texel buffer (the cloud buffer) created a Vulkan buffer view on every push and queued it for destruction two frames later. The view only depends on the buffer, offset, size and format, so it is now kept on the buffer (up to 8 per buffer) and destroyed together with the buffer, after the GPU is done with it. Whether the view came from the buffer is kept on the render pass between creating the view and queueing it for destruction, instead of in a holder object allocated on every descriptor push.
+Pushing descriptors that use a texel buffer (the cloud buffer) created a Vulkan buffer view on every push and queued it for destruction two frames later. The view only depends on the buffer, offset, size and format, so it is now kept on the buffer (up to 8 per buffer) and destroyed together with the buffer, after the GPU is done with it. A view that does not fit on its buffer is queued for destruction as before.
+
+Every descriptor push also built its Vulkan structs through LWJGL wrapper objects: one for the write array, one per uniform for the write and one for its buffer or image info, and for texel buffers a long buffer and a create info. The push now writes the same structs straight into the render thread's stack memory with LWJGL's raw field setters, in the same order and with the same values, so the driver receives the same bytes without any of those objects.
 
 ### Pipeline switches
 
