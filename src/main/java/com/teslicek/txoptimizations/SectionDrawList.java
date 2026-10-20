@@ -19,12 +19,18 @@ public final class SectionDrawList {
     private static final int NONE            = -1;
     private static final int INSTANCE_COUNT  = 1;
     private static final int DRAW_INTS       = 5;
-    private static final int NEXT            = 0;
+    private static final int GROUP           = 0;
     private static final int INDEX_COUNT     = 1;
     private static final int FIRST_INDEX     = 2;
     private static final int BASE_VERTEX     = 3;
     private static final int BASE_INSTANCE   = 4;
     private static final int SECTION_INTS    = 4;
+
+    private static final int COMMAND_INDEX_COUNT    = 0;
+    private static final int COMMAND_INSTANCE_COUNT = 1;
+    private static final int COMMAND_FIRST_INDEX    = 2;
+    private static final int COMMAND_BASE_VERTEX    = 3;
+    private static final int COMMAND_BASE_INSTANCE  = 4;
     private static final int INITIAL_GROUPS  = 16;
     private static final int INITIAL_DRAWS   = 4096;
 
@@ -35,8 +41,8 @@ public final class SectionDrawList {
     private @Nullable GpuBuffer[] indexBuffers  = new GpuBuffer[INITIAL_GROUPS];
     private @Nullable IndexType[] indexTypes    = new IndexType[INITIAL_GROUPS];
     private int[]                 groupLayers   = new int[INITIAL_GROUPS];
-    private int[]                 firstDraws    = new int[INITIAL_GROUPS];
-    private int[]                 lastDraws     = new int[INITIAL_GROUPS];
+    private int[]                 groupStarts   = new int[INITIAL_GROUPS];
+    private int[]                 groupCursors  = new int[INITIAL_GROUPS];
     private int[]                 drawCounts    = new int[INITIAL_GROUPS];
     private int[]                 order         = new int[INITIAL_GROUPS];
     private int[]                 cacheKeys     = new int[INITIAL_GROUPS * 2];
@@ -149,21 +155,12 @@ public final class SectionDrawList {
         if (draw + DRAW_INTS > this.draws.length)
             this.draws = Arrays.copyOf(this.draws, this.draws.length * 2);
 
-        this.draws[draw + NEXT]          = NONE;
+        this.draws[draw + GROUP]         = group;
         this.draws[draw + INDEX_COUNT]   = indexCount;
         this.draws[draw + FIRST_INDEX]   = firstIndex;
         this.draws[draw + BASE_VERTEX]   = baseVertex;
         this.draws[draw + BASE_INSTANCE] = baseInstance;
         this.drawInts                    = draw + DRAW_INTS;
-
-        int last = this.lastDraws[group];
-
-        if (last == NONE)
-            this.firstDraws[group] = draw;
-        else
-            this.draws[last + NEXT] = draw;
-
-        this.lastDraws[group] = draw;
         this.drawCounts[group] ++;
     }
 
@@ -183,6 +180,8 @@ public final class SectionDrawList {
 
         if (index != this.groups)
             throw new IllegalStateException(this.groups + " section draw groups were made but the layers list " + index);
+
+        this.placeCommands();
 
         return this;
     }
@@ -236,29 +235,19 @@ public final class SectionDrawList {
     }
 
     public void writeCommands(long address) {
-        long start = address;
-
-        for (int index = 0; index < this.groups; index ++) {
-            int  group = this.order[index];
-            long bytes = (long) this.drawCounts[group] * COMMAND_BYTES;
-
-            if (this.reversed[this.groupLayers[group]])
-                this.writeCommands(group, start + bytes - COMMAND_BYTES, -COMMAND_BYTES);
-            else
-                this.writeCommands(group, start, COMMAND_BYTES);
-
-            start += bytes;
-        }
+        MemoryUtil.memIntBuffer(address, this.drawInts).put(this.draws, 0, this.drawInts);
     }
 
     public void countDraws(long[] layerDraws, long[] layerTriangles) {
         for (int group = 0; group < this.groups; group ++) {
             int layer = this.groupLayers[group];
+            int start = this.groupStarts[group];
+            int end   = start + this.drawCounts[group];
 
             layerDraws[layer] += this.drawCounts[group];
 
-            for (int draw = this.firstDraws[group]; draw != NONE; draw = this.draws[draw + NEXT])
-                layerTriangles[layer] += this.draws[draw + INDEX_COUNT] / 3;
+            for (int slot = start; slot < end; slot ++)
+                layerTriangles[layer] += this.draws[slot * DRAW_INTS + COMMAND_INDEX_COUNT] / 3;
         }
     }
 
@@ -273,29 +262,76 @@ public final class SectionDrawList {
     }
 
     public List<DynamicGpuData.IndexedDraw> indexedDraws(int group) {
-        List<DynamicGpuData.IndexedDraw> draws = new ArrayList<>(this.drawCounts[group]);
+        int                              count    = this.drawCounts[group];
+        int                              start    = this.groupStarts[group];
+        boolean                          reversed = this.reversed[this.groupLayers[group]];
+        List<DynamicGpuData.IndexedDraw> draws    = new ArrayList<>(count);
 
-        for (int draw = this.firstDraws[group]; draw != NONE; draw = this.draws[draw + NEXT])
-            draws.add(this.indexedDraw(draw));
+        for (int position = 0; position < count; position ++) {
+            int command = (reversed ? start + count - 1 - position : start + position) * DRAW_INTS;
+
+            draws.add(new DynamicGpuData.IndexedDraw(this.draws[command + COMMAND_INDEX_COUNT], INSTANCE_COUNT, this.draws[command + COMMAND_FIRST_INDEX], this.draws[command + COMMAND_BASE_VERTEX], this.draws[command + COMMAND_BASE_INSTANCE]));
+        }
 
         return draws;
     }
 
-    private DynamicGpuData.IndexedDraw indexedDraw(int draw) {
-        return new DynamicGpuData.IndexedDraw(this.draws[draw + INDEX_COUNT], INSTANCE_COUNT, this.draws[draw + FIRST_INDEX], this.draws[draw + BASE_VERTEX], this.draws[draw + BASE_INSTANCE]);
-    }
+    private void placeCommands() {
+        int slot = 0;
 
-    private void writeCommands(int group, long first, long step) {
-        long address = first;
+        for (int index = 0; index < this.groups; index ++) {
+            int group = this.order[index];
+            int count = this.drawCounts[group];
 
-        for (int draw = this.firstDraws[group]; draw != NONE; draw = this.draws[draw + NEXT]) {
-            MemoryUtil.memPutInt(address, this.draws[draw + INDEX_COUNT]);
-            MemoryUtil.memPutInt(address + 4L, INSTANCE_COUNT);
-            MemoryUtil.memPutInt(address + 8L, this.draws[draw + FIRST_INDEX]);
-            MemoryUtil.memPutInt(address + 12L, this.draws[draw + BASE_VERTEX]);
-            MemoryUtil.memPutInt(address + 16L, this.draws[draw + BASE_INSTANCE]);
+            this.groupStarts[group]  = slot;
+            this.groupCursors[group] = this.reversed[this.groupLayers[group]] ? slot + count : slot;
+            slot                    += count;
+        }
 
-            address += step;
+        int[] draws   = this.draws;
+        int   records = this.drawInts / DRAW_INTS;
+
+        for (int record = 0; record < records; record ++) {
+            int base  = record * DRAW_INTS;
+            int group = draws[base + GROUP];
+
+            draws[base + GROUP] = ~(this.reversed[this.groupLayers[group]] ? -- this.groupCursors[group] : this.groupCursors[group] ++);
+        }
+
+        for (int record = 0; record < records; record ++) {
+            int base = record * DRAW_INTS;
+
+            if (draws[base + GROUP] >= 0)
+                continue;
+
+            int destination  = ~draws[base + GROUP];
+            int indexCount   = draws[base + INDEX_COUNT];
+            int firstIndex   = draws[base + FIRST_INDEX];
+            int baseVertex   = draws[base + BASE_VERTEX];
+            int baseInstance = draws[base + BASE_INSTANCE];
+
+            while (true) {
+                int target = destination * DRAW_INTS;
+
+                if (destination == record) {
+                    putCommand(draws, target, indexCount, firstIndex, baseVertex, baseInstance);
+                    break;
+                }
+
+                int nextDestination  = ~draws[target + GROUP];
+                int nextIndexCount   = draws[target + INDEX_COUNT];
+                int nextFirstIndex   = draws[target + FIRST_INDEX];
+                int nextBaseVertex   = draws[target + BASE_VERTEX];
+                int nextBaseInstance = draws[target + BASE_INSTANCE];
+
+                putCommand(draws, target, indexCount, firstIndex, baseVertex, baseInstance);
+
+                destination  = nextDestination;
+                indexCount   = nextIndexCount;
+                firstIndex   = nextFirstIndex;
+                baseVertex   = nextBaseVertex;
+                baseInstance = nextBaseInstance;
+            }
         }
     }
 
@@ -319,8 +355,6 @@ public final class SectionDrawList {
         this.indexBuffers[group]  = customIndex ? SectionBuffers.buffer(indexBuffer) : null;
         this.indexTypes[group]    = customIndex ? INDEX_TYPES[indexType] : null;
         this.groupLayers[group]   = layer;
-        this.firstDraws[group]    = NONE;
-        this.lastDraws[group]     = NONE;
         this.drawCounts[group]    = 0;
         this.groups               = group + 1;
         this.reversed[layer]      = translucent && this.respectTranslucentOrder;
@@ -343,8 +377,8 @@ public final class SectionDrawList {
         this.indexBuffers  = Arrays.copyOf(this.indexBuffers, capacity);
         this.indexTypes    = Arrays.copyOf(this.indexTypes, capacity);
         this.groupLayers   = Arrays.copyOf(this.groupLayers, capacity);
-        this.firstDraws    = Arrays.copyOf(this.firstDraws, capacity);
-        this.lastDraws     = Arrays.copyOf(this.lastDraws, capacity);
+        this.groupStarts   = Arrays.copyOf(this.groupStarts, capacity);
+        this.groupCursors  = Arrays.copyOf(this.groupCursors, capacity);
         this.drawCounts    = Arrays.copyOf(this.drawCounts, capacity);
         this.order         = Arrays.copyOf(this.order, capacity);
     }
@@ -401,6 +435,14 @@ public final class SectionDrawList {
             if (values[slot] != 0)
                 this.cacheGroup(keys[slot], values[slot] - 1);
         }
+    }
+
+    private static void putCommand(int[] draws, int command, int indexCount, int firstIndex, int baseVertex, int baseInstance) {
+        draws[command + COMMAND_INDEX_COUNT]    = indexCount;
+        draws[command + COMMAND_INSTANCE_COUNT] = INSTANCE_COUNT;
+        draws[command + COMMAND_FIRST_INDEX]    = firstIndex;
+        draws[command + COMMAND_BASE_VERTEX]    = baseVertex;
+        draws[command + COMMAND_BASE_INSTANCE]  = baseInstance;
     }
 
     private static int[] indexTypeHashes() {
