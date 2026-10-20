@@ -54,8 +54,11 @@ public final class SectionDrawList {
     private int                   largestIndexCount;
     private int                   lastTranslucentHash;
     private boolean               respectTranslucentOrder;
+    private long                  builds;
 
     public void begin(int layers, boolean respectTranslucentOrder) {
+        this.builds ++;
+
         if (this.layerGroups.length != layers) {
             this.layerGroups = new int[layers][INITIAL_GROUPS];
             this.layerCounts = new int[layers];
@@ -165,6 +168,10 @@ public final class SectionDrawList {
             throw new IllegalStateException(this.groups + " section draw groups were made but the layers list " + index);
 
         return this;
+    }
+
+    public long builds() {
+        return this.builds;
     }
 
     public int largestIndexCount() {
