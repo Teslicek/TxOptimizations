@@ -13,6 +13,7 @@ import com.mojang.renderpearl.backend.vulkan.VulkanRenderPass;
 import com.mojang.renderpearl.backend.vulkan.VulkanRenderPipeline;
 import com.mojang.renderpearl.backend.vulkan.VulkanUtils;
 import com.mojang.renderpearl.util.TextureViewAndSampler;
+import com.teslicek.txoptimizations.DynamicStateCache;
 import com.teslicek.txoptimizations.TexelViewCache;
 import it.unimi.dsi.fastutil.objects.ReferenceList;
 import java.util.List;
@@ -72,6 +73,11 @@ public abstract class VulkanRenderPassDescriptorWriteMixin {
     private void pushDescriptors() {
         if (!this.anyDescriptorDirty)
             return;
+
+        if (!DynamicStateCache.changesDescriptors(this.commandBuffer.address(), this.pipeline.pipelineLayout(), this.uniforms)) {
+            this.anyDescriptorDirty = false;
+            return;
+        }
 
         List<BindGroupLayout.UniformDescription> uniforms = this.pipeline.uniforms();
         int                                      count    = uniforms.size();

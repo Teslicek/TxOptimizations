@@ -263,7 +263,6 @@
     "VulkanGpuSurfacePresentThreadMixin",
     "VulkanQueueDrainMixin",
     "VulkanRenderPassBindSkipMixin",
-    "VulkanRenderPassDescriptorReuseMixin",
     "VulkanRenderPassDynamicStateMixin",
     "VulkanRenderPassDescriptorWriteMixin",
     "VulkanRenderPassUniformResetMixin",

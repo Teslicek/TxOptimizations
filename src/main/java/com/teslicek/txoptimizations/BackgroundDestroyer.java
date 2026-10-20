@@ -28,12 +28,14 @@ public final class BackgroundDestroyer implements DestructionQueue.Destroyer<Des
     @Override
     public void begin(int count) {
         throwFailure();
-        this.batch = new ArrayList<>(count);
     }
 
     @Override
     public void destroy(Destroyable destroyable) {
         if (destroyable instanceof VulkanGpuBuffer.Direct || destroyable instanceof VulkanGpuTexture || destroyable instanceof VulkanGpuTextureView) {
+            if (this.batch == null)
+                this.batch = new ArrayList<>();
+
             this.batch.add(destroyable);
 
             return;
@@ -46,12 +48,11 @@ public final class BackgroundDestroyer implements DestructionQueue.Destroyer<Des
     public void end() {
         List<Destroyable> destroyables = this.batch;
 
-        this.batch = null;
-
-        if (destroyables.isEmpty())
+        if (destroyables == null)
             return;
 
-        pending = pending.thenRunAsync(() -> destroyables.forEach(Destroyable::destroy), EXECUTOR);
+        this.batch = null;
+        pending    = pending.thenRunAsync(() -> destroyables.forEach(Destroyable::destroy), EXECUTOR);
     }
 
     public static void drain() {

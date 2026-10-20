@@ -21,7 +21,6 @@ public final class FacingCulling {
     private static final int    UNASSIGNED         = 3;
     private static final int    OPPOSITE           = GROUPS - 1;
     private static final int    PLANES             = GROUPS;
-    private static final int    AXES               = 3;
     private static final int    X                  = 0;
     private static final int    Y                  = 1;
     private static final int    Z                  = 2;

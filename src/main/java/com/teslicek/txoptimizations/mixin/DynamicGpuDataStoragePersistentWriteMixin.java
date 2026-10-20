@@ -101,7 +101,6 @@ public abstract class DynamicGpuDataStoragePersistentWriteMixin<T extends Dynami
     }
 
     @Override
-    @SuppressWarnings("unchecked")
     public GpuBufferSlice[] txoptimizations$writeSectionCommands(SectionDrawList draws) {
         int lists = draws.groupCount();
 
@@ -123,13 +122,11 @@ public abstract class DynamicGpuDataStoragePersistentWriteMixin<T extends Dynami
 
         this.txoptimizations$write(buffer, offset, bytes, draws::writeCommands);
         this.nextBlock += totalCount;
-        this.lastData   = (T) draws.lastCommand();
 
         return result;
     }
 
     @Override
-    @SuppressWarnings("unchecked")
     public GpuBufferSlice txoptimizations$writeSectionInfos(SectionDrawList draws) {
         int count = draws.sectionCount();
 
@@ -142,7 +139,6 @@ public abstract class DynamicGpuDataStoragePersistentWriteMixin<T extends Dynami
 
         this.txoptimizations$write(buffer, offset, bytes, draws::writeSectionInfos);
         this.nextBlock += count;
-        this.lastData   = (T) draws.sectionInfo(count - 1);
 
         return buffer.slice(offset, bytes);
     }

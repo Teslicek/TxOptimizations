@@ -262,18 +262,6 @@ public final class SectionDrawList {
         }
     }
 
-    public DynamicGpuData.IndexedDraw lastCommand() {
-        if (this.groups == 0)
-            throw new IllegalStateException("No section draw groups were made");
-
-        int group = this.order[this.groups - 1];
-
-        if (this.drawCounts[group] == 0)
-            throw new IllegalStateException("The last section draw group holds no draws");
-
-        return this.indexedDraw(this.reversed[this.groupLayers[group]] ? this.firstDraws[group] : this.lastDraws[group]);
-    }
-
     public void writeSectionInfos(long address) {
         MemoryUtil.memIntBuffer(address, this.sectionInts).put(this.sections, 0, this.sectionInts);
     }

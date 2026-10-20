@@ -364,7 +364,7 @@ Block collision scans (particles moving near blocks, the player's suffocation ch
 
 ### Render type equality
 
-Batching draws compares prepared render types with their generated record equality, which went through method-handle dispatch and compared the name string before anything else. It now compares the same six components with `Objects.equals`, cheapest first (pipeline, transform slice, scissor, OIT set, name, textures), which returns the same answer. Their hash code, which hashed the whole texture list on every map lookup, is worked out once per prepared render type and kept: every component is immutable or hashes by identity, so it never changes.
+Batching draws compares prepared render types with their generated record equality, which went through method-handle dispatch and compared the name string before anything else. It now compares the same six components with `Objects.equals`, cheapest first (pipeline, transform slice, scissor, OIT set, name, textures), which returns the same answer. Their hash code is the record's own: a prepared render type is made new for every lookup, so a kept hash code was never reused, and the texture list it hashes keeps its own hash code (see texture lists below).
 
 ### Pipeline vertex formats
 
