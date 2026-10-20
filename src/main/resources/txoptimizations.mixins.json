@@ -82,6 +82,7 @@
     "FeaturePreparedGroupAccessor",
     "FeatureRenderDispatcherRenderersAccessor",
     "FeatureRendererMapValuesMixin",
+    "DynamicAtlasTreeFreeSpaceMixin",
     "FontTextureSizeMixin",
     "FontManagerTextLayoutCacheMixin",
     "FormattedBidiReorderFastPathMixin",
