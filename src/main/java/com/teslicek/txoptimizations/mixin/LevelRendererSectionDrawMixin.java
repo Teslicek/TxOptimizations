@@ -147,17 +147,15 @@ public abstract class LevelRendererSectionDrawMixin {
 
     @Unique
     private SectionDrawList txoptimizations$collectDraws(boolean respectTranslucentOrder) {
-        boolean[]               translucent = SectionLayers.TRANSLUCENT;
-        SectionDrawList         draws       = this.txoptimizations$draws;
-        SectionRenderDispatcher dispatcher  = this.sectionRenderDispatcher;
+        boolean[]       translucent = SectionLayers.TRANSLUCENT;
+        SectionDrawList draws       = this.txoptimizations$draws;
 
         draws.begin(translucent.length, respectTranslucentOrder);
 
-        if (dispatcher == null)
+        if (this.sectionRenderDispatcher == null)
             return draws.finish();
 
         FacingCulling.beginFrame(this.levelRenderState.cameraRenderState.pos);
-        dispatcher.lock();
 
         long fadeDuration = Util.toMillis(this.optionsRenderState.chunkSectionFadeInTime);
         long now          = Util.getMillis();
@@ -172,49 +170,46 @@ public abstract class LevelRendererSectionDrawMixin {
         Object[]                                visible       = this.visibleSections.elements();
         int                                     size          = this.visibleSections.size();
 
-        try {
-            for (int chunkStart = 0; chunkStart < size; chunkStart += CHUNK) {
-                int chunkSize = Math.min(CHUNK, size - chunkStart);
-                int drawn     = 0;
+        for (int chunkStart = 0; chunkStart < size; chunkStart += CHUNK) {
+            int chunkSize = Math.min(CHUNK, size - chunkStart);
+            int drawn     = 0;
 
-                for (int index = 0; index < chunkSize; index ++) {
-                    SectionRenderDispatcher.RenderSection section = (SectionRenderDispatcher.RenderSection) visible[chunkStart + index];
+            for (int index = 0; index < chunkSize; index ++) {
+                SectionRenderDispatcher.RenderSection section = (SectionRenderDispatcher.RenderSection) visible[chunkStart + index];
 
-                    chunkSections[index] = section;
-                    chunkRecords[index]  = section.getSectionMesh() instanceof DrawRecordHolder mesh ? mesh.txoptimizations$drawRecord() : null;
-                }
-
-                for (int index = 0; index < chunkSize; index ++) {
-                    int[] record = chunkRecords[index];
-
-                    if (record == null)
-                        continue;
-
-                    int flags = DrawRecords.flags(record);
-
-                    if (DrawRecords.drawable(flags) == 0)
-                        continue;
-
-                    SectionRenderDispatcher.RenderSection section      = chunkSections[index];
-                    BlockPos                              renderOffset = section.getRenderOrigin();
-
-                    chunkRecords[drawn] = record;
-                    chunkFlags[drawn]   = flags;
-                    chunkX[drawn]       = renderOffset.getX();
-                    chunkY[drawn]       = renderOffset.getY();
-                    chunkZ[drawn]       = renderOffset.getZ();
-                    chunkFades[drawn]   = section.getVisibility(now, fadeDuration);
-                    drawn ++;
-                }
-
-                for (int index = 0; index < drawn; index ++)
-                    txoptimizations$collectSection(draws, translucent, chunkRecords[index], chunkFlags[index], chunkX[index], chunkY[index], chunkZ[index], chunkFades[index]);
+                chunkSections[index] = section;
+                chunkRecords[index]  = section.getSectionMesh() instanceof DrawRecordHolder mesh ? mesh.txoptimizations$drawRecord() : null;
             }
-        } finally {
-            Arrays.fill(chunkSections, null);
-            Arrays.fill(chunkRecords, null);
-            dispatcher.unlock();
+
+            for (int index = 0; index < chunkSize; index ++) {
+                int[] record = chunkRecords[index];
+
+                if (record == null)
+                    continue;
+
+                int flags = DrawRecords.flags(record);
+
+                if (DrawRecords.drawable(flags) == 0)
+                    continue;
+
+                SectionRenderDispatcher.RenderSection section      = chunkSections[index];
+                BlockPos                              renderOffset = section.getRenderOrigin();
+
+                chunkRecords[drawn] = record;
+                chunkFlags[drawn]   = flags;
+                chunkX[drawn]       = renderOffset.getX();
+                chunkY[drawn]       = renderOffset.getY();
+                chunkZ[drawn]       = renderOffset.getZ();
+                chunkFades[drawn]   = section.getVisibility(now, fadeDuration);
+                drawn ++;
+            }
+
+            for (int index = 0; index < drawn; index ++)
+                txoptimizations$collectSection(draws, translucent, chunkRecords[index], chunkFlags[index], chunkX[index], chunkY[index], chunkZ[index], chunkFades[index]);
         }
+
+        Arrays.fill(chunkSections, null);
+        Arrays.fill(chunkRecords, null);
 
         return draws.finish();
     }
