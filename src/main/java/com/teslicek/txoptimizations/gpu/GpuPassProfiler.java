@@ -76,11 +76,12 @@ public final class GpuPassProfiler {
         if (isRunning())
             throw new IllegalStateException("GPU profile is already running");
 
-        COPY_LABELS.clear();
-        PIPELINE_LABELS.clear();
         if (!COMPILER.isCompilationTimeMonitoringSupported())
             throw new IllegalStateException("The JVM does not report JIT compilation time, which the profile's warm-up waits on");
 
+        COPY_LABELS.clear();
+        PIPELINE_LABELS.clear();
+        resetMeasurements();
         JfrRecorder.start(Thread.currentThread());
         warming    = true;
         warmStart  = System.nanoTime();
@@ -92,24 +93,28 @@ public final class GpuPassProfiler {
 
     private static void beginMeasurement() {
         draining = false;
+        resetMeasurements();
+        context = ProfileContext.capture(Minecraft.getInstance());
+        GcPauses.start();
+        CpuSampler.start(Thread.currentThread(), DURATION);
+        JfrRecorder.measureFromNow();
+        recording    = true;
+        measuredFrom = System.nanoTime();
+    }
+
+    private static void resetMeasurements() {
         PASSES.clear();
-        recording  = true;
-        framesRead = 0;
-        gpuNanos   = 0L;
-        startNanos = System.nanoTime();
+        framesRead     = 0;
+        gpuNanos       = 0L;
+        startNanos     = System.nanoTime();
+        frameTimeCount = 0;
+        screenFormats  = null;
         Arrays.fill(SLOW_NANOS, 0L);
         Arrays.fill(SLOW_TEXTS, null);
         FramePath.resetCounts();
         ProfileCounters.reset();
         FragmentCounts.reset();
         HudProfile.reset();
-        context        = ProfileContext.capture(Minecraft.getInstance());
-        frameTimeCount = 0;
-        screenFormats  = null;
-        GcPauses.start();
-        CpuSampler.start(Thread.currentThread(), DURATION);
-        JfrRecorder.measureFromNow();
-        measuredFrom   = System.nanoTime();
     }
 
     private static boolean isWarmedUp(long now) {
