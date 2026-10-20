@@ -1,6 +1,7 @@
 package com.teslicek.txoptimizations.mixin;
 
 import com.teslicek.txoptimizations.SectionSubset;
+import com.teslicek.txoptimizations.TerrainDrawChanges;
 import java.util.List;
 import net.minecraft.client.renderer.SectionOcclusionGraph;
 import net.minecraft.client.renderer.chunk.SectionRenderDispatcher;
@@ -21,5 +22,6 @@ public abstract class SectionOcclusionGraphVisibleSectionsMixin {
     @Inject(method = "addSectionsInFrustum", at = @At("RETURN"))
     private void txoptimizations$endAdd(Frustum frustum, List<SectionRenderDispatcher.RenderSection> visibleSections, List<SectionRenderDispatcher.RenderSection> nearbyVisibleSections, CallbackInfo ci) {
         SectionSubset.endVisibleChange();
+        TerrainDrawChanges.mark();
     }
 }

@@ -2,7 +2,6 @@ package com.teslicek.txoptimizations;
 
 import com.mojang.renderpearl.api.buffers.GpuBuffer;
 import com.mojang.renderpearl.api.pipeline.IndexType;
-import com.teslicek.txoptimizations.gpu.ProfileCounters;
 import it.unimi.dsi.fastutil.HashCommon;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -137,8 +136,6 @@ public final class SectionDrawList {
         this.draws[draw + BASE_INSTANCE] = baseInstance;
         this.drawInts                    = draw + DRAW_INTS;
 
-        ProfileCounters.countTerrainDraw(this.groupLayers[group], indexCount);
-
         int last = this.lastDraws[group];
 
         if (last == NONE)
@@ -231,6 +228,17 @@ public final class SectionDrawList {
                 this.writeCommands(group, start, COMMAND_BYTES);
 
             start += bytes;
+        }
+    }
+
+    public void countDraws(long[] layerDraws, long[] layerTriangles) {
+        for (int group = 0; group < this.groups; group ++) {
+            int layer = this.groupLayers[group];
+
+            layerDraws[layer] += this.drawCounts[group];
+
+            for (int draw = this.firstDraws[group]; draw != NONE; draw = this.draws[draw + NEXT])
+                layerTriangles[layer] += this.draws[draw + INDEX_COUNT] / 3;
         }
     }
 

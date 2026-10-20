@@ -8,6 +8,7 @@ import com.teslicek.txoptimizations.FacingCulling;
 import com.teslicek.txoptimizations.SectionAllocations;
 import com.teslicek.txoptimizations.SectionBufferId;
 import com.teslicek.txoptimizations.SectionLayers;
+import com.teslicek.txoptimizations.TerrainDrawChanges;
 import java.util.Map;
 import net.minecraft.client.renderer.chunk.ChunkSectionLayer;
 import net.minecraft.client.renderer.chunk.CompiledSectionMesh;
@@ -91,6 +92,8 @@ public abstract class CompiledSectionMeshDrawRecordMixin implements SectionAlloc
     public void txoptimizations$setAllocation(int slot, TlsfAllocator.@Nullable Allocation allocation) {
         this.txoptimizations$allocations[slot] = allocation;
 
+        TerrainDrawChanges.mark();
+
         int[] record = this.txoptimizations$drawRecord;
 
         if (record == null) {
@@ -106,6 +109,8 @@ public abstract class CompiledSectionMeshDrawRecordMixin implements SectionAlloc
     @Inject(method = "close", at = @At("RETURN"))
     private void txoptimizations$dropDraws(CallbackInfo ci) {
         this.txoptimizations$translucentGeometry = false;
+
+        TerrainDrawChanges.mark();
 
         int[] record = this.txoptimizations$drawRecord;
 

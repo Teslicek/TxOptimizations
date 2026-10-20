@@ -195,6 +195,7 @@
     "RenderSectionSubsetMarkMixin",
     "RenderSectionOctreeLeafMixin",
     "RenderSectionMeshReleaseMixin",
+    "RenderSectionDrawChangeMixin",
     "RenderSetupTextureCacheMixin",
     "RenderPipelineFormatArrayMixin",
     "EnvironmentAttributeSamplerLayersMixin",

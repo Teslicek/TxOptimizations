@@ -1,5 +1,6 @@
 package com.teslicek.txoptimizations.gpu;
 
+import com.teslicek.txoptimizations.SectionDrawList;
 import com.teslicek.txoptimizations.SectionLayers;
 import java.util.Arrays;
 import java.util.Locale;
@@ -59,12 +60,9 @@ public final class ProfileCounters {
             batchedDraws += count;
     }
 
-    public static void countTerrainDraw(int layer, int indexCount) {
-        if (!GpuPassProfiler.isRecording())
-            return;
-
-        terrainDraws[layer] ++;
-        terrainTriangles[layer] += indexCount / 3;
+    public static void countTerrainDraws(SectionDrawList sectionDraws) {
+        if (GpuPassProfiler.isRecording())
+            sectionDraws.countDraws(terrainDraws, terrainTriangles);
     }
 
     static String report(int frames) {
