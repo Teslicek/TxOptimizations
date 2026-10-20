@@ -1,13 +1,14 @@
 package com.teslicek.txoptimizations.mixin;
 
+import com.mojang.blaze3d.vertex.StagingBuffer;
+import com.mojang.renderpearl.api.commands.CommandEncoder;
 import com.teslicek.txoptimizations.SectionMeshReleases;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import net.minecraft.client.renderer.chunk.SectionRenderDispatcher;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;
-import org.spongepowered.asm.mixin.injection.Inject;
-import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
+import org.spongepowered.asm.mixin.injection.Redirect;
 
 @Mixin(SectionRenderDispatcher.class)
 public abstract class SectionRenderDispatcherMeshReleaseMixin implements SectionMeshReleases {
@@ -20,11 +21,13 @@ public abstract class SectionRenderDispatcherMeshReleaseMixin implements Section
         this.txoptimizations$releases.add(release);
     }
 
-    @Inject(method = "uploadTerrainBuffersToGpu", at = @At("HEAD"))
-    private void txoptimizations$runReleases(CallbackInfo ci) {
+    @Redirect(method = "uploadTerrainBuffersToGpu", at = @At(value = "INVOKE", target = "Lcom/mojang/blaze3d/vertex/StagingBuffer;startUploading(Lcom/mojang/renderpearl/api/commands/CommandEncoder;)Lcom/mojang/blaze3d/vertex/StagingBuffer$Uploader;"))
+    private StagingBuffer.Uploader txoptimizations$releaseBeforeUploading(StagingBuffer stagingBuffer, CommandEncoder encoder) {
         Runnable release;
 
         while ((release = this.txoptimizations$releases.poll()) != null)
             release.run();
+
+        return stagingBuffer.startUploading(encoder);
     }
 }

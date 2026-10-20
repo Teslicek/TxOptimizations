@@ -44,12 +44,14 @@ public abstract class ChunkSkyLightSourcesScanMixin {
             PalettedContainer.Data<BlockState> data        = states.data;
             BitStorage                         storage     = data.storage();
             Palette<BlockState>                palette     = data.palette();
+            int                                topIndex    = states.strategy.getIndex(x, 15, z);
+            int                                layerSize   = topIndex - states.strategy.getIndex(x, 14, z);
             int                                sectionMinY = SectionPos.sectionToBlockCoord(chunk.getSectionYFromSectionIndex(sectionIndex));
             int                                lastId      = -1;
             BlockState                         bottomState = null;
 
-            for (int y = 15; y >= 0; y --) {
-                int id = storage.get(states.strategy.getIndex(x, y, z));
+            for (int y = 15, index = topIndex; y >= 0; y --, index -= layerSize) {
+                int id = storage.get(index);
 
                 if (id != lastId) {
                     bottomState = palette.valueFor(id);
