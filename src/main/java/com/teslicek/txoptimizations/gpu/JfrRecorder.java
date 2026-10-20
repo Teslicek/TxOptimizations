@@ -73,6 +73,13 @@ final class JfrRecorder {
         renderThread = target.getName();
     }
 
+    static void measureFromNow() {
+        if (recording == null)
+            throw new IllegalStateException("Flight Recorder profile was never started");
+
+        startTime = Instant.now();
+    }
+
     static String finish(double seconds) {
         Recording finished = recording;
 
@@ -88,7 +95,7 @@ final class JfrRecorder {
             try {
                 finished.dump(file);
 
-                List<RecordedEvent> events = RecordingFile.readAllEvents(file);
+                List<RecordedEvent> events = RecordingFile.readAllEvents(file).stream().filter(event -> !event.getStartTime().isBefore(startTime)).toList();
 
                 return jvmReport(events) + gcReport(events) + allocationReport(events, seconds);
             } finally {

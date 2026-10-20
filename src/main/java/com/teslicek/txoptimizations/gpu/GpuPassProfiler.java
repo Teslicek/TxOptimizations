@@ -44,6 +44,7 @@ public final class GpuPassProfiler {
     private static CommandEncoderBackend encoder;
     private static int                   slot;
     private static boolean               warming;
+    private static boolean               draining;
     private static long                  warmedAt;
     private static boolean               recording;
     private static int                   framesPending;
@@ -65,16 +66,17 @@ public final class GpuPassProfiler {
         if (isRunning())
             throw new IllegalStateException("GPU profile is already running");
 
+        COPY_LABELS.clear();
+        PIPELINE_LABELS.clear();
         JfrRecorder.start(Thread.currentThread());
-        warming  = true;
-        warmedAt = System.nanoTime() + WARMUP;
+        warming   = true;
+        warmedAt  = System.nanoTime() + WARMUP;
+        recording = true;
     }
 
     private static void beginMeasurement() {
-        warming = false;
+        draining = false;
         PASSES.clear();
-        COPY_LABELS.clear();
-        PIPELINE_LABELS.clear();
         recording  = true;
         framesRead = 0;
         gpuNanos   = 0L;
@@ -90,11 +92,12 @@ public final class GpuPassProfiler {
         screenFormats  = null;
         GcPauses.start();
         CpuSampler.start(Thread.currentThread(), DURATION);
+        JfrRecorder.measureFromNow();
         measuredFrom   = System.nanoTime();
     }
 
     public static boolean isRunning() {
-        return warming || recording || framesPending > 0;
+        return warming || draining || recording || framesPending > 0;
     }
 
     public static boolean isRecording() {
@@ -199,17 +202,16 @@ public final class GpuPassProfiler {
         if (!isRunning())
             return;
 
-        if (warming) {
-            if (System.nanoTime() >= warmedAt)
-                beginMeasurement();
-
-            return;
-        }
-
         if (recording) {
             mark(frameDevice, frameEncoder, FRAME_END);
             framesPending ++;
-            recording = System.nanoTime() - startNanos < DURATION;
+            recording = warming || System.nanoTime() - startNanos < DURATION;
+        }
+
+        if (warming && System.nanoTime() >= warmedAt) {
+            warming   = false;
+            recording = false;
+            draining  = true;
         }
 
         FragmentCounts.drain();
@@ -218,6 +220,12 @@ public final class GpuPassProfiler {
         if (COUNTS[slot] > 0) {
             read(slot);
             framesPending --;
+        }
+
+        if (draining && framesPending == 0 && FragmentCounts.isDrained()) {
+            beginMeasurement();
+
+            return;
         }
 
         if (!isRunning())

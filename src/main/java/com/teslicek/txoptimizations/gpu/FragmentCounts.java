@@ -32,6 +32,10 @@ public final class FragmentCounts {
         TOTALS.clear();
     }
 
+    static boolean isDrained() {
+        return PENDING.isEmpty();
+    }
+
     public static void begin(VkDevice vkDevice, VkCommandBuffer commandBuffer, String label) {
         if (openLabel != null && openLabel.equals(label) && openBuffer == commandBuffer)
             return;
