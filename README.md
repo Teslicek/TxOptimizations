@@ -278,6 +278,10 @@ The hand and screen effect passes drained their submit collections twice per fra
 
 At the end of every frame the GUI item atlas walked all its slots looking for slots marked to be dropped after the frame. The sweep now only runs when a slot was marked since the last sweep.
 
+### Animated sprite draw order
+
+Every client tick redraws the animated block textures into each mip level of the atlas, one render pass per level. Interpolated sprites such as magma, prismarine, sculk and command blocks use a different pipeline than sprites that only switch frames, such as water, lava and fire, and the atlas listed them in stitching order, so the pipeline switched back and forth between neighbouring sprites in every pass. In a server lobby capture the atlas tick was 8.7% of the render thread in the slowest 1% of frames, which are the tick frames, and the pipeline binds inside it alone were 2.3%. The atlas now lists the interpolated sprites first and the others after them, each group in its original order, so every pass binds each pipeline once. Each sprite draws only its own rectangle of the atlas without blending, and every draw sets all its textures and uniforms itself, so the atlas holds the same pixels as before.
+
 ### Viewport, scissor and pipeline binds
 
 Every render pass set the viewport and scissor and bound its first pipeline again, even when the command buffer already had exactly that state from the previous pass. The bound pipeline and both dynamic states stay valid across render passes in the same command buffer, so a viewport, scissor or pipeline that is already set is no longer recorded again. `vkCmdBindPipeline` alone was 2.8% of the render thread in the BedWars prelobby. Pushed descriptors also stay valid across render passes, so the check that skips pushing an identical descriptor set with the same pipeline layout now spans the whole command buffer instead of a single pass. The remembered state is dropped whenever a new command buffer starts recording. The scissor is compared before its Vulkan struct is built, and a changed one is written straight into stack memory, so a GUI draw that keeps the scissor builds nothing.

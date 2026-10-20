@@ -240,6 +240,7 @@
     "StagedVertexBufferDirectCopyMixin",
     "StagedVertexBufferDrawAccessor",
     "TextFeatureRendererLayoutCacheMixin",
+    "TextureAtlasAnimationOrderMixin",
     "TextureAtlasScratchViewMixin",
     "TextureSetupLightmapCacheMixin",
     "TextureTransformFrameMillisMixin",
