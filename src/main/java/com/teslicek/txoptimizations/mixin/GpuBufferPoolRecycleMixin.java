@@ -17,6 +17,7 @@ import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
+import org.spongepowered.asm.mixin.injection.Redirect;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 @Mixin(targets = "net.minecraft.client.renderer.StagedVertexBuffer$GpuBufferPool")
@@ -96,11 +97,11 @@ public abstract class GpuBufferPoolRecycleMixin {
             original.call(expired, close);
     }
 
-    @WrapOperation(method = "endFrame", at = @At(value = "INVOKE", target = "Ljava/util/List;clear()V"))
-    private void txoptimizations$keepSpares(List<GpuBuffer> buffers, Operation<Void> original) {
+    @Redirect(method = "endFrame", at = @At(value = "INVOKE", target = "Ljava/util/List;clear()V"))
+    private void txoptimizations$keepSpares(List<GpuBuffer> buffers) {
         if (buffers == this.available)
             return;
 
-        original.call(buffers);
+        buffers.clear();
     }
 }

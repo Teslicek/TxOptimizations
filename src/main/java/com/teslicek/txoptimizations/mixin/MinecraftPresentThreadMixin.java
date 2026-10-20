@@ -23,6 +23,7 @@ import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
+import org.spongepowered.asm.mixin.injection.Redirect;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 @Mixin(Minecraft.class)
@@ -75,12 +76,12 @@ public abstract class MinecraftPresentThreadMixin {
     @Unique
     private boolean txoptimizations$frameAcquiredEarly;
 
-    @WrapOperation(method = "renderFrame", at = @At(value = "INVOKE", target = "Lcom/mojang/renderpearl/api/device/GpuSurface;isAcquired()Z", ordinal = 0))
-    private boolean txoptimizations$startWithEarlyImage(GpuSurface surface, Operation<Boolean> original) {
+    @Redirect(method = "renderFrame", at = @At(value = "INVOKE", target = "Lcom/mojang/renderpearl/api/device/GpuSurface;isAcquired()Z", ordinal = 0))
+    private boolean txoptimizations$startWithEarlyImage(GpuSurface surface) {
         if (this.txoptimizations$imageAcquiredEarly)
             return false;
 
-        return original.call(surface);
+        return surface.isAcquired();
     }
 
     @ModifyExpressionValue(method = "renderFrame", at = @At(value = "FIELD", target = "Lnet/minecraft/client/Minecraft;windowSurfaceNeedsReconfiguring:Z", opcode = Opcodes.GETFIELD))
@@ -100,24 +101,24 @@ public abstract class MinecraftPresentThreadMixin {
         return needsReconfiguring;
     }
 
-    @WrapOperation(method = "renderFrame", at = @At(value = "INVOKE", target = "Lcom/mojang/renderpearl/api/device/GpuSurface;isSuboptimal()Z"))
-    private boolean txoptimizations$skipDeferredSuboptimal(GpuSurface surface, Operation<Boolean> original) {
+    @Redirect(method = "renderFrame", at = @At(value = "INVOKE", target = "Lcom/mojang/renderpearl/api/device/GpuSurface;isSuboptimal()Z"))
+    private boolean txoptimizations$skipDeferredSuboptimal(GpuSurface surface) {
         if (this.txoptimizations$acquireDeferred || this.txoptimizations$frameAcquiredEarly)
             return false;
 
-        return original.call(surface);
+        return surface.isSuboptimal();
     }
 
-    @WrapOperation(method = "renderFrame", at = @At(value = "INVOKE", target = "Lcom/mojang/renderpearl/api/device/GpuSurface;configure(Lcom/mojang/renderpearl/api/device/GpuSurface$Configuration;)V"))
-    private void txoptimizations$dropEarlyBeforeConfigure(GpuSurface surface, GpuSurface.Configuration config, Operation<Void> original) {
+    @Redirect(method = "renderFrame", at = @At(value = "INVOKE", target = "Lcom/mojang/renderpearl/api/device/GpuSurface;configure(Lcom/mojang/renderpearl/api/device/GpuSurface$Configuration;)V"))
+    private void txoptimizations$dropEarlyBeforeConfigure(GpuSurface surface, GpuSurface.Configuration config) throws SurfaceException {
         this.txoptimizations$dropEarlyAcquire(surface);
-        original.call(surface, config);
+        surface.configure(config);
     }
 
-    @WrapOperation(method = "renderFrame", at = @At(value = "INVOKE", target = "Lcom/mojang/renderpearl/api/device/GpuSurface;acquireNextTexture()V"))
-    private void txoptimizations$useEarlyAcquire(GpuSurface surface, Operation<Void> original) throws SurfaceException {
+    @Redirect(method = "renderFrame", at = @At(value = "INVOKE", target = "Lcom/mojang/renderpearl/api/device/GpuSurface;acquireNextTexture()V"))
+    private void txoptimizations$useEarlyAcquire(GpuSurface surface) throws SurfaceException {
         if (!this.txoptimizations$frameAcquiredEarly) {
-            original.call(surface);
+            surface.acquireNextTexture();
 
             return;
         }
@@ -137,8 +138,8 @@ public abstract class MinecraftPresentThreadMixin {
         return invalid || this.txoptimizations$acquireDeferred || this.txoptimizations$holdFrame;
     }
 
-    @WrapOperation(method = "renderFrame", at = @At(value = "INVOKE", target = "Lcom/mojang/renderpearl/api/device/GpuSurface;isAcquired()Z", ordinal = 1))
-    private boolean txoptimizations$acquireBeforeBlit(GpuSurface surface, Operation<Boolean> original) {
+    @Redirect(method = "renderFrame", at = @At(value = "INVOKE", target = "Lcom/mojang/renderpearl/api/device/GpuSurface;isAcquired()Z", ordinal = 1))
+    private boolean txoptimizations$acquireBeforeBlit(GpuSurface surface) {
         if (this.txoptimizations$acquireDeferred) {
             this.txoptimizations$acquireDeferred = false;
 
@@ -146,16 +147,16 @@ public abstract class MinecraftPresentThreadMixin {
                 this.txoptimizations$configureAndAcquire();
         }
 
-        return original.call(surface);
+        return surface.isAcquired();
     }
 
-    @WrapOperation(method = "renderFrame", at = @At(value = "INVOKE", target = "Lcom/mojang/renderpearl/api/commands/CommandEncoder;submit()V"))
-    private void txoptimizations$presentOnPresentThread(CommandEncoder encoder, Operation<Void> original) {
+    @Redirect(method = "renderFrame", at = @At(value = "INVOKE", target = "Lcom/mojang/renderpearl/api/commands/CommandEncoder;submit()V"))
+    private void txoptimizations$presentOnPresentThread(CommandEncoder encoder) {
         if (this.windowSurface.isAcquired())
             PresentThread.arm(this.windowSurface);
 
         try {
-            original.call(encoder);
+            encoder.submit();
         } finally {
             PresentThread.disarm();
         }

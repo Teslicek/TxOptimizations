@@ -1,7 +1,5 @@
 package com.teslicek.txoptimizations.mixin;
 
-import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
-import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
 import com.mojang.renderpearl.backend.vulkan.VulkanCommandEncoder;
 import com.mojang.renderpearl.backend.vulkan.VulkanTransientMemory;
 import com.teslicek.txoptimizations.FrontSubmission;
@@ -13,6 +11,7 @@ import org.spongepowered.asm.mixin.Overwrite;
 import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
+import org.spongepowered.asm.mixin.injection.Redirect;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 @Mixin(value = VulkanTransientMemory.class, priority = 999)
@@ -45,11 +44,11 @@ public abstract class VulkanTransientMemoryLazyMixin {
         ((FrontSubmission) ((VulkanCommandEncoderSubmissionAccessor) this.encoder).txoptimizations$submissionBuilder()).txoptimizations$executeFirst(this.commandBuffer);
     }
 
-    @WrapOperation(method = "endSubmit", at = @At(value = "INVOKE", target = "Lorg/lwjgl/vulkan/VK12;vkEndCommandBuffer(Lorg/lwjgl/vulkan/VkCommandBuffer;)I"))
-    private int txoptimizations$endOnlyStarted(VkCommandBuffer commandBuffer, Operation<Integer> original) {
+    @Redirect(method = "endSubmit", at = @At(value = "INVOKE", target = "Lorg/lwjgl/vulkan/VK12;vkEndCommandBuffer(Lorg/lwjgl/vulkan/VkCommandBuffer;)I"))
+    private int txoptimizations$endOnlyStarted(VkCommandBuffer commandBuffer) {
         if (commandBuffer == null)
             return VK10.VK_SUCCESS;
 
-        return original.call(commandBuffer);
+        return VK10.vkEndCommandBuffer(commandBuffer);
     }
 }
