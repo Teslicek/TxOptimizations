@@ -1,5 +1,7 @@
 package com.teslicek.txoptimizations.mixin;
 
+import com.teslicek.txoptimizations.NativeWrites;
+import java.nio.ByteBuffer;
 import java.util.Objects;
 import net.minecraft.client.renderer.DynamicGpuData;
 import org.joml.Matrix4fc;
@@ -9,9 +11,22 @@ import org.spongepowered.asm.mixin.Final;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Overwrite;
 import org.spongepowered.asm.mixin.Shadow;
+import org.spongepowered.asm.mixin.Unique;
 
 @Mixin(value = DynamicGpuData.Transform.class, priority = 999)
 public abstract class DynamicTransformEqualsMixin {
+
+    @Unique
+    private static final long TEXTURE_MATRIX_OFFSET = 64L;
+
+    @Unique
+    private static final long COLOR_MODULATOR_OFFSET = 128L;
+
+    @Unique
+    private static final long MODEL_OFFSET_OFFSET = 144L;
+
+    @Unique
+    private static final int TRANSFORM_BYTES = 156;
 
     @Shadow
     @Final
@@ -28,6 +43,16 @@ public abstract class DynamicTransformEqualsMixin {
     @Shadow
     @Final
     private Matrix4fc textureMatrix;
+
+    @Overwrite
+    public void write(ByteBuffer buffer) {
+        long address = NativeWrites.reserve(buffer, TRANSFORM_BYTES);
+
+        this.modelView.getToAddress(address);
+        this.textureMatrix.getToAddress(address + TEXTURE_MATRIX_OFFSET);
+        this.colorModulator.getToAddress(address + COLOR_MODULATOR_OFFSET);
+        this.modelOffset.getToAddress(address + MODEL_OFFSET_OFFSET);
+    }
 
     @Overwrite
     public final boolean equals(Object other) {

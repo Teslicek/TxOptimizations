@@ -4,7 +4,9 @@ import com.mojang.blaze3d.buffers.Std140Builder;
 import com.mojang.blaze3d.systems.RenderSystem;
 import com.mojang.renderpearl.api.buffers.GpuBuffer;
 import com.mojang.renderpearl.api.buffers.GpuBufferSlice;
+import com.mojang.renderpearl.backend.vulkan.VulkanGpuBuffer;
 import com.teslicek.txoptimizations.OutlineScissor;
+import com.teslicek.txoptimizations.PersistentRingBuffer;
 import net.minecraft.client.renderer.GameRenderer;
 import net.minecraft.client.renderer.MappableRingBuffer;
 import net.minecraft.client.renderer.ProjectionMatrixBuffer;
@@ -28,8 +30,12 @@ public abstract class GameRendererLevelProjectionRingMixin {
 
         GpuBuffer target = this.txoptimizations$levelProjection.currentBuffer();
 
-        try (GpuBufferSlice.MappedView view = target.map(false, true)) {
-            Std140Builder.intoBuffer(view.data()).putMat4f(projectionMatrix);
+        if (target instanceof VulkanGpuBuffer.Direct) {
+            Std140Builder.intoBuffer(((PersistentRingBuffer) this.txoptimizations$levelProjection).txoptimizations$mapCurrent().clear()).putMat4f(projectionMatrix);
+        } else {
+            try (GpuBufferSlice.MappedView view = target.map(false, true)) {
+                Std140Builder.intoBuffer(view.data()).putMat4f(projectionMatrix);
+            }
         }
 
         GpuBufferSlice slice = target.slice(0L, RenderSystem.PROJECTION_MATRIX_UBO_SIZE);
