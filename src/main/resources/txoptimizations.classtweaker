@@ -114,5 +114,8 @@ accessible field net/minecraft/client/renderer/Octree$Branch nodes [Lnet/minecra
 accessible field net/minecraft/client/renderer/Octree$Branch boundingBox Lnet/minecraft/world/level/levelgen/structure/BoundingBox;
 accessible method net/minecraft/client/renderer/Octree isClose (DDDDDDI)Z
 
+# Section compile queue inbox
+accessible field net/minecraft/client/renderer/chunk/SectionRenderDispatcher$RenderSection$SectionTask isCancelled Ljava/util/concurrent/atomic/AtomicBoolean;
+
 # Section subsets across visible section walks
 accessible field net/minecraft/client/renderer/ViewArea sections Lnet/minecraft/client/RotatingSectionStorage;
