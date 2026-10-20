@@ -1,6 +1,6 @@
 package com.teslicek.txoptimizations.mixin;
 
-import com.teslicek.txoptimizations.AirCollision;
+import com.teslicek.txoptimizations.BlockCollisionScan;
 import java.util.List;
 import net.minecraft.client.particle.Particle;
 import net.minecraft.world.entity.Entity;
@@ -14,11 +14,11 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Redirect;
 
 @Mixin(Particle.class)
-public abstract class ParticleAirCollisionMixin {
+public abstract class ParticleCollisionScanMixin {
 
     @Redirect(method = "move", at = @At(value = "INVOKE", target = "Lnet/minecraft/world/entity/Entity;collideBoundingBox(Lnet/minecraft/world/phys/shapes/CollisionContext;Lnet/minecraft/world/phys/Vec3;Lnet/minecraft/world/phys/AABB;Lnet/minecraft/world/level/Level;Ljava/util/List;)Lnet/minecraft/world/phys/Vec3;"))
-    private Vec3 txoptimizations$skipAirCollision(CollisionContext context, Vec3 movement, AABB box, Level level, List<VoxelShape> colliders) {
-        if (colliders.isEmpty() && AirCollision.isOnlyAir(level, box.expandTowards(movement)))
+    private Vec3 txoptimizations$skipFreeMovement(CollisionContext context, Vec3 movement, AABB box, Level level, List<VoxelShape> colliders) {
+        if (colliders.isEmpty() && BlockCollisionScan.cannotCollide(level, context, box.expandTowards(movement)))
             return movement;
 
         return Entity.collideBoundingBox(context, movement, box, level, colliders);

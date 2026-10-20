@@ -155,7 +155,7 @@
     "ModelPartCubeDirectWriteMixin",
     "ModelRenderTypeCacheMixin",
     "ModelResetPoseMixin",
-    "ParticleAirCollisionMixin",
+    "ParticleCollisionScanMixin",
     "ParticleLightCacheMixin",
     "ParticleRotationMixin",
     "PatchedDataComponentMapEmptyPatchMixin",
