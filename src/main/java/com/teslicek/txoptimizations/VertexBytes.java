@@ -22,6 +22,7 @@ public final class VertexBytes {
     private static final int    HALF_BITS          = 16;
     private static final long   INT_MASK           = 0xFFFFFFFFL;
     private static final byte   NORMAL_SCALE       = 127;
+    private static final long   LINE_EDGE_BYTES    = 4L * LINE_STRIDE;
 
     private VertexBytes() {
     }
@@ -89,13 +90,46 @@ public final class VertexBytes {
         return (byte) (int) (value * NORMAL_SCALE);
     }
 
-    public static void putLine(long pointer, float x, float y, float z, int colorBits, long tail) {
-        if (!LITTLE_ENDIAN)
-            throw new IllegalStateException("Line vertices are only packed into words on little-endian CPUs");
+    public static void putLineSegment(long pointer, float startX, float startY, float startZ, float endX, float endY, float endZ, int colorBits, long tail) {
+        requireLittleEndianLines();
 
-        MemoryUtil.memPutLong(pointer, (long) Float.floatToRawIntBits(y) << Integer.SIZE | Float.floatToRawIntBits(x) & INT_MASK);
-        MemoryUtil.memPutLong(pointer + 8L, (long) colorBits << Integer.SIZE | Float.floatToRawIntBits(z) & INT_MASK);
-        MemoryUtil.memPutLong(pointer + 16L, tail);
+        long color = (long) colorBits << Integer.SIZE;
+
+        putLineSegmentWords(pointer, lineXy(startX, startY), color | lineZ(startZ), lineXy(endX, endY), color | lineZ(endZ), tail);
+    }
+
+    public static void putLineBox(long pointer, float x0, float y0, float z0, float x1, float y1, float z1, int colorBits, int xColorBits, int yColorBits, int zColorBits, float width) {
+        requireLittleEndianLines();
+
+        long x0y0  = lineXy(x0, y0);
+        long x1y0  = lineXy(x1, y0);
+        long x0y1  = lineXy(x0, y1);
+        long x1y1  = lineXy(x1, y1);
+        long front = lineZ(z0);
+        long back  = lineZ(z1);
+        long box   = (long) colorBits << Integer.SIZE;
+        long xEdge = (long) xColorBits << Integer.SIZE;
+        long yEdge = (long) yColorBits << Integer.SIZE;
+        long zEdge = (long) zColorBits << Integer.SIZE;
+        long posX  = lineTail(packNormal(x1 - x0, 0.0F, 0.0F), width);
+        long negX  = lineTail(packNormal(x0 - x1, 0.0F, 0.0F), width);
+        long posY  = lineTail(packNormal(0.0F, y1 - y0, 0.0F), width);
+        long negY  = lineTail(packNormal(0.0F, y0 - y1, 0.0F), width);
+        long posZ  = lineTail(packNormal(0.0F, 0.0F, z1 - z0), width);
+        long negZ  = lineTail(packNormal(0.0F, 0.0F, z0 - z1), width);
+
+        putLineEdgeWords(pointer, x0y0, xEdge | front, x1y0, xEdge | front, posX);
+        putLineEdgeWords(pointer + LINE_EDGE_BYTES, x0y0, yEdge | front, x0y1, yEdge | front, posY);
+        putLineEdgeWords(pointer + 2L * LINE_EDGE_BYTES, x0y0, zEdge | front, x0y0, zEdge | back, posZ);
+        putLineEdgeWords(pointer + 3L * LINE_EDGE_BYTES, x1y0, box | front, x1y1, box | front, posY);
+        putLineEdgeWords(pointer + 4L * LINE_EDGE_BYTES, x1y1, box | front, x0y1, box | front, negX);
+        putLineEdgeWords(pointer + 5L * LINE_EDGE_BYTES, x0y1, box | front, x0y1, box | back, posZ);
+        putLineEdgeWords(pointer + 6L * LINE_EDGE_BYTES, x0y1, box | back, x0y0, box | back, negY);
+        putLineEdgeWords(pointer + 7L * LINE_EDGE_BYTES, x0y0, box | back, x1y0, box | back, posX);
+        putLineEdgeWords(pointer + 8L * LINE_EDGE_BYTES, x1y0, box | back, x1y0, box | front, negZ);
+        putLineEdgeWords(pointer + 9L * LINE_EDGE_BYTES, x0y1, box | back, x1y1, box | back, posX);
+        putLineEdgeWords(pointer + 10L * LINE_EDGE_BYTES, x1y0, box | back, x1y1, box | back, posY);
+        putLineSegmentWords(pointer + 11L * LINE_EDGE_BYTES, x1y1, box | front, x1y1, box | back, posZ);
     }
 
     public static void requireLineLayout(VertexFormat format) {
@@ -117,5 +151,35 @@ public final class VertexBytes {
 
     private static int packedBits(int packed) {
         return LITTLE_ENDIAN ? packed : Integer.rotateLeft(packed, HALF_BITS);
+    }
+
+    private static void requireLittleEndianLines() {
+        if (!LITTLE_ENDIAN)
+            throw new IllegalStateException("Line vertices are only packed into words on little-endian CPUs");
+    }
+
+    private static long lineXy(float x, float y) {
+        return (long) Float.floatToRawIntBits(y) << Integer.SIZE | Float.floatToRawIntBits(x) & INT_MASK;
+    }
+
+    private static long lineZ(float z) {
+        return Float.floatToRawIntBits(z) & INT_MASK;
+    }
+
+    private static void putLineEdgeWords(long pointer, long startXy, long startZ, long endXy, long endZ, long tail) {
+        putLineSegmentWords(pointer, startXy, startZ, endXy, endZ, tail);
+        putLineVertexWords(pointer + 3L * LINE_STRIDE, endXy, endZ, tail);
+    }
+
+    private static void putLineSegmentWords(long pointer, long startXy, long startZ, long endXy, long endZ, long tail) {
+        putLineVertexWords(pointer, startXy, startZ, tail);
+        putLineVertexWords(pointer + LINE_STRIDE, startXy, startZ, tail);
+        putLineVertexWords(pointer + 2L * LINE_STRIDE, endXy, endZ, tail);
+    }
+
+    private static void putLineVertexWords(long pointer, long xy, long zColor, long tail) {
+        MemoryUtil.memPutLong(pointer, xy);
+        MemoryUtil.memPutLong(pointer + 8L, zColor);
+        MemoryUtil.memPutLong(pointer + 16L, tail);
     }
 }

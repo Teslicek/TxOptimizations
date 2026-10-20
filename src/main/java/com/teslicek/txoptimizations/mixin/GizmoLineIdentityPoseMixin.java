@@ -34,6 +34,9 @@ public abstract class GizmoLineIdentityPoseMixin extends RenderTypeFeatureRender
     private static final int LINE_VERTICES = 3;
 
     @Unique
+    private static final int BOX_VERTICES = GizmoLineList.BOX_LINES * (LINE_VERTICES + 1) - 1;
+
+    @Unique
     private static final int BOX_CORNERS = 8;
 
     @Unique
@@ -86,12 +89,24 @@ public abstract class GizmoLineIdentityPoseMixin extends RenderTypeFeatureRender
                 continue;
             }
 
+            float x0 = (float) (packed.coordinate(entry, 0) - camX);
+            float y0 = (float) (packed.coordinate(entry, 1) - camY);
+            float z0 = (float) (packed.coordinate(entry, 2) - camZ);
+            float x1 = (float) (packed.coordinate(entry, 3) - camX);
+            float y1 = (float) (packed.coordinate(entry, 4) - camY);
+            float z1 = (float) (packed.coordinate(entry, 5) - camZ);
+
+            if (direct && txoptimizations$boxInFront(viewX, viewY, viewZ, viewW, x0, y0, z0, x1, y1, z1)) {
+                VertexBytes.putLineBox(((DirectVertexBuffer) builder).txoptimizations$reserveAfterLastVertex(BOX_VERTICES), x0, y0, z0, x1, y1, z1, VertexBytes.colorBits(lineColor), VertexBytes.colorBits(packed.edgeColor(entry, 0)), VertexBytes.colorBits(packed.edgeColor(entry, 1)), VertexBytes.colorBits(packed.edgeColor(entry, 2)), lineWidth);
+                continue;
+            }
+
             float[] corners = this.txoptimizations$corners;
 
             for (int corner = 0; corner < BOX_CORNERS; corner ++) {
-                float x    = (float) (packed.coordinate(entry, (corner & 1) == 0 ? 0 : 3) - camX);
-                float y    = (float) (packed.coordinate(entry, (corner & 2) == 0 ? 1 : 4) - camY);
-                float z    = (float) (packed.coordinate(entry, (corner & 4) == 0 ? 2 : 5) - camZ);
+                float x    = (corner & 1) == 0 ? x0 : x1;
+                float y    = (corner & 2) == 0 ? y0 : y1;
+                float z    = (corner & 4) == 0 ? z0 : z1;
                 int   base = corner * CORNER_VALUES;
 
                 corners[base]     = x;
@@ -112,6 +127,20 @@ public abstract class GizmoLineIdentityPoseMixin extends RenderTypeFeatureRender
     @Unique
     private static float txoptimizations$depth(float viewX, float viewY, float viewZ, float viewW, float x, float y, float z) {
         return Math.fma(viewX, x, Math.fma(viewY, y, Math.fma(viewZ, z, viewW * 1.0F)));
+    }
+
+    @Unique
+    private static boolean txoptimizations$boxInFront(float viewX, float viewY, float viewZ, float viewW, float x0, float y0, float z0, float x1, float y1, float z1) {
+        if (!Float.isFinite(x0) || !Float.isFinite(y0) || !Float.isFinite(z0) || !Float.isFinite(x1) || !Float.isFinite(y1) || !Float.isFinite(z1))
+            return false;
+
+        return txoptimizations$inFront(viewX, viewY, viewZ, viewW, x0, y0, z0) && txoptimizations$inFront(viewX, viewY, viewZ, viewW, x1, y0, z0) && txoptimizations$inFront(viewX, viewY, viewZ, viewW, x0, y1, z0) && txoptimizations$inFront(viewX, viewY, viewZ, viewW, x1, y1, z0)
+            && txoptimizations$inFront(viewX, viewY, viewZ, viewW, x0, y0, z1) && txoptimizations$inFront(viewX, viewY, viewZ, viewW, x1, y0, z1) && txoptimizations$inFront(viewX, viewY, viewZ, viewW, x0, y1, z1) && txoptimizations$inFront(viewX, viewY, viewZ, viewW, x1, y1, z1);
+    }
+
+    @Unique
+    private static boolean txoptimizations$inFront(float viewX, float viewY, float viewZ, float viewW, float x, float y, float z) {
+        return !(txoptimizations$depth(viewX, viewY, viewZ, viewW, x, y, z) > NEAR_VIEW_Z);
     }
 
     @Unique
@@ -154,12 +183,6 @@ public abstract class GizmoLineIdentityPoseMixin extends RenderTypeFeatureRender
             return;
         }
 
-        long pointer   = ((DirectVertexBuffer) builder).txoptimizations$reserveAfterLastVertex(LINE_VERTICES);
-        int  colorBits = VertexBytes.colorBits(lineColor);
-        long tail      = VertexBytes.lineTail(VertexBytes.packNormal(normalX, normalY, normalZ), lineWidth);
-
-        VertexBytes.putLine(pointer, startX, startY, startZ, colorBits, tail);
-        VertexBytes.putLine(pointer + VertexBytes.LINE_STRIDE, startX, startY, startZ, colorBits, tail);
-        VertexBytes.putLine(pointer + 2L * VertexBytes.LINE_STRIDE, endX, endY, endZ, colorBits, tail);
+        VertexBytes.putLineSegment(((DirectVertexBuffer) builder).txoptimizations$reserveAfterLastVertex(LINE_VERTICES), startX, startY, startZ, endX, endY, endZ, VertexBytes.colorBits(lineColor), VertexBytes.lineTail(VertexBytes.packNormal(normalX, normalY, normalZ), lineWidth));
     }
 }
