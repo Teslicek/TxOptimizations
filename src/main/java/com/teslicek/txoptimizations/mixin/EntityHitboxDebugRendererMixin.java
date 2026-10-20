@@ -1,8 +1,8 @@
 package com.teslicek.txoptimizations.mixin;
 
+import com.teslicek.txoptimizations.HitboxGizmos;
 import net.minecraft.client.renderer.debug.EntityHitboxDebugRenderer;
 import net.minecraft.gizmos.GizmoStyle;
-import net.minecraft.gizmos.Gizmos;
 import net.minecraft.util.ARGB;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.LivingEntity;
@@ -40,44 +40,56 @@ public abstract class EntityHitboxDebugRendererMixin {
         double offsetY         = currentPosition.y + -latestPosition.y;
         double offsetZ         = currentPosition.z + -latestPosition.z;
         int    mainColor       = isServerEntity ? -16711936 : -1;
-        AABB   box             = entity.getBoundingBox().move(offsetX, offsetY, offsetZ);
+        AABB   bounds          = entity.getBoundingBox();
+        double minX            = Math.min(bounds.minX + offsetX, bounds.maxX + offsetX);
+        double minY            = Math.min(bounds.minY + offsetY, bounds.maxY + offsetY);
+        double minZ            = Math.min(bounds.minZ + offsetZ, bounds.maxZ + offsetZ);
+        double maxX            = Math.max(bounds.minX + offsetX, bounds.maxX + offsetX);
+        double maxY            = Math.max(bounds.minY + offsetY, bounds.maxY + offsetY);
+        double maxZ            = Math.max(bounds.minZ + offsetZ, bounds.maxZ + offsetZ);
 
-        Gizmos.cuboid(box, isServerEntity ? SERVER_STROKE : CLIENT_STROKE);
-        Gizmos.point(currentPosition, mainColor, 2.0F);
+        HitboxGizmos.cuboid(minX, minY, minZ, maxX, maxY, maxZ, isServerEntity ? SERVER_STROKE : CLIENT_STROKE);
+        HitboxGizmos.point(currentPosition, mainColor, 2.0F);
 
         Entity vehicle = entity.getVehicle();
 
         if (vehicle != null) {
-            float width    = Math.min(vehicle.getBbWidth(), entity.getBbWidth()) / 2.0F;
-            Vec3  riding   = vehicle.getPassengerRidingPosition(entity);
+            float  width   = Math.min(vehicle.getBbWidth(), entity.getBbWidth()) / 2.0F;
+            Vec3   riding  = vehicle.getPassengerRidingPosition(entity);
             double ridingX = riding.x + offsetX;
             double ridingY = riding.y + offsetY;
             double ridingZ = riding.z + offsetZ;
 
-            Gizmos.cuboid(new AABB(ridingX - width, ridingY, ridingZ - width, ridingX + width, ridingY + 0.0625, ridingZ + width), VEHICLE_STROKE);
+            HitboxGizmos.cuboid(ridingX - width, ridingY, ridingZ - width, ridingX + width, ridingY + 0.0625, ridingZ + width, VEHICLE_STROKE);
         }
 
         if (entity instanceof LivingEntity)
-            Gizmos.cuboid(new AABB(box.minX, box.minY + entity.getEyeHeight() - 0.01F, box.minZ, box.maxX, box.minY + entity.getEyeHeight() + 0.01F, box.maxZ), EYE_STROKE);
+            HitboxGizmos.cuboid(minX, minY + entity.getEyeHeight() - 0.01F, minZ, maxX, minY + entity.getEyeHeight() + 0.01F, maxZ, EYE_STROKE);
 
         if (entity instanceof EnderDragon dragon) {
             for (EnderDragonPart subEntity : dragon.getSubEntities()) {
-                Vec3 latestSubPosition  = subEntity.position();
-                Vec3 currentSubPosition = subEntity.getPosition(partialTicks);
+                Vec3   latestSubPosition  = subEntity.position();
+                Vec3   currentSubPosition = subEntity.getPosition(partialTicks);
+                double subOffsetX         = currentSubPosition.x + -latestSubPosition.x;
+                double subOffsetY         = currentSubPosition.y + -latestSubPosition.y;
+                double subOffsetZ         = currentSubPosition.z + -latestSubPosition.z;
+                AABB   subBounds          = subEntity.getBoundingBox();
 
-                Gizmos.cuboid(subEntity.getBoundingBox().move(currentSubPosition.x + -latestSubPosition.x, currentSubPosition.y + -latestSubPosition.y, currentSubPosition.z + -latestSubPosition.z), DRAGON_PART_STROKE);
+                HitboxGizmos.cuboid(subBounds.minX + subOffsetX, subBounds.minY + subOffsetY, subBounds.minZ + subOffsetZ, subBounds.maxX + subOffsetX, subBounds.maxY + subOffsetY, subBounds.maxZ + subOffsetZ, DRAGON_PART_STROKE);
             }
         }
 
-        Vec3 eyePosition = currentPosition.add(0.0, entity.getEyeHeight(), 0.0);
-        Vec3 viewVector  = entity.getViewVector(partialTicks);
+        double eyeX       = currentPosition.x + 0.0;
+        double eyeY       = currentPosition.y + entity.getEyeHeight();
+        double eyeZ       = currentPosition.z + 0.0;
+        Vec3   viewVector = entity.getViewVector(partialTicks);
 
-        Gizmos.arrow(eyePosition, eyePosition.add(viewVector.x * 2.0, viewVector.y * 2.0, viewVector.z * 2.0), -16776961);
+        HitboxGizmos.arrow(eyeX, eyeY, eyeZ, eyeX + viewVector.x * 2.0, eyeY + viewVector.y * 2.0, eyeZ + viewVector.z * 2.0, -16776961);
 
         if (isServerEntity) {
             Vec3 deltaMovement = entity.getDeltaMovement();
 
-            Gizmos.arrow(currentPosition, currentPosition.add(deltaMovement), -256);
+            HitboxGizmos.arrow(currentPosition.x, currentPosition.y, currentPosition.z, currentPosition.x + deltaMovement.x, currentPosition.y + deltaMovement.y, currentPosition.z + deltaMovement.z, -256);
         }
     }
 }

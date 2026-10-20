@@ -95,6 +95,7 @@
     "GizmoLineIdentityPoseMixin",
     "GlSurfaceDiscardMixin",
     "GlyphRenderStateMatrixMixin",
+    "GizmosAccessor",
     "GizmosCollectorCacheMixin",
     "GizmosTemporaryCollectionCacheMixin",
     "GlyphRendererVertexBuilderMixin",
