@@ -204,7 +204,7 @@ With a frame limit set, the limiter waits until the next frame is due by parking
 
 ### FPS counter
 
-TxOptimizations draws its own FPS counter in the top left corner (`123 FPS`, white, no shadow, at 2,2), hidden while the F3 screen is open or the HUD is hidden. `K` toggles it (rebindable under Options > Controls > TxOptimizations), and the choice is saved in `config/txoptimizations.json`. The number is the average frame rate over the last 0.5 seconds and updates every 0.5 seconds. It only counts frames, and the text is rebuilt only when the number changes, so drawing it skips translating and laying out the text again every frame.
+TxOptimizations draws its own FPS counter in the top left corner (`123 FPS`, white, no shadow, at 2,2), hidden while the F3 screen is open or the HUD is hidden. `K` toggles it (rebindable under Options > Controls > TxOptimizations), and the choice is saved in `config/txoptimizations.json`. The file is only written when it is missing or the setting changes, never on every start, and each write goes to a temporary file that is flushed to disk and then renamed over the old one, so a system crash or power loss leaves either the old or the new file instead of a file of zeros. A file that cannot be read stops the game with its path and contents. The number is the average frame rate over the last 0.5 seconds and updates every 0.5 seconds. It only counts frames, and the text is rebuilt only when the number changes, so drawing it skips translating and laying out the text again every frame.
 
 ### Baked block entities
 

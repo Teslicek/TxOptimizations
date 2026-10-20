@@ -3,19 +3,25 @@ package com.teslicek.txoptimizations;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.google.gson.JsonElement;
+import com.google.gson.JsonParseException;
 import com.google.gson.JsonParser;
 import java.io.IOException;
-import java.io.Reader;
-import java.io.Writer;
+import java.nio.ByteBuffer;
+import java.nio.channels.FileChannel;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
+import java.nio.file.StandardOpenOption;
 import java.util.Map;
+import java.util.stream.Collectors;
 import net.fabricmc.loader.api.FabricLoader;
 
 public final class TxOptimizationsConfig {
 
-    private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
-    private static final Path PATH = FabricLoader.getInstance().getConfigDir().resolve("txoptimizations.json");
+    private static final Gson GSON      = new GsonBuilder().setPrettyPrinting().create();
+    private static final Path PATH      = FabricLoader.getInstance().getConfigDir().resolve("txoptimizations.json");
+    private static final Path TEMPORARY = PATH.resolveSibling("txoptimizations.json.tmp");
 
     private static Data    data   = new Data();
     private static boolean loaded;
@@ -29,18 +35,25 @@ public final class TxOptimizationsConfig {
 
         loaded = true;
 
-        if (Files.exists(PATH)) {
-            try (Reader reader = Files.newBufferedReader(PATH)) {
-                JsonElement tree = JsonParser.parseReader(reader);
+        if (!Files.exists(PATH)) {
+            save();
 
-                rejectNulls(tree, PATH.getFileName().toString());
-                data = GSON.fromJson(tree, Data.class);
-            } catch (IOException error) {
-                throw new IllegalStateException("Failed to read TxOptimizations config " + PATH, error);
-            }
+            return;
         }
 
-        save();
+        String text = read();
+
+        try {
+            JsonElement tree = JsonParser.parseString(text);
+
+            if (!tree.isJsonObject())
+                throw new IllegalStateException("TxOptimizations config " + PATH + " does not hold a JSON object; delete it to start from defaults. Contents: " + printable(text));
+
+            rejectNulls(tree, PATH.getFileName().toString());
+            data = GSON.fromJson(tree, Data.class);
+        } catch (JsonParseException error) {
+            throw new IllegalStateException("TxOptimizations config " + PATH + " is not valid JSON; delete it to start from defaults. Contents: " + printable(text), error);
+        }
     }
 
     public static boolean fpsCounter() {
@@ -56,15 +69,34 @@ public final class TxOptimizationsConfig {
         if (!loaded)
             throw new IllegalStateException("TxOptimizations config saved before it was loaded");
 
+        ByteBuffer bytes = ByteBuffer.wrap(GSON.toJson(data).getBytes(StandardCharsets.UTF_8));
+
         try {
             Files.createDirectories(PATH.getParent());
 
-            try (Writer writer = Files.newBufferedWriter(PATH)) {
-                GSON.toJson(data, writer);
+            try (FileChannel channel = FileChannel.open(TEMPORARY, StandardOpenOption.CREATE, StandardOpenOption.WRITE, StandardOpenOption.TRUNCATE_EXISTING)) {
+                while (bytes.hasRemaining())
+                    channel.write(bytes);
+
+                channel.force(true);
             }
+
+            Files.move(TEMPORARY, PATH, StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING);
         } catch (IOException error) {
             throw new IllegalStateException("Failed to write TxOptimizations config " + PATH, error);
         }
+    }
+
+    private static String read() {
+        try {
+            return Files.readString(PATH);
+        } catch (IOException error) {
+            throw new IllegalStateException("Failed to read TxOptimizations config " + PATH, error);
+        }
+    }
+
+    private static String printable(String text) {
+        return text.chars().mapToObj(character -> character < 0x20 && character != '\n' ? String.format("\\u%04x", character) : String.valueOf((char) character)).collect(Collectors.joining());
     }
 
     private static void rejectNulls(JsonElement element, String path) {
