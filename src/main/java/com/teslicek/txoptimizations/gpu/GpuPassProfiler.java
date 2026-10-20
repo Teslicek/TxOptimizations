@@ -24,6 +24,7 @@ public final class GpuPassProfiler {
     private static final int                                 SLOTS           = 3;
     private static final int                                 CAPACITY        = 4096;
     private static final long                                DURATION        = 10_000_000_000L;
+    private static final long                                WARMUP          = 1_000_000_000L;
     private static final int                                 CHAT_LINES      = 8;
     private static final int                                 SLOW_FRAMES     = 10;
     private static final int                                 SLOW_PASSES     = 4;
@@ -42,6 +43,8 @@ public final class GpuPassProfiler {
     private static VulkanDevice          device;
     private static CommandEncoderBackend encoder;
     private static int                   slot;
+    private static boolean               warming;
+    private static long                  warmedAt;
     private static boolean               recording;
     private static int                   framesPending;
     private static int                   framesRead;
@@ -62,6 +65,13 @@ public final class GpuPassProfiler {
         if (isRunning())
             throw new IllegalStateException("GPU profile is already running");
 
+        JfrRecorder.start(Thread.currentThread());
+        warming  = true;
+        warmedAt = System.nanoTime() + WARMUP;
+    }
+
+    private static void beginMeasurement() {
+        warming = false;
         PASSES.clear();
         COPY_LABELS.clear();
         PIPELINE_LABELS.clear();
@@ -79,13 +89,12 @@ public final class GpuPassProfiler {
         frameTimeCount = 0;
         screenFormats  = null;
         GcPauses.start();
-        JfrRecorder.start(Thread.currentThread());
         CpuSampler.start(Thread.currentThread(), DURATION);
         measuredFrom   = System.nanoTime();
     }
 
     public static boolean isRunning() {
-        return recording || framesPending > 0;
+        return warming || recording || framesPending > 0;
     }
 
     public static boolean isRecording() {
@@ -189,6 +198,13 @@ public final class GpuPassProfiler {
     public static void endFrame(VulkanDevice frameDevice, CommandEncoderBackend frameEncoder) {
         if (!isRunning())
             return;
+
+        if (warming) {
+            if (System.nanoTime() >= warmedAt)
+                beginMeasurement();
+
+            return;
+        }
 
         if (recording) {
             mark(frameDevice, frameEncoder, FRAME_END);
