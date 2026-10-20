@@ -2,22 +2,30 @@ package com.teslicek.txoptimizations.mixin;
 
 import com.teslicek.txoptimizations.SectionSubset;
 import com.teslicek.txoptimizations.TerrainDrawChanges;
+import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import net.minecraft.client.renderer.LevelRenderer;
+import net.minecraft.client.renderer.chunk.SectionRenderDispatcher;
+import org.spongepowered.asm.mixin.Final;
 import org.spongepowered.asm.mixin.Mixin;
-import org.spongepowered.asm.mixin.injection.At;
-import org.spongepowered.asm.mixin.injection.Inject;
-import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
+import org.spongepowered.asm.mixin.Overwrite;
+import org.spongepowered.asm.mixin.Shadow;
 
-@Mixin(LevelRenderer.class)
+@Mixin(value = LevelRenderer.class, priority = 999)
 public abstract class LevelRendererVisibleSectionsMixin {
 
-    @Inject(method = "clearVisibleSections", at = @At("HEAD"))
-    private void txoptimizations$beginClear(CallbackInfo ci) {
-        SectionSubset.beginVisibleChange();
-    }
+    @Shadow
+    @Final
+    private ObjectArrayList<SectionRenderDispatcher.RenderSection> visibleSections;
 
-    @Inject(method = "clearVisibleSections", at = @At("RETURN"))
-    private void txoptimizations$endClear(CallbackInfo ci) {
+    @Shadow
+    @Final
+    private ObjectArrayList<SectionRenderDispatcher.RenderSection> nearbyVisibleSections;
+
+    @Overwrite
+    public void clearVisibleSections() {
+        SectionSubset.beginVisibleChange();
+        this.visibleSections.clear();
+        this.nearbyVisibleSections.clear();
         SectionSubset.endVisibleChange();
         TerrainDrawChanges.mark();
     }

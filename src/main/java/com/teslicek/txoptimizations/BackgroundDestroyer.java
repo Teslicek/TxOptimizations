@@ -23,7 +23,7 @@ public final class BackgroundDestroyer implements DestructionQueue.Destroyer<Des
 
     private static volatile CompletableFuture<Void> pending = CompletableFuture.completedFuture(null);
 
-    private List<Destroyable> batch = new ArrayList<>();
+    private List<Destroyable> batch;
 
     @Override
     public void begin(int count) {
@@ -44,13 +44,14 @@ public final class BackgroundDestroyer implements DestructionQueue.Destroyer<Des
 
     @Override
     public void end() {
-        if (this.batch.isEmpty())
-            return;
-
         List<Destroyable> destroyables = this.batch;
 
-        this.batch = new ArrayList<>();
-        pending    = pending.thenRunAsync(() -> destroyables.forEach(Destroyable::destroy), EXECUTOR);
+        this.batch = null;
+
+        if (destroyables.isEmpty())
+            return;
+
+        pending = pending.thenRunAsync(() -> destroyables.forEach(Destroyable::destroy), EXECUTOR);
     }
 
     public static void drain() {

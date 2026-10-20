@@ -50,7 +50,7 @@ public abstract class EntityRendererCullBoxMixin<T extends Entity> {
         double maxY = Math.max(box.minY - CULLING_MARGIN, box.maxY + CULLING_MARGIN);
         double maxZ = Math.max(box.minZ - CULLING_MARGIN, box.maxZ + CULLING_MARGIN);
 
-        if (Double.isNaN(minX) || Double.isNaN(minY) || Double.isNaN(minZ) || Double.isNaN(maxX) || Double.isNaN(maxY) || Double.isNaN(maxZ) || (maxX - minX + (maxY - minY) + (maxZ - minZ)) / 3.0 == 0.0) {
+        if (Double.isNaN(minX) || Double.isNaN(minY) || Double.isNaN(minZ) || Double.isNaN(maxX) || Double.isNaN(maxY) || Double.isNaN(maxZ) || maxX - minX + (maxY - minY) + (maxZ - minZ) <= Double.MIN_VALUE) {
             AABB fallback = new AABB(entity.getX() - FALLBACK_RADIUS, entity.getY() - FALLBACK_RADIUS, entity.getZ() - FALLBACK_RADIUS, entity.getX() + FALLBACK_RADIUS, entity.getY() + FALLBACK_RADIUS, entity.getZ() + FALLBACK_RADIUS);
 
             minX = fallback.minX;

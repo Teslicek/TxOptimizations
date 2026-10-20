@@ -1,5 +1,6 @@
 package com.teslicek.txoptimizations.mixin;
 
+import java.util.Arrays;
 import net.minecraft.world.level.chunk.DataLayer;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
@@ -24,10 +25,8 @@ public abstract class DataLayerUniformMixin {
         if (value == 0 || (first >> 4 & 15) != value)
             return;
 
-        for (byte packed : data) {
-            if (packed != first)
-                return;
-        }
+        if (Arrays.mismatch(data, 0, data.length - 1, data, 1, data.length) != -1)
+            return;
 
         this.data         = null;
         this.defaultValue = value;

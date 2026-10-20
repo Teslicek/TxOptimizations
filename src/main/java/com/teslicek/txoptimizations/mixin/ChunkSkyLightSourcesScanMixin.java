@@ -46,7 +46,6 @@ public abstract class ChunkSkyLightSourcesScanMixin {
             Palette<BlockState>                palette     = data.palette();
             int                                topIndex    = states.strategy.getIndex(x, 15, z);
             int                                layerSize   = topIndex - states.strategy.getIndex(x, 14, z);
-            int                                sectionMinY = SectionPos.sectionToBlockCoord(chunk.getSectionYFromSectionIndex(sectionIndex));
             int                                lastId      = -1;
             BlockState                         bottomState = null;
 
@@ -60,7 +59,7 @@ public abstract class ChunkSkyLightSourcesScanMixin {
 
                 if (topState != open || bottomState != open) {
                     if (isEdgeOccluded(topState, bottomState))
-                        return sectionMinY + y + 1;
+                        return SectionPos.sectionToBlockCoord(chunk.getSectionYFromSectionIndex(sectionIndex)) + y + 1;
 
                     if (topState == bottomState)
                         open = bottomState;

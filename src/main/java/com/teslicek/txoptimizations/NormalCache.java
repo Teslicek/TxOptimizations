@@ -23,9 +23,7 @@ public final class NormalCache {
     }
 
     public static boolean usable() {
-        RenderThreadStack.Owner owner = RenderThreadStack.owner();
-
-        return owner != null && owner.thread() == Thread.currentThread();
+        return RenderThreadStack.isOwner();
     }
 
     public static void select(PoseStack.Pose pose) {

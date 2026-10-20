@@ -25,9 +25,6 @@ public abstract class FrontendRenderPipelineUniformsMixin implements PipelineUni
     @Unique
     private int[] txoptimizations$slots;
 
-    @Unique
-    private Object2IntMap<String> txoptimizations$slotsByName;
-
     @Override
     public String[] txoptimizations$uniformNames() {
         if (this.txoptimizations$names == null)
@@ -46,14 +43,20 @@ public abstract class FrontendRenderPipelineUniformsMixin implements PipelineUni
 
     @Override
     public int txoptimizations$uniformSlot(String name) {
-        Object2IntMap<String> slots = this.txoptimizations$slotsByName;
+        String[] names = this.txoptimizations$uniformNames();
+        int[]    slots = this.txoptimizations$slots;
 
-        if (slots == null) {
-            slots                            = ((UnmodifiableObject2IntMapAccessor) this.uniformIndices).txoptimizations$map();
-            this.txoptimizations$slotsByName = slots;
+        for (int index = 0; index < names.length; index ++) {
+            if (names[index] == name)
+                return slots[index];
         }
 
-        return slots.getOrDefault(name, NO_SLOT);
+        for (int index = 0; index < names.length; index ++) {
+            if (names[index].equals(name))
+                return slots[index];
+        }
+
+        return NO_SLOT;
     }
 
     @Unique
@@ -64,7 +67,7 @@ public abstract class FrontendRenderPipelineUniformsMixin implements PipelineUni
         int                   index = 0;
 
         for (Object2IntMap.Entry<String> uniform : Object2IntMaps.fastIterable(map)) {
-            names[index] = uniform.getKey();
+            names[index] = uniform.getKey().intern();
             slots[index] = uniform.getIntValue();
             index ++;
         }

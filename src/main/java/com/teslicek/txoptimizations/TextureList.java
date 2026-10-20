@@ -35,8 +35,8 @@ public final class TextureList extends AbstractList<PreparedRenderType.Texture> 
         if (other == this)
             return true;
 
-        if (other instanceof TextureList list && list.hash != this.hash)
-            return false;
+        if (other instanceof TextureList list)
+            return list.hash == this.hash && Arrays.equals(this.textures, list.textures);
 
         return super.equals(other);
     }

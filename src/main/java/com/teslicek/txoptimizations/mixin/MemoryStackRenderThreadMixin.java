@@ -16,10 +16,8 @@ public abstract class MemoryStackRenderThreadMixin {
 
     @Overwrite
     public static MemoryStack stackGet() {
-        RenderThreadStack.Owner owner = RenderThreadStack.owner();
-
-        if (owner != null && owner.thread() == Thread.currentThread())
-            return owner.stack();
+        if (RenderThreadStack.isOwner())
+            return RenderThreadStack.stack();
 
         return TLS.get();
     }

@@ -1,5 +1,6 @@
 package com.teslicek.txoptimizations;
 
+import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import java.util.List;
 import net.minecraft.client.renderer.Octree;
 import net.minecraft.client.renderer.chunk.SectionRenderDispatcher;
@@ -96,15 +97,18 @@ public final class SectionTreeWalk {
         if (size < 2)
             return;
 
-        SectionRenderDispatcher.RenderSection[] sections = this.visible.toArray(new SectionRenderDispatcher.RenderSection[0]);
-        int[]                                   keys     = new int[size];
-        int                                     cameraX  = SectionPos.blockToSectionCoord(this.cameraX);
-        int                                     cameraY  = SectionPos.blockToSectionCoord(this.cameraY);
-        int                                     cameraZ  = SectionPos.blockToSectionCoord(this.cameraZ);
-        int                                     largest  = 0;
+        if (!(this.visible instanceof ObjectArrayList<SectionRenderDispatcher.RenderSection> list))
+            throw new IllegalStateException("Visible sections are kept in a " + this.visible.getClass().getName() + " instead of an ObjectArrayList");
+
+        Object[] sections = list.elements();
+        int[]    keys     = new int[size];
+        int      cameraX  = SectionPos.blockToSectionCoord(this.cameraX);
+        int      cameraY  = SectionPos.blockToSectionCoord(this.cameraY);
+        int      cameraZ  = SectionPos.blockToSectionCoord(this.cameraZ);
+        int      largest  = 0;
 
         for (int index = 0; index < size; index ++) {
-            long node = sections[index].getSectionNode();
+            long node = ((SectionRenderDispatcher.RenderSection) sections[index]).getSectionNode();
             int  x    = SectionPos.x(node) - cameraX;
             int  y    = SectionPos.y(node) - cameraY;
             int  z    = SectionPos.z(node) - cameraZ;
@@ -122,7 +126,18 @@ public final class SectionTreeWalk {
             starts[key] += starts[key - 1];
 
         for (int index = 0; index < size; index ++)
-            this.visible.set(starts[keys[index]] ++, sections[index]);
+            keys[index] = starts[keys[index]] ++;
+
+        for (int index = 0; index < size; index ++) {
+            for (int target = keys[index]; target != index; target = keys[index]) {
+                Object section = sections[target];
+
+                sections[target] = sections[index];
+                sections[index]  = section;
+                keys[index]      = keys[target];
+                keys[target]     = target;
+            }
+        }
     }
 
     public static void collect(Octree octree, Frustum frustum, List<SectionRenderDispatcher.RenderSection> visible, List<SectionRenderDispatcher.RenderSection> nearby) {

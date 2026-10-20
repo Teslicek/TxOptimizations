@@ -15,7 +15,11 @@ public final class FrameSpin {
 
     public static void recordFrame(long frameNanos) {
         averageFrameNanos = averageFrameNanos == 0L ? frameNanos : averageFrameNanos + (frameNanos - averageFrameNanos >> SMOOTHING_SHIFT);
-        fastFrames        = averageFrameNanos < FAST_FRAME_NANOS;
+
+        boolean fast = averageFrameNanos < FAST_FRAME_NANOS;
+
+        if (fast != fastFrames)
+            fastFrames = fast;
     }
 
     public static boolean isFastFrames() {

@@ -215,7 +215,6 @@
     "SectionRenderDispatcherMeshReleaseMixin",
     "SectionRenderDispatcherSlotMixin",
     "SectionDirtyStateChangeMixin",
-    "SectionOcclusionGraphVisibleSectionsMixin",
     "SectionOcclusionGraphTreeWalkMixin",
     "OctreeBranchSectionLeafMixin",
     "SectionCompilerEnclosedFluidMixin",

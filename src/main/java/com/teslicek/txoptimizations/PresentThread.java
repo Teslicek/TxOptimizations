@@ -7,15 +7,19 @@ import java.util.concurrent.locks.LockSupport;
 
 public final class PresentThread {
 
-    private static final int    SPINS  = 1024;
-    private static final Thread WORKER = Thread.ofPlatform().name("TxOptimizations Present").daemon().priority(Thread.MAX_PRIORITY).start(PresentThread::work);
+    private static final int      SPINS       = 1024;
+    private static final Runnable PRESENT_JOB = PresentThread::presentHandedOff;
+    private static final Thread   WORKER      = Thread.ofPlatform().name("TxOptimizations Present").daemon().priority(Thread.MAX_PRIORITY).start(PresentThread::work);
 
-    private static volatile Runnable  job;
-    private static volatile Thread    waiting;
-    private static volatile Throwable failure;
-    private static GpuSurface         armed;
-    private static Runnable           captured;
-    private static boolean            capturing;
+    private static volatile Runnable      job;
+    private static volatile Thread        waiting;
+    private static volatile boolean       workerParked;
+    private static volatile Throwable     failure;
+    private static GpuSurface             armed;
+    private static Runnable               captured;
+    private static boolean                capturing;
+    private static VulkanQueue.Submission handedSubmission;
+    private static Runnable               handedPresent;
 
     private PresentThread() {
     }
@@ -69,11 +73,12 @@ public final class PresentThread {
             return;
         }
 
-        job = () -> {
-            submission.close();
-            present.run();
-        };
-        LockSupport.unpark(WORKER);
+        handedSubmission = submission;
+        handedPresent    = present;
+        job              = PRESENT_JOB;
+
+        if (workerParked)
+            LockSupport.unpark(WORKER);
     }
 
     public static boolean isCapturing() {
@@ -91,19 +96,19 @@ public final class PresentThread {
         if (Thread.currentThread() == WORKER)
             return;
 
-        if (job != null) {
+        int spins = 0;
+
+        while (job != null) {
+            if (spins < SPINS) {
+                spins ++;
+                Thread.onSpinWait();
+                continue;
+            }
+
             waiting = Thread.currentThread();
 
-            int spins = 0;
-
-            while (job != null) {
-                if (spins < SPINS) {
-                    spins ++;
-                    Thread.onSpinWait();
-                } else {
-                    LockSupport.park(PresentThread.class);
-                }
-            }
+            if (job != null)
+                LockSupport.park(PresentThread.class);
 
             waiting = null;
         }
@@ -132,9 +137,12 @@ public final class PresentThread {
                 if (FrameSpin.isFastFrames())
                     awaitJob(System.nanoTime() + FrameSpin.SPIN_NANOS);
 
+                workerParked = true;
+
                 if (job == null)
                     LockSupport.park(PresentThread.class);
 
+                workerParked = false;
                 continue;
             }
 
@@ -145,8 +153,23 @@ public final class PresentThread {
             }
 
             job = null;
-            LockSupport.unpark(waiting);
+
+            Thread parked = waiting;
+
+            if (parked != null)
+                LockSupport.unpark(parked);
         }
+    }
+
+    private static void presentHandedOff() {
+        VulkanQueue.Submission submission = handedSubmission;
+        Runnable               present    = handedPresent;
+
+        handedSubmission = null;
+        handedPresent    = null;
+
+        submission.close();
+        present.run();
     }
 
     private static void awaitJob(long deadline) {

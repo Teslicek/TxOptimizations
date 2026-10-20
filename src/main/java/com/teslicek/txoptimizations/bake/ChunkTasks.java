@@ -17,8 +17,11 @@ public final class ChunkTasks {
         TASKS.computeIfAbsent(section, _ -> new ConcurrentLinkedQueue<>()).add(task);
     }
 
-    public static void run(SectionPos section) {
-        Queue<Runnable> tasks = TASKS.remove(section);
+    public static void run(long sectionNode) {
+        if (TASKS.isEmpty())
+            return;
+
+        Queue<Runnable> tasks = TASKS.remove(SectionPos.of(sectionNode));
 
         if (tasks == null)
             return;

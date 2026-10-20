@@ -47,6 +47,11 @@ public final class SectionDrawList {
     private int[]                 layerCounts   = new int[0];
     private int[]                 layerEnds     = new int[0];
     private boolean[]             reversed      = new boolean[0];
+    private int[]                 memoHashes    = new int[0];
+    private int[]                 memoVertices  = new int[0];
+    private int[]                 memoIndices   = new int[0];
+    private int[]                 memoTypes     = new int[0];
+    private int[]                 memoGroups    = new int[0];
     private int                   groups;
     private int                   cacheSize;
     private int                   drawInts;
@@ -60,13 +65,19 @@ public final class SectionDrawList {
         this.builds ++;
 
         if (this.layerGroups.length != layers) {
-            this.layerGroups = new int[layers][INITIAL_GROUPS];
-            this.layerCounts = new int[layers];
-            this.layerEnds   = new int[layers];
-            this.reversed    = new boolean[layers];
+            this.layerGroups  = new int[layers][INITIAL_GROUPS];
+            this.layerCounts  = new int[layers];
+            this.layerEnds    = new int[layers];
+            this.reversed     = new boolean[layers];
+            this.memoHashes   = new int[layers];
+            this.memoVertices = new int[layers];
+            this.memoIndices  = new int[layers];
+            this.memoTypes    = new int[layers];
+            this.memoGroups   = new int[layers];
         }
 
         Arrays.fill(this.layerCounts, 0);
+        Arrays.fill(this.memoGroups, NONE);
         Arrays.fill(this.reversed, false);
         Arrays.fill(this.cacheValues, 0);
 
@@ -100,6 +111,11 @@ public final class SectionDrawList {
     }
 
     public int group(int layer, boolean translucent, int vertexBuffer, int indexBuffer, int indexType) {
+        boolean ordered = translucent && this.respectTranslucentOrder;
+
+        if (!ordered && this.memoGroups[layer] != NONE && this.memoVertices[layer] == vertexBuffer && this.memoIndices[layer] == indexBuffer && this.memoTypes[layer] == indexType)
+            return this.memoGroups[layer];
+
         int hash = 31 * GROUP_HASH_SEED + SectionBuffers.hash(vertexBuffer);
 
         if (indexBuffer != DrawRecords.NO_BUFFER) {
@@ -107,7 +123,7 @@ public final class SectionDrawList {
             hash = 31 * hash + INDEX_TYPE_HASHES[indexType];
         }
 
-        if (translucent && this.respectTranslucentOrder) {
+        if (ordered) {
             boolean sameAsLast = hash == this.lastTranslucentHash;
 
             this.lastTranslucentHash = hash;
@@ -119,11 +135,15 @@ public final class SectionDrawList {
         }
 
         int cached = this.cachedGroup(hash);
+        int group  = cached != NONE ? cached : this.addGroup(layer, translucent, hash, vertexBuffer, indexBuffer, indexType);
 
-        if (cached != NONE)
-            return cached;
+        this.memoHashes[layer]   = hash;
+        this.memoVertices[layer] = vertexBuffer;
+        this.memoIndices[layer]  = indexBuffer;
+        this.memoTypes[layer]    = indexType;
+        this.memoGroups[layer]   = group;
 
-        return this.addGroup(layer, translucent, hash, vertexBuffer, indexBuffer, indexType);
+        return group;
     }
 
     public void add(int group, int indexCount, int firstIndex, int baseVertex, int baseInstance) {
@@ -366,6 +386,7 @@ public final class SectionDrawList {
         while (this.cacheValues[slot] != 0) {
             if (this.cacheKeys[slot] == hash) {
                 this.cacheValues[slot] = group + 1;
+                this.forgetMemos(hash);
                 return;
             }
 
@@ -378,6 +399,13 @@ public final class SectionDrawList {
 
         if (this.cacheSize * 2 > this.cacheValues.length)
             this.rehash(this.cacheValues.length * 2);
+    }
+
+    private void forgetMemos(int hash) {
+        for (int layer = 0; layer < this.memoGroups.length; layer ++) {
+            if (this.memoHashes[layer] == hash)
+                this.memoGroups[layer] = NONE;
+        }
     }
 
     private void rehash(int capacity) {
