@@ -33,7 +33,6 @@
     "BufferBuilderElementCacheMixin",
     "ByteBufferBuilderAccessor",
     "ByteBufferResultAccessor",
-    "CameraFluidCacheMixin",
     "CameraFluidLookupMixin",
     "CameraNearPlaneAccessor",
     "ClientChunkCachePrecipitationMixin",

@@ -42,7 +42,7 @@ Every piece of text drawn on screen goes through `FormattedBidiReorder.reorder`,
 
 ### Camera fluid
 
-`Camera.getFluidInCamera` checks the blocks at the camera and at the four near-plane corners for water, lava and powder snow, and it is called several times per frame. TxOptimizations computes it once per frame and reuses the answer while the camera's level, position and rotation are the same.
+`Camera.getFluidInCamera` checks the blocks at the camera and at the four near-plane corners for water, lava and powder snow, and it is called several times per frame. TxOptimizations computes it once per frame and reuses the answer while the camera's level, position and rotation are the same. The check itself is one fluid lookup at the camera's block, then a fluid lookup and usually a block lookup at five points of the near plane. The near plane is a few hundredths of a block across, so these points almost always fall in the camera's own block, and a point in the same block as the previous one reuses that lookup. The five points are computed as plain numbers with the same sums vanilla's vectors use (the forward point, then forward plus or minus up, plus or minus left), added to the camera position and floored into one reused block position, so the check no longer creates ten vectors, a point array and five block positions per frame. The points, their order and every comparison are unchanged.
 
 ### Spare vertex buffers
 
@@ -117,10 +117,6 @@ Every LWJGL call that needs scratch memory (descriptor pushes, buffer copies, ma
 ### Empty render phase checks
 
 Draining the frame's submit collections asked every feature render phase whether it was empty, and each check walked all of the phase's per-feature lists and batch maps, 0.3% of the render thread in the BedWars prelobby. Each phase now remembers whether anything was submitted since it was last cleared, which is the only way its lists can fill or empty.
-
-### Camera fluid lookups
-
-Every frame the camera checks whether it is in water, lava or powder snow: one fluid lookup at its block, then a fluid lookup and usually a block lookup at five points of the near plane. The near plane is a few hundredths of a block across, so these points almost always fall in the camera's own block. A point in the same block as the previous one now reuses that lookup. The points, their order and every comparison are unchanged.
 
 ### Per-frame allocations
 
@@ -252,7 +248,7 @@ Entities that are culled, or were not extracted in any frame since the previous 
 
 ### Persistent buffer mapping
 
-Every write into a CPU-visible GPU buffer (dynamic transforms, uniforms, fog, clouds, vertex staging) mapped the buffer's memory with `vmaMapMemory` and unmapped it again when the view closed, two native calls per write. A spark profile showed these calls at 2.8% of the render thread. Each buffer is now mapped the first time it is written and stays mapped until it is destroyed. Every mappable buffer is allocated host-visible and host-coherent, so the GPU sees the same bytes at the same addresses without any flush, and vanilla's check that a buffer is not closed while a view is open still works. The global settings and level projection uniforms, written once per frame, keep one view per ring buffer and write through it from the start, so they no longer build a new mapped view each frame. A frame's model-view transform (two matrices, a color and an offset, 156 bytes in std140 layout) is written straight to the mapped address at the same offsets instead of through the std140 builder; over 200,000 random transforms, including NaN, infinities and signed zeros, both produced the same bytes and end position.
+Every write into a CPU-visible GPU buffer (dynamic transforms, uniforms, fog, clouds, vertex staging) mapped the buffer's memory with `vmaMapMemory` and unmapped it again when the view closed, two native calls per write. A spark profile showed these calls at 2.8% of the render thread. Each buffer is now mapped the first time it is written and stays mapped until it is destroyed. Every mappable buffer is allocated host-visible and host-coherent, so the GPU sees the same bytes at the same addresses without any flush, and vanilla's check that a buffer is not closed while a view is open still works. The global settings and level projection uniforms, written once per frame, keep one view per ring buffer and write through it from the start, so they no longer build a new mapped view each frame. Each draw's transform (two matrices, a color and an offset, 156 bytes in std140 layout) is written straight to the mapped address at the same offsets instead of through the std140 builder; over 200,000 random transforms, including NaN, infinities and signed zeros, both produced the same bytes and end position.
 
 ### Texel buffer views
 

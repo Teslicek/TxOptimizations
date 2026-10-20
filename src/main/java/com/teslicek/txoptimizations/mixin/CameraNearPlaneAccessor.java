@@ -10,4 +10,10 @@ public interface CameraNearPlaneAccessor {
 
     @Accessor("forward")
     Vec3 txoptimizations$forward();
+
+    @Accessor("left")
+    Vec3 txoptimizations$left();
+
+    @Accessor("up")
+    Vec3 txoptimizations$up();
 }
