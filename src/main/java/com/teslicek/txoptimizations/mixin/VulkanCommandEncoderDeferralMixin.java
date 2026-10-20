@@ -57,6 +57,9 @@ public abstract class VulkanCommandEncoderDeferralMixin {
     private final LongArrayList txoptimizations$pendingRanges = new LongArrayList();
 
     @Unique
+    private final long[] txoptimizations$rangeScratch = new long[3];
+
+    @Unique
     private int txoptimizations$deferDepth;
 
     @Unique
@@ -285,15 +288,10 @@ public abstract class VulkanCommandEncoderDeferralMixin {
 
     @Redirect(method = {"writeToBuffer", "copyToBuffer"}, at = @At(value = "INVOKE", target = "Lcom/mojang/renderpearl/backend/vulkan/VulkanCommandEncoder;memoryBarrier(Lorg/lwjgl/system/MemoryStack;)V"))
     private void txoptimizations$deferUploadBarrier(VulkanCommandEncoder encoder, MemoryStack stack) {
-        this.txoptimizations$pendingRanges.add(this.txoptimizations$uploadBuffer);
-        this.txoptimizations$pendingRanges.add(this.txoptimizations$uploadStart);
-        this.txoptimizations$pendingRanges.add(this.txoptimizations$uploadEnd);
+        this.txoptimizations$addPending(this.txoptimizations$uploadBuffer, this.txoptimizations$uploadStart, this.txoptimizations$uploadEnd);
 
-        if (this.txoptimizations$readBuffer != 0L) {
-            this.txoptimizations$pendingRanges.add(this.txoptimizations$readBuffer);
-            this.txoptimizations$pendingRanges.add(this.txoptimizations$readStart);
-            this.txoptimizations$pendingRanges.add(this.txoptimizations$readEnd);
-        }
+        if (this.txoptimizations$readBuffer != 0L)
+            this.txoptimizations$addPending(this.txoptimizations$readBuffer, this.txoptimizations$readStart, this.txoptimizations$readEnd);
 
         this.txoptimizations$barrierPending = true;
     }
@@ -401,13 +399,59 @@ public abstract class VulkanCommandEncoderDeferralMixin {
     @Unique
     private boolean txoptimizations$overlapsPending(long buffer, long start, long end) {
         LongArrayList ranges = this.txoptimizations$pendingRanges;
+        int           before = this.txoptimizations$firstPendingAtOrAfter(buffer, end) - 1;
 
-        for (int index = 0; index < ranges.size(); index += 3) {
-            if (ranges.getLong(index) == buffer && ranges.getLong(index + 1) < end && start < ranges.getLong(index + 2))
-                return true;
+        return before >= 0 && ranges.getLong(before * 3) == buffer && start < ranges.getLong(before * 3 + 2);
+    }
+
+    @Unique
+    private void txoptimizations$addPending(long buffer, long start, long end) {
+        long[] range = this.txoptimizations$rangeScratch;
+
+        range[0] = buffer;
+        range[1] = start;
+        range[2] = end;
+
+        this.txoptimizations$pendingRanges.addElements(this.txoptimizations$pendingInsertion(buffer, start, end) * 3, range, 0, 3);
+    }
+
+    @Unique
+    private int txoptimizations$pendingInsertion(long buffer, long start, long end) {
+        LongArrayList ranges = this.txoptimizations$pendingRanges;
+        int           low    = 0;
+        int           high   = ranges.size() / 3;
+
+        while (low < high) {
+            int  middle       = low + high >>> 1;
+            long middleBuffer = ranges.getLong(middle * 3);
+            long middleStart  = ranges.getLong(middle * 3 + 1);
+
+            if (middleBuffer < buffer || middleBuffer == buffer && (middleStart < start || middleStart == start && ranges.getLong(middle * 3 + 2) <= end))
+                low = middle + 1;
+            else
+                high = middle;
         }
 
-        return false;
+        return low;
+    }
+
+    @Unique
+    private int txoptimizations$firstPendingAtOrAfter(long buffer, long start) {
+        LongArrayList ranges = this.txoptimizations$pendingRanges;
+        int           low    = 0;
+        int           high   = ranges.size() / 3;
+
+        while (low < high) {
+            int  middle       = low + high >>> 1;
+            long middleBuffer = ranges.getLong(middle * 3);
+
+            if (middleBuffer < buffer || middleBuffer == buffer && ranges.getLong(middle * 3 + 1) < start)
+                low = middle + 1;
+            else
+                high = middle;
+        }
+
+        return low;
     }
 
     @Unique

@@ -3,13 +3,18 @@ package com.teslicek.txoptimizations.mixin;
 import com.llamalad7.mixinextras.injector.v2.WrapWithCondition;
 import com.mojang.renderpearl.backend.vulkan.VulkanRenderPass;
 import com.teslicek.txoptimizations.DynamicStateCache;
+import org.lwjgl.system.MemoryStack;
+import org.lwjgl.vulkan.VK10;
 import org.lwjgl.vulkan.VkCommandBuffer;
+import org.lwjgl.vulkan.VkExtent2D;
+import org.lwjgl.vulkan.VkOffset2D;
 import org.lwjgl.vulkan.VkRect2D;
 import org.lwjgl.vulkan.VkViewport;
 import org.spongepowered.asm.mixin.Mixin;
+import org.spongepowered.asm.mixin.Overwrite;
 import org.spongepowered.asm.mixin.injection.At;
 
-@Mixin(VulkanRenderPass.class)
+@Mixin(value = VulkanRenderPass.class, priority = 999)
 public abstract class VulkanRenderPassDynamicStateMixin {
 
     @WrapWithCondition(method = "<init>", at = @At(value = "INVOKE", target = "Lorg/lwjgl/vulkan/VK12;vkCmdSetViewport(Lorg/lwjgl/vulkan/VkCommandBuffer;ILorg/lwjgl/vulkan/VkViewport$Buffer;)V"))
@@ -22,13 +27,17 @@ public abstract class VulkanRenderPassDynamicStateMixin {
         return DynamicStateCache.changesViewport(commandBuffer.address(), viewport.width(), viewport.height());
     }
 
-    @WrapWithCondition(method = "setScissor", at = @At(value = "INVOKE", target = "Lorg/lwjgl/vulkan/VK12;vkCmdSetScissor(Lorg/lwjgl/vulkan/VkCommandBuffer;ILorg/lwjgl/vulkan/VkRect2D$Buffer;)V"))
-    private static boolean txoptimizations$setChangedScissor(VkCommandBuffer commandBuffer, int firstScissor, VkRect2D.Buffer scissors) {
-        VkRect2D scissor = scissors.get(0);
+    @Overwrite
+    private static void setScissor(MemoryStack stack, VkCommandBuffer commandBuffer, int x, int y, int width, int height) {
+        if (!DynamicStateCache.changesScissor(commandBuffer.address(), x, y, width, height))
+            return;
 
-        if (firstScissor != 0 || scissors.remaining() != 1)
-            throw new IllegalStateException("Unexpected scissor layout");
+        long scissor = stack.ncalloc(VkRect2D.ALIGNOF, 1, VkRect2D.SIZEOF);
 
-        return DynamicStateCache.changesScissor(commandBuffer.address(), scissor.offset().x(), scissor.offset().y(), scissor.extent().width(), scissor.extent().height());
+        VkOffset2D.nx(scissor + VkRect2D.OFFSET, x);
+        VkOffset2D.ny(scissor + VkRect2D.OFFSET, y);
+        VkExtent2D.nwidth(scissor + VkRect2D.EXTENT, width);
+        VkExtent2D.nheight(scissor + VkRect2D.EXTENT, height);
+        VK10.nvkCmdSetScissor(commandBuffer, 0, 1, scissor);
     }
 }
