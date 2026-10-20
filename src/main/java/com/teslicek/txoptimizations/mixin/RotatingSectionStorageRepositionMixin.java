@@ -64,34 +64,47 @@ public abstract class RotatingSectionStorageRepositionMixin<T extends RotatingSe
 
     @Unique
     private void txoptimizations$moveAll(int lowestX, int lowestZ) {
-        for (int gridX = 0; gridX < this.sectionGridSizeXZ; gridX ++) {
-            int sectionX = txoptimizations$sectionAt(gridX, lowestX, this.sectionGridSizeXZ);
+        int size     = this.sectionGridSizeXZ;
+        int firstZ   = txoptimizations$sectionAt(0, lowestZ, size);
+        int sectionX = txoptimizations$sectionAt(0, lowestX, size);
 
-            for (int gridZ = 0; gridZ < this.sectionGridSizeXZ; gridZ ++) {
-                int sectionZ = txoptimizations$sectionAt(gridZ, lowestZ, this.sectionGridSizeXZ);
+        for (int gridX = 0; gridX < size; gridX ++) {
+            int sectionZ = firstZ;
 
+            for (int gridZ = 0; gridZ < size; gridZ ++) {
                 for (int gridY = 0; gridY < this.sectionGridSizeY; gridY ++)
                     this.txoptimizations$move(this.nodes[this.getSectionIndex(gridX, gridY, gridZ)].value(), SectionPos.asLong(sectionX, this.minY + gridY, sectionZ));
+
+                sectionZ = txoptimizations$nextSection(sectionZ, lowestZ, size);
             }
+
+            sectionX = txoptimizations$nextSection(sectionX, lowestX, size);
         }
     }
 
     @Unique
     private void txoptimizations$moveShifted(int lowestX, int lowestZ, int previousLowestX, int previousLowestZ) {
-        int size = this.sectionGridSizeXZ;
+        int size           = this.sectionGridSizeXZ;
+        int firstZ         = txoptimizations$sectionAt(0, lowestZ, size);
+        int firstPreviousZ = txoptimizations$sectionAt(0, previousLowestZ, size);
+        int sectionX       = txoptimizations$sectionAt(0, lowestX, size);
+        int previousX      = txoptimizations$sectionAt(0, previousLowestX, size);
 
         for (int gridX = 0; gridX < size; gridX ++) {
-            int     sectionX    = txoptimizations$sectionAt(gridX, lowestX, size);
-            int     previousX   = txoptimizations$sectionAt(gridX, previousLowestX, size);
             boolean columnMoved = sectionX != previousX;
+            int     sectionZ    = firstZ;
+            int     previousZ   = firstPreviousZ;
 
             for (int gridZ = 0; gridZ < size; gridZ ++) {
-                int sectionZ  = txoptimizations$sectionAt(gridZ, lowestZ, size);
-                int previousZ = txoptimizations$sectionAt(gridZ, previousLowestZ, size);
-
                 if (columnMoved || sectionZ != previousZ)
                     this.txoptimizations$moveColumn(gridX, gridZ, sectionX, sectionZ, previousX, previousZ);
+
+                sectionZ  = txoptimizations$nextSection(sectionZ, lowestZ, size);
+                previousZ = txoptimizations$nextSection(previousZ, previousLowestZ, size);
             }
+
+            sectionX  = txoptimizations$nextSection(sectionX, lowestX, size);
+            previousX = txoptimizations$nextSection(previousX, previousLowestX, size);
         }
     }
 
@@ -118,5 +131,10 @@ public abstract class RotatingSectionStorageRepositionMixin<T extends RotatingSe
     @Unique
     private static int txoptimizations$sectionAt(int grid, int lowest, int size) {
         return lowest + Math.floorMod(grid - lowest, size);
+    }
+
+    @Unique
+    private static int txoptimizations$nextSection(int section, int lowest, int size) {
+        return section + 1 == lowest + size ? lowest : section + 1;
     }
 }
