@@ -117,7 +117,7 @@ public final class OutlineScissor {
         if (!vanilla || RenderSystem.getProjectionMatrixBuffer() != projectionSlice)
             return;
 
-        ((BackgroundVertexCopy) vertices).txoptimizations$finishVertexCopy();
+        ((BackgroundVertexCopy) vertices).txoptimizations$finishOutlineBounds();
 
         minX = Double.POSITIVE_INFINITY;
         minY = Double.POSITIVE_INFINITY;

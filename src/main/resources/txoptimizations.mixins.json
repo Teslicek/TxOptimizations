@@ -263,6 +263,7 @@
     "VulkanCommandEncoderPollMixin",
     "VulkanCommandEncoderPresentThreadMixin",
     "VulkanCommandEncoderSubmissionAccessor",
+    "VulkanCommandEncoderVertexCopyMixin",
     "VulkanGpuBufferDirectMixin",
     "VulkanGpuBufferUnmapMixin",
     "VulkanGpuSurfacePresentThreadMixin",

@@ -13,8 +13,9 @@ public final class VertexCopy {
     private static final int QUEUED      = 1;
     private static final int RUNNING     = 2;
 
-    private final AtomicInteger next  = new AtomicInteger();
-    private final AtomicInteger state = new AtomicInteger();
+    private final AtomicInteger next     = new AtomicInteger();
+    private final AtomicInteger state    = new AtomicInteger();
+    private final AtomicInteger measured = new AtomicInteger();
 
     private volatile Throwable failure;
     private long[]             sources       = new long[64];
@@ -28,6 +29,7 @@ public final class VertexCopy {
     private int                count;
     private int                bounds;
     private boolean            pending;
+    private boolean            background;
 
     public void begin() {
         if (this.pending)
@@ -77,6 +79,7 @@ public final class VertexCopy {
             return;
 
         this.next.set(0);
+        this.measured.set(0);
         this.pending = true;
     }
 
@@ -87,6 +90,7 @@ public final class VertexCopy {
         if (this.state.get() != IDLE)
             throw new IllegalStateException("The vertex copies were already started");
 
+        this.background = true;
         this.state.set(QUEUED);
         Worker.queue(this);
     }
@@ -101,7 +105,8 @@ public final class VertexCopy {
         while (this.state.get() == RUNNING)
             Thread.onSpinWait();
 
-        this.pending = false;
+        this.pending    = false;
+        this.background = false;
         Arrays.fill(this.boundsBoxes, 0, this.bounds, null);
 
         Throwable thrown = this.failure;
@@ -112,6 +117,34 @@ public final class VertexCopy {
         this.failure = null;
 
         throw new IllegalStateException("Copying vertices on the vertex copy thread failed", thrown);
+    }
+
+    public boolean isInBackground() {
+        return this.background;
+    }
+
+    public void finishBounds() {
+        if (!this.pending)
+            return;
+
+        int bounds = this.bounds;
+        int jobs   = bounds + this.count;
+
+        for (int job = this.next.getAndIncrement(); job < jobs; job = this.next.getAndIncrement()) {
+            this.run(job, bounds);
+
+            if (job >= bounds)
+                break;
+        }
+
+        while (this.measured.get() < bounds) {
+            Throwable thrown = this.failure;
+
+            if (thrown != null)
+                throw new IllegalStateException("Measuring outline bounds on the vertex copy thread failed", thrown);
+
+            Thread.onSpinWait();
+        }
     }
 
     public static void runQueuedCopy() {
@@ -135,12 +168,18 @@ public final class VertexCopy {
         int bounds = this.bounds;
         int jobs   = bounds + this.count;
 
-        for (int job = this.next.getAndIncrement(); job < jobs; job = this.next.getAndIncrement()) {
-            if (job < bounds)
-                PositionBounds.measure(this.boundsSources[job], this.boundsCounts[job], this.boundsStrides[job], this.boundsBoxes[job], this.boundsOffsets[job]);
-            else
-                MemoryUtil.memCopy(this.sources[job - bounds], this.targets[job - bounds], this.sizes[job - bounds]);
+        for (int job = this.next.getAndIncrement(); job < jobs; job = this.next.getAndIncrement())
+            this.run(job, bounds);
+    }
+
+    private void run(int job, int bounds) {
+        if (job >= bounds) {
+            MemoryUtil.memCopy(this.sources[job - bounds], this.targets[job - bounds], this.sizes[job - bounds]);
+            return;
         }
+
+        PositionBounds.measure(this.boundsSources[job], this.boundsCounts[job], this.boundsStrides[job], this.boundsBoxes[job], this.boundsOffsets[job]);
+        this.measured.incrementAndGet();
     }
 
     private static final class Worker {

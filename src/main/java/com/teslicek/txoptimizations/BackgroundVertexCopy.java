@@ -4,5 +4,7 @@ public interface BackgroundVertexCopy {
 
     void txoptimizations$copyVerticesInBackground();
 
+    void txoptimizations$finishOutlineBounds();
+
     void txoptimizations$finishVertexCopy();
 }

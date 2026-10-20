@@ -8,11 +8,13 @@ import com.mojang.renderpearl.api.buffers.GpuBuffer;
 import com.mojang.renderpearl.api.buffers.GpuBufferSlice;
 import com.mojang.renderpearl.api.device.GpuDevice;
 import com.teslicek.txoptimizations.BackgroundVertexCopy;
+import com.teslicek.txoptimizations.InFlightVertexCopy;
 import com.teslicek.txoptimizations.OutlineDraw;
 import com.teslicek.txoptimizations.PositionBounds;
 import com.teslicek.txoptimizations.VertexCopy;
 import java.nio.BufferOverflowException;
 import java.nio.ByteBuffer;
+import java.util.ArrayList;
 import java.util.List;
 import net.minecraft.client.renderer.StagedVertexBuffer;
 import org.jspecify.annotations.Nullable;
@@ -44,6 +46,9 @@ public abstract class StagedVertexBufferDirectCopyMixin implements BackgroundVer
     private final VertexCopy txoptimizations$vertexCopy = new VertexCopy();
 
     @Unique
+    private final List<StagedVertexBuffer.Draw> txoptimizations$copiedDraws = new ArrayList<>();
+
+    @Unique
     private GpuBufferSlice.MappedView txoptimizations$vertexView;
 
     @Shadow
@@ -73,6 +78,7 @@ public abstract class StagedVertexBufferDirectCopyMixin implements BackgroundVer
 
             StagedVertexBufferDrawAccessor accessor = (StagedVertexBufferDrawAccessor) draw;
 
+            this.txoptimizations$copiedDraws.add(draw);
             vertices.position(accessor.txoptimizations$vertexOffset());
 
             for (ByteBufferBuilder.Result slice : accessor.txoptimizations$vertexBufferSlices())
@@ -107,17 +113,34 @@ public abstract class StagedVertexBufferDirectCopyMixin implements BackgroundVer
     @Override
     public void txoptimizations$copyVerticesInBackground() {
         this.txoptimizations$vertexCopy.startInBackground();
+
+        if (this.txoptimizations$vertexCopy.isInBackground())
+            InFlightVertexCopy.set(this);
     }
 
     @ModifyVariable(method = "getExecuteInfo", at = @At("HEAD"), argsOnly = true)
     private StagedVertexBuffer.Draw txoptimizations$finishBeforeDraw(StagedVertexBuffer.Draw draw) {
+        if (!this.txoptimizations$vertexCopy.isInBackground())
+            this.txoptimizations$finishVertexCopy();
+
+        return draw;
+    }
+
+    @Inject(method = "endDraw", at = @At("HEAD"))
+    private void txoptimizations$finishBeforeRelease(CallbackInfo ci) {
+        if (!this.txoptimizations$vertexCopy.isInBackground())
+            this.txoptimizations$finishVertexCopy();
+    }
+
+    @ModifyVariable(method = "getVertexBuilder", at = @At("HEAD"), argsOnly = true)
+    private StagedVertexBuffer.Draw txoptimizations$finishBeforeReuse(StagedVertexBuffer.Draw draw) {
         this.txoptimizations$finishVertexCopy();
 
         return draw;
     }
 
-    @Inject(method = {"endDraw", "close"}, at = @At("HEAD"))
-    private void txoptimizations$finishBeforeRelease(CallbackInfo ci) {
+    @Inject(method = "close", at = @At("HEAD"))
+    private void txoptimizations$finishBeforeClose(CallbackInfo ci) {
         this.txoptimizations$finishVertexCopy();
     }
 
@@ -157,6 +180,11 @@ public abstract class StagedVertexBufferDirectCopyMixin implements BackgroundVer
     }
 
     @Override
+    public void txoptimizations$finishOutlineBounds() {
+        this.txoptimizations$vertexCopy.finishBounds();
+    }
+
+    @Override
     public void txoptimizations$finishVertexCopy() {
         if (this.txoptimizations$vertexView == null)
             return;
@@ -164,10 +192,11 @@ public abstract class StagedVertexBufferDirectCopyMixin implements BackgroundVer
         this.txoptimizations$vertexCopy.finish();
         this.txoptimizations$vertexView.close();
         this.txoptimizations$vertexView = null;
+        InFlightVertexCopy.clear(this);
 
-        for (StagedVertexBuffer.Draw draw : this.draws) {
-            if (!draw.isEmpty())
-                ((StagedVertexBufferDrawAccessor) draw).txoptimizations$freeVertexData();
-        }
+        for (StagedVertexBuffer.Draw draw : this.txoptimizations$copiedDraws)
+            ((StagedVertexBufferDrawAccessor) draw).txoptimizations$freeVertexData();
+
+        this.txoptimizations$copiedDraws.clear();
     }
 }
