@@ -9,6 +9,8 @@ import com.mojang.renderpearl.frontend.FrontendRenderPipeline;
 import com.teslicek.txoptimizations.FramePath;
 import com.teslicek.txoptimizations.mixin.gpu.VulkanQueryPoolAccessor;
 import org.lwjgl.vulkan.VK12;
+import java.lang.management.CompilationMXBean;
+import java.lang.management.ManagementFactory;
 import java.nio.file.Path;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -25,6 +27,10 @@ public final class GpuPassProfiler {
     private static final int                                 CAPACITY        = 4096;
     private static final long                                DURATION        = 10_000_000_000L;
     private static final long                                WARMUP          = 1_000_000_000L;
+    private static final long                                WARMUP_LIMIT    = 10_000_000_000L;
+    private static final long                                JIT_WINDOW      = 500_000_000L;
+    private static final long                                JIT_QUIET       = 50L;
+    private static final CompilationMXBean                   COMPILER        = ManagementFactory.getCompilationMXBean();
     private static final int                                 CHAT_LINES      = 8;
     private static final int                                 SLOW_FRAMES     = 10;
     private static final int                                 SLOW_PASSES     = 4;
@@ -45,7 +51,11 @@ public final class GpuPassProfiler {
     private static int                   slot;
     private static boolean               warming;
     private static boolean               draining;
+    private static long                  warmStart;
     private static long                  warmedAt;
+    private static long                  jitCheckAt;
+    private static long                  jitMillis;
+    private static String                warmup;
     private static boolean               recording;
     private static int                   framesPending;
     private static int                   framesRead;
@@ -68,10 +78,16 @@ public final class GpuPassProfiler {
 
         COPY_LABELS.clear();
         PIPELINE_LABELS.clear();
+        if (!COMPILER.isCompilationTimeMonitoringSupported())
+            throw new IllegalStateException("The JVM does not report JIT compilation time, which the profile's warm-up waits on");
+
         JfrRecorder.start(Thread.currentThread());
-        warming   = true;
-        warmedAt  = System.nanoTime() + WARMUP;
-        recording = true;
+        warming    = true;
+        warmStart  = System.nanoTime();
+        warmedAt   = warmStart + WARMUP;
+        jitCheckAt = warmStart;
+        jitMillis  = COMPILER.getTotalCompilationTime();
+        recording  = true;
     }
 
     private static void beginMeasurement() {
@@ -94,6 +110,30 @@ public final class GpuPassProfiler {
         CpuSampler.start(Thread.currentThread(), DURATION);
         JfrRecorder.measureFromNow();
         measuredFrom   = System.nanoTime();
+    }
+
+    private static boolean isWarmedUp(long now) {
+        if (now < jitCheckAt)
+            return false;
+
+        long compiled = COMPILER.getTotalCompilationTime();
+        long spent    = compiled - jitMillis;
+
+        jitCheckAt = now + JIT_WINDOW;
+        jitMillis  = compiled;
+
+        if (now >= warmedAt && spent < JIT_QUIET) {
+            warmup = String.format(Locale.ROOT, "Warm-up: %.1f s, until the JIT compiler spent less than %d ms in %d ms", (now - warmStart) / 1.0e9, JIT_QUIET, JIT_WINDOW / 1_000_000L);
+
+            return true;
+        }
+
+        if (now - warmStart < WARMUP_LIMIT)
+            return false;
+
+        warmup = String.format(Locale.ROOT, "Warm-up: %.1f s, the JIT compiler was still busy (%d ms in the last %d ms)", (now - warmStart) / 1.0e9, spent, JIT_WINDOW / 1_000_000L);
+
+        return true;
     }
 
     public static boolean isRunning() {
@@ -208,7 +248,7 @@ public final class GpuPassProfiler {
             recording = warming || System.nanoTime() - startNanos < DURATION;
         }
 
-        if (warming && System.nanoTime() >= warmedAt) {
+        if (warming && isWarmedUp(System.nanoTime())) {
             warming   = false;
             recording = false;
             draining  = true;
@@ -339,6 +379,7 @@ public final class GpuPassProfiler {
 
         report.append(String.format(Locale.ROOT, "%d frames in %.1f s (%.0f fps), GPU %.3f ms per frame, GPU busy %.0f%% of the time%n", framesRead, seconds, framesRead / seconds, frameMs, gpuNanos / 1.0e7 / seconds));
         report.append(String.format(Locale.ROOT, "Present thread used for %.0f%% of frames%n", FramePath.workerShare() * 100.0));
+        report.append(warmup).append(String.format(Locale.ROOT, "%n"));
         report.append(frameTimeReport());
         report.append(ProfileCounters.report(framesRead));
         report.append(context);

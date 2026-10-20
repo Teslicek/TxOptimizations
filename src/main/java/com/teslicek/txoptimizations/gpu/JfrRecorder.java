@@ -33,8 +33,11 @@ final class JfrRecorder {
     private static final String   GC_WORKER      = "jdk.GCPhaseParallel";
     private static final String   GC_EVACUATION  = "jdk.EvacuationInformation";
     private static final String   GC_HEAP        = "jdk.G1HeapSummary";
+    private static final String   CLASS_LOAD     = "jdk.ClassLoad";
     private static final String   BEFORE_GC      = "Before GC";
     private static final Duration WAIT_THRESHOLD = Duration.ofNanos(200_000L);
+    private static final Duration LOAD_THRESHOLD = Duration.ofNanos(100_000L);
+    private static final int      LOAD_FRAMES    = 4;
     private static final int      SITE_FRAMES    = 6;
     private static final int      WAIT_FRAMES    = 6;
     private static final int      TOP_SITES      = 60;
@@ -67,6 +70,7 @@ final class JfrRecorder {
         started.enable(GC_WORKER).withThreshold(Duration.ZERO);
         started.enable(GC_EVACUATION);
         started.enable(GC_HEAP);
+        started.enable(CLASS_LOAD).withThreshold(LOAD_THRESHOLD).withStackTrace();
         started.start();
         recording    = started;
         startTime    = Instant.now();
@@ -111,6 +115,7 @@ final class JfrRecorder {
         List<RecordedEvent> safepoints      = new ArrayList<>();
         List<RecordedEvent> compilations    = new ArrayList<>();
         List<RecordedEvent> waits           = new ArrayList<>();
+        List<RecordedEvent> classLoads      = new ArrayList<>();
         List<RecordedEvent> operations      = new ArrayList<>();
         Map<String, Long>   operationNanos  = new HashMap<>();
         Map<String, Long>   operationCounts = new HashMap<>();
@@ -130,6 +135,10 @@ final class JfrRecorder {
                     operations.add(event);
                     operationNanos.merge(name, event.getDuration().toNanos(), Long::sum);
                     operationCounts.merge(name, 1L, Long::sum);
+                }
+                case CLASS_LOAD -> {
+                    if (event.getThread() != null && renderThread.equals(event.getThread().getJavaName()))
+                        classLoads.add(event);
                 }
                 case DEOPTIMIZATION -> deoptimizations.merge(method(event.getValue("method")) + " (" + event.getString("reason") + ", " + event.getString("action") + ")", 1L, Long::sum);
                 case PARK, MONITOR -> {
@@ -176,6 +185,9 @@ final class JfrRecorder {
             .sorted(Map.Entry.<String, Long>comparingByValue().reversed())
             .limit(TOP_EVENTS)
             .forEach(entry -> report.append(String.format(Locale.ROOT, "  %8.3f ms  %5dx  %s%n", entry.getValue() / 1.0e6, waitCounts.get(entry.getKey()), entry.getKey())));
+
+        report.append(String.format(Locale.ROOT, "Render thread class loads of %.1f ms or longer: %d, %.2f ms in total%n", LOAD_THRESHOLD.toNanos() / 1.0e6, classLoads.size(), totalMillis(classLoads)));
+        longest(classLoads).forEach(event -> report.append(String.format(Locale.ROOT, "  %8.3f ms  at %.3f s  %s  from %s%n", millis(event), seconds(event), event.getClass("loadedClass").getName(), frames(event, LOAD_FRAMES))));
 
         return report.toString();
     }
@@ -310,7 +322,7 @@ final class JfrRecorder {
         for (RecordedFrame frame : event.getStackTrace().getFrames()) {
             String className = frame.getMethod().getType().getName();
 
-            if (className.startsWith("java.") || className.startsWith("jdk."))
+            if (className.startsWith("java.") || className.startsWith("jdk.") || className.startsWith("net.fabricmc.loader.") || className.startsWith("org.spongepowered.asm."))
                 continue;
 
             if (frames > 0)

@@ -34,7 +34,7 @@ public final class TxOptimizationsClient implements ClientModInitializer {
                 }
 
                 GpuPassProfiler.start();
-                command.getSource().sendFeedback(Component.literal("Recording GPU and CPU time for 10 seconds"));
+                command.getSource().sendFeedback(Component.literal("Warming up, then recording GPU and CPU time for 10 seconds"));
 
                 return 1;
             }));
