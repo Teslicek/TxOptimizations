@@ -128,3 +128,13 @@ accessible field net/minecraft/world/level/chunk/PalettedContainer strategy Lnet
 accessible class net/minecraft/client/renderer/texture/SpriteContents$AnimatedTexture
 accessible field net/minecraft/client/renderer/texture/SpriteContents$AnimatedTexture interpolateFrames Z
 accessible field net/minecraft/client/renderer/texture/SpriteContents$AnimationState animationInfo Lnet/minecraft/client/renderer/texture/SpriteContents$AnimatedTexture;
+
+# Idle block entity ticks
+accessible field net/minecraft/world/level/block/entity/ChestBlockEntity chestLidController Lnet/minecraft/world/level/block/entity/ChestLidController;
+accessible field net/minecraft/world/level/block/entity/EnderChestBlockEntity chestLidController Lnet/minecraft/world/level/block/entity/ChestLidController;
+accessible field net/minecraft/world/level/block/entity/ChestLidController shouldBeOpen Z
+accessible field net/minecraft/world/level/block/entity/ChestLidController openness F
+accessible field net/minecraft/world/level/block/entity/ChestLidController oOpenness F
+accessible field net/minecraft/world/level/BaseSpawner spin D
+accessible field net/minecraft/world/level/BaseSpawner oSpin D
+accessible method net/minecraft/world/level/BaseSpawner isNearPlayer (Lnet/minecraft/world/level/Level;Lnet/minecraft/core/BlockPos;)Z

@@ -157,6 +157,7 @@
     "ModelRenderTypeCacheMixin",
     "ModelResetPoseMixin",
     "ParticleCollisionScanMixin",
+    "BoundTickingBlockEntityIdleMixin",
     "ParticleLightCacheMixin",
     "ParticleRotationMixin",
     "PatchedDataComponentMapEmptyPatchMixin",
