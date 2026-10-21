@@ -9,8 +9,9 @@ import com.mojang.renderpearl.api.vertex.VertexFormat;
 import com.mojang.renderpearl.api.vertex.VertexFormatElement;
 import com.teslicek.txoptimizations.mixin.PipelineCacheAccessor;
 import com.teslicek.txoptimizations.mixin.RenderSystemPipelineCacheAccessor;
+import java.util.IdentityHashMap;
+import java.util.Map;
 import java.util.Optional;
-import net.minecraft.client.renderer.chunk.ChunkSectionLayer;
 import net.minecraft.resources.Identifier;
 import org.jspecify.annotations.Nullable;
 
@@ -19,11 +20,13 @@ public final class PackedTerrain {
     private static final String     DEFINE         = "TX_PACKED_TERRAIN";
     private static final Identifier SHADER         = Identifier.withDefaultNamespace("core/terrain");
     private static final String     FILE           = "shaders/core/terrain.vsh";
-    private static final String     INPUTS         = "layout(location = 2) in vec2 UV0;\nlayout(location = 3) in ivec2 UV2;\n#ifdef MULTIDRAW_TERRAIN\nlayout(location = 4) in ivec3 ChunkPosition;\nlayout(location = 5) in float ChunkVisibility;\n#endif\n";
-    private static final String     PACKED         = "#ifdef " + DEFINE + "\nlayout(location = 2) in uvec3 UVData;\nlayout(location = 3) in ivec4 ChunkData;\n#define UV0 uintBitsToFloat(UVData.xy)\n#define UV2 ivec2((int(UVData.z) << 16) >> 16, int(UVData.z) >> 16)\n#define ChunkPosition ChunkData.xyz\n#define ChunkVisibility intBitsToFloat(ChunkData.w)\n#else\n" + INPUTS + "#endif\n";
+    private static final String     INPUTS         = "layout(location = 0) in vec3 Position;\nlayout(location = 1) in vec4 Color;\nlayout(location = 2) in vec2 UV0;\nlayout(location = 3) in ivec2 UV2;\n#ifdef MULTIDRAW_TERRAIN\nlayout(location = 4) in ivec3 ChunkPosition;\nlayout(location = 5) in float ChunkVisibility;\n#endif\n";
+    private static final String     PACKED         = "#ifdef " + DEFINE + "\nlayout(location = 0) in uvec2 PositionData;\nlayout(location = 1) in vec4 Color;\nlayout(location = 2) in uvec2 UVLight;\n#define Position (vec3(uvec3(PositionData.x & 0xFFFFFu, PositionData.x >> 20u | (PositionData.y & 0xFFu) << 12u, PositionData.y >> 8u & 0xFFFFFu)) * (1.0 / 32768.0) - 8.0)\n#define UV0 (vec2(UVLight & 0xFFFFFFu) * (1.0 / 8388608.0))\n#define UV2 ivec2(UVLight >> 24u)\n#ifdef MULTIDRAW_TERRAIN\nlayout(location = 3) in ivec4 ChunkData;\n#define ChunkPosition ChunkData.xyz\n#define ChunkVisibility intBitsToFloat(ChunkData.w)\n#endif\n#else\n" + INPUTS + "#endif\n";
     private static final int        SLOTS          = 16;
     private static final int        BLOCK_ELEMENTS = 4;
     private static final int        CHUNK_ELEMENTS = 2;
+
+    private static final Map<RenderPipeline, RenderPipeline> COMPACT = new IdentityHashMap<>();
 
     private static @Nullable PipelineCache checkedCache;
     private static boolean                 packedSource;
@@ -38,11 +41,18 @@ public final class PackedTerrain {
         return source.replace(INPUTS, PACKED);
     }
 
-    public static RenderPipeline multiDrawPipeline(ChunkSectionLayer layer, RenderPipeline vanilla) {
+    public static RenderPipeline terrainPipeline(RenderPipeline vanilla) {
+        if (!CompactTerrain.active())
+            return vanilla;
+
+        return COMPACT.computeIfAbsent(vanilla, PackedTerrain::compact);
+    }
+
+    public static boolean isPackedSource() {
         PipelineCache cache = RenderSystemPipelineCacheAccessor.txoptimizations$currentPipelineCache();
 
         if (cache == null)
-            throw new IllegalStateException("Terrain is drawn before any shaders were loaded");
+            throw new IllegalStateException("Terrain is used before any shaders were loaded");
 
         if (cache != checkedCache) {
             String source = ((PipelineCacheAccessor) cache).txoptimizations$shaderSource().getShader(SHADER, ShaderType.VERTEX);
@@ -51,64 +61,50 @@ public final class PackedTerrain {
             packedSource = source != null && source.contains(PACKED);
         }
 
-        if (!packedSource)
-            return vanilla;
-
-        return Pipelines.VALUES[layer.ordinal()];
+        return packedSource;
     }
 
-    private static RenderPipeline pack(ChunkSectionLayer layer) {
-        RenderPipeline     vanilla = layer.pipeline(true);
+    private static RenderPipeline compact(RenderPipeline vanilla) {
+        Identifier         shader  = vanilla.getShaders().get(ShaderType.VERTEX);
         VertexFormat       block   = vanilla.getVertexFormatBinding(0);
         VertexFormat       chunk   = vanilla.getVertexFormatBinding(1);
         VertexFormat[]     formats = new VertexFormat[SLOTS];
         ColorTargetState[] targets = vanilla.getColorTargetStates().toArray(new ColorTargetState[0]);
 
-        if (block == null || chunk == null || block.getElements().size() != BLOCK_ELEMENTS || chunk.getElements().size() != CHUNK_ELEMENTS || vanilla.getVertexFormatBindings().size() != SLOTS)
-            throw new IllegalStateException(vanilla.getLocation() + " does not bind exactly the block and chunk section vertex formats " + vanilla.getVertexFormatBindings());
+        if (!SHADER.equals(shader))
+            throw new IllegalStateException(vanilla.getLocation() + " draws terrain with the vertex shader " + shader + " instead of " + SHADER);
 
-        formats[0] = VertexFormat.builder(block.getStepRate()).addAttribute("Position", GpuFormat.RGB32_FLOAT).addAttribute("Color", GpuFormat.RGBA8_UNORM).addAttribute("UVData", GpuFormat.RGB32_UINT).build();
-        formats[1] = VertexFormat.builder(chunk.getStepRate()).addAttribute("ChunkData", GpuFormat.RGBA32_SINT).build();
+        if (block == null || block.getElements().size() != BLOCK_ELEMENTS || chunk != null && chunk.getElements().size() != CHUNK_ELEMENTS || vanilla.getVertexFormatBindings().size() != SLOTS)
+            throw new IllegalStateException(vanilla.getLocation() + " does not bind the block vertex format and at most the chunk section format " + vanilla.getVertexFormatBindings());
+
+        if (block.getStepRate() != CompactTerrain.FORMAT.getStepRate())
+            throw new IllegalStateException(vanilla.getLocation() + " steps its block vertices at rate " + block.getStepRate() + " instead of " + CompactTerrain.FORMAT.getStepRate());
+
+        formats[0] = CompactTerrain.FORMAT;
+
+        if (chunk != null) {
+            formats[1] = VertexFormat.builder(chunk.getStepRate()).addAttribute("ChunkData", GpuFormat.RGBA32_SINT).build();
+            requireLayout(chunk, formats[1], "ChunkPosition", GpuFormat.RGB32_SINT, 0);
+            requireLayout(chunk, formats[1], "ChunkVisibility", GpuFormat.R32_FLOAT, 12);
+        }
 
         for (int slot = 2; slot < SLOTS; slot ++) {
             if (vanilla.getVertexFormatBinding(slot) != null)
                 throw new IllegalStateException(vanilla.getLocation() + " binds an unexpected vertex format in slot " + slot);
         }
 
-        requireLayout(block, formats[0], "Position", GpuFormat.RGB32_FLOAT, "Position", 0);
-        requireLayout(block, formats[0], "Color", GpuFormat.RGBA8_UNORM, "Color", 0);
-        requireLayout(block, formats[0], "UV0", GpuFormat.RG32_FLOAT, "UVData", 0);
-        requireLayout(block, formats[0], "UV2", GpuFormat.RG16_SINT, "UVData", 8);
-        requireLayout(chunk, formats[1], "ChunkPosition", GpuFormat.RGB32_SINT, "ChunkData", 0);
-        requireLayout(chunk, formats[1], "ChunkVisibility", GpuFormat.R32_FLOAT, "ChunkData", 12);
-
         RenderPipeline.Snippet copy = new RenderPipeline.Snippet(vanilla.getShaders(), Optional.of(vanilla.getShaderDefines()), Optional.of(vanilla.getBindGroupLayouts()), targets, targets.length, Optional.ofNullable(vanilla.getDepthStencilState()), Optional.of(vanilla.getPolygonMode()), Optional.of(vanilla.isCull()), formats, Optional.of(vanilla.getPrimitiveTopology()), vanilla.pushConstantSize());
 
         return RenderPipeline.builder(copy).withLocation(Identifier.fromNamespaceAndPath("txoptimizations", vanilla.getLocation().getPath() + "_packed")).withShaderDefine(DEFINE).build();
     }
 
-    private static void requireLayout(VertexFormat vanilla, VertexFormat packed, String name, GpuFormat format, String packedName, int offsetInPacked) {
+    private static void requireLayout(VertexFormat vanilla, VertexFormat packed, String name, GpuFormat format, int offset) {
         VertexFormatElement element = vanilla.getElement(name);
 
         if (vanilla.getVertexSize() != packed.getVertexSize() || vanilla.getStepRate() != packed.getStepRate())
             throw new IllegalStateException("Packed terrain format " + packed + " does not match the layout of " + vanilla);
 
-        if (element == null || element.format() != format)
-            throw new IllegalStateException("Packed terrain reads " + name + " as " + format + " but " + vanilla + " has " + element);
-
-        int packedOffset = packed.getElement(packedName).offset() + offsetInPacked;
-
-        if (element.offset() != packedOffset)
-            throw new IllegalStateException(name + " is at byte " + element.offset() + " of " + vanilla + " but packed terrain reads it at byte " + packedOffset);
-    }
-
-    private static final class Pipelines {
-
-        private static final RenderPipeline[] VALUES = new RenderPipeline[SectionLayers.VALUES.length];
-
-        static {
-            for (ChunkSectionLayer layer : SectionLayers.VALUES)
-                VALUES[layer.ordinal()] = pack(layer);
-        }
+        if (element == null || element.format() != format || element.offset() != offset)
+            throw new IllegalStateException("Packed terrain reads " + name + " as " + format + " at byte " + offset + " but " + vanilla + " has " + element);
     }
 }

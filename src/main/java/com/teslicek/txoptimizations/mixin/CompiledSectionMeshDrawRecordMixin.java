@@ -2,6 +2,7 @@ package com.teslicek.txoptimizations.mixin;
 
 import com.mojang.blaze3d.vertex.MeshData;
 import com.mojang.blaze3d.vertex.TlsfAllocator;
+import com.teslicek.txoptimizations.CompactTerrain;
 import com.teslicek.txoptimizations.DrawRecordHolder;
 import com.teslicek.txoptimizations.DrawRecords;
 import com.teslicek.txoptimizations.FacingCulling;
@@ -63,10 +64,11 @@ public abstract class CompiledSectionMeshDrawRecordMixin implements SectionAlloc
 
             DrawRecords.setDraw(record, layer.ordinal(), layer.translucent(), draw.indexCount(), draw.hasCustomIndexBuffer(), draw.indexType().ordinal());
 
-            if (layer.translucent())
-                continue;
+            if (!layer.translucent())
+                FacingCulling.groupQuads(entry.getValue(), record, DrawRecords.facing(record, layer.ordinal()));
 
-            FacingCulling.groupQuads(entry.getValue(), record, DrawRecords.facing(record, layer.ordinal()));
+            if (CompactTerrain.active())
+                CompactTerrain.encode(entry.getValue());
         }
 
         this.txoptimizations$drawRecord = record;
@@ -137,7 +139,7 @@ public abstract class CompiledSectionMeshDrawRecordMixin implements SectionAlloc
             firstIndex  = (int) index.getOffsetFromHeap() / draw.indexType().bytes;
         }
 
-        DrawRecords.setDrawable(record, layer.ordinal(), txoptimizations$bufferId(vertex), (int) vertex.getOffsetFromHeap() / layer.pipeline(false).getVertexFormatBinding(0).getVertexSize(), indexBuffer, firstIndex, layer.translucent());
+        DrawRecords.setDrawable(record, layer.ordinal(), txoptimizations$bufferId(vertex), (int) vertex.getOffsetFromHeap() / CompactTerrain.vertexSize(layer), indexBuffer, firstIndex, layer.translucent());
     }
 
     @Unique
