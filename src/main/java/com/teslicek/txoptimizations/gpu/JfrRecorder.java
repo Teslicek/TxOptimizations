@@ -71,7 +71,9 @@ final class JfrRecorder {
         started.enable(GC_EVACUATION);
         started.enable(GC_HEAP);
         started.enable(CLASS_LOAD).withThreshold(LOAD_THRESHOLD).withStackTrace();
+        started.enable(GpuCallEvent.class).withThreshold(WAIT_THRESHOLD);
         started.start();
+        GpuCallEvent.setRecording(true);
         recording    = started;
         startTime    = Instant.now();
         renderThread = target.getName();
@@ -91,6 +93,7 @@ final class JfrRecorder {
             throw new IllegalStateException("Flight Recorder profile was never started");
 
         recording = null;
+        GpuCallEvent.setRecording(false);
         finished.stop();
 
         try {
@@ -117,11 +120,14 @@ final class JfrRecorder {
         List<RecordedEvent> waits           = new ArrayList<>();
         List<RecordedEvent> classLoads      = new ArrayList<>();
         List<RecordedEvent> operations      = new ArrayList<>();
+        List<RecordedEvent> calls           = new ArrayList<>();
         Map<String, Long>   operationNanos  = new HashMap<>();
         Map<String, Long>   operationCounts = new HashMap<>();
         Map<String, Long>   deoptimizations = new HashMap<>();
         Map<String, Long>   waitNanos       = new HashMap<>();
         Map<String, Long>   waitCounts      = new HashMap<>();
+        Map<String, Long>   callNanos       = new HashMap<>();
+        Map<String, Long>   callCounts      = new HashMap<>();
 
         for (RecordedEvent event : events) {
             String type = event.getEventType().getName();
@@ -139,6 +145,13 @@ final class JfrRecorder {
                 case CLASS_LOAD -> {
                     if (event.getThread() != null && renderThread.equals(event.getThread().getJavaName()))
                         classLoads.add(event);
+                }
+                case GpuCallEvent.NAME -> {
+                    String call = event.getString("call");
+
+                    calls.add(event);
+                    callNanos.merge(call, event.getDuration().toNanos(), Long::sum);
+                    callCounts.merge(call, 1L, Long::sum);
                 }
                 case DEOPTIMIZATION -> deoptimizations.merge(method(event.getValue("method")) + " (" + event.getString("reason") + ", " + event.getString("action") + ")", 1L, Long::sum);
                 case PARK, MONITOR -> {
@@ -164,10 +177,7 @@ final class JfrRecorder {
         report.append(String.format(Locale.ROOT, "VM operations: %d, %.2f ms in total%n", operations.size(), totalMillis(operations)));
         longest(operations).forEach(event -> report.append(String.format(Locale.ROOT, "  %8.3f ms  at %.3f s  %s%s%n", millis(event), seconds(event), event.getString("operation"), event.getBoolean("safepoint") ? " (safepoint)" : "")));
         report.append(String.format(Locale.ROOT, "  by operation%n"));
-        operationNanos.entrySet().stream()
-            .sorted(Map.Entry.<String, Long>comparingByValue().reversed())
-            .limit(TOP_EVENTS)
-            .forEach(entry -> report.append(String.format(Locale.ROOT, "  %8.3f ms  %5dx  %s%n", entry.getValue() / 1.0e6, operationCounts.get(entry.getKey()), entry.getKey())));
+        appendTotals(report, operationNanos, operationCounts);
 
         report.append(String.format(Locale.ROOT, "JIT compilations: %d, %.1f ms of compiler time in total%n", compilations.size(), totalMillis(compilations)));
         longest(compilations).forEach(event -> report.append(String.format(Locale.ROOT, "  %8.3f ms  at %.3f s  tier %d  %s%n", millis(event), seconds(event), event.getInt("compileLevel"), method(event.getValue("method")))));
@@ -181,10 +191,12 @@ final class JfrRecorder {
         report.append(String.format(Locale.ROOT, "Render thread waits of %.1f ms or longer: %d, %.2f ms in total%n", WAIT_THRESHOLD.toNanos() / 1.0e6, waits.size(), totalMillis(waits)));
         longest(waits).forEach(event -> report.append(String.format(Locale.ROOT, "  %8.3f ms  at %.3f s  %s%n", millis(event), seconds(event), frames(event, 2))));
         report.append(String.format(Locale.ROOT, "  by site%n"));
-        waitNanos.entrySet().stream()
-            .sorted(Map.Entry.<String, Long>comparingByValue().reversed())
-            .limit(TOP_EVENTS)
-            .forEach(entry -> report.append(String.format(Locale.ROOT, "  %8.3f ms  %5dx  %s%n", entry.getValue() / 1.0e6, waitCounts.get(entry.getKey()), entry.getKey())));
+        appendTotals(report, waitNanos, waitCounts);
+
+        report.append(String.format(Locale.ROOT, "GPU driver calls of %.1f ms or longer: %d, %.2f ms in total%n", WAIT_THRESHOLD.toNanos() / 1.0e6, calls.size(), totalMillis(calls)));
+        longest(calls).forEach(event -> report.append(String.format(Locale.ROOT, "  %8.3f ms  at %.3f s  %s on %s%n", millis(event), seconds(event), event.getString("call"), event.getThread().getJavaName())));
+        report.append(String.format(Locale.ROOT, "  by call%n"));
+        appendTotals(report, callNanos, callCounts);
 
         report.append(String.format(Locale.ROOT, "Render thread class loads of %.1f ms or longer: %d, %.2f ms in total%n", LOAD_THRESHOLD.toNanos() / 1.0e6, classLoads.size(), totalMillis(classLoads)));
         longest(classLoads).forEach(event -> report.append(String.format(Locale.ROOT, "  %8.3f ms  at %.3f s  %s  from %s%n", millis(event), seconds(event), event.getClass("loadedClass").getName(), frames(event, LOAD_FRAMES))));
@@ -285,6 +297,13 @@ final class JfrRecorder {
             });
 
         return report.toString();
+    }
+
+    private static void appendTotals(StringBuilder report, Map<String, Long> nanos, Map<String, Long> counts) {
+        nanos.entrySet().stream()
+            .sorted(Map.Entry.<String, Long>comparingByValue().reversed())
+            .limit(TOP_EVENTS)
+            .forEach(entry -> report.append(String.format(Locale.ROOT, "  %8.3f ms  %5dx  %s%n", entry.getValue() / 1.0e6, counts.get(entry.getKey()), entry.getKey())));
     }
 
     private static List<RecordedEvent> longest(List<RecordedEvent> events) {

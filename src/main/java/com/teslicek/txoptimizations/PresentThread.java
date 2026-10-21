@@ -2,6 +2,7 @@ package com.teslicek.txoptimizations;
 
 import com.mojang.renderpearl.api.device.GpuSurface;
 import com.mojang.renderpearl.backend.vulkan.VulkanQueue;
+import com.teslicek.txoptimizations.gpu.GpuCallEvent;
 import java.util.Optional;
 import java.util.concurrent.locks.LockSupport;
 
@@ -20,6 +21,7 @@ public final class PresentThread {
     private static boolean                capturing;
     private static VulkanQueue.Submission handedSubmission;
     private static Runnable               handedPresent;
+    private static GpuCallEvent           handedStart;
 
     private PresentThread() {
     }
@@ -67,14 +69,14 @@ public final class PresentThread {
         drain();
 
         if (!FramePath.frameUsesWorker()) {
-            submission.close();
-            present.run();
+            submitAndPresent(submission, present);
 
             return;
         }
 
         handedSubmission = submission;
         handedPresent    = present;
+        handedStart      = startEvent();
         job              = PRESENT_JOB;
 
         if (workerParked)
@@ -164,12 +166,39 @@ public final class PresentThread {
     private static void presentHandedOff() {
         VulkanQueue.Submission submission = handedSubmission;
         Runnable               present    = handedPresent;
+        GpuCallEvent           start      = handedStart;
 
         handedSubmission = null;
         handedPresent    = null;
+        handedStart      = null;
 
-        submission.close();
-        present.run();
+        if (start != null)
+            start.commit();
+
+        submitAndPresent(submission, present);
+    }
+
+    private static void submitAndPresent(VulkanQueue.Submission submission, Runnable present) {
+        if (!GpuCallEvent.isRecording()) {
+            submission.close();
+            present.run();
+
+            return;
+        }
+
+        GpuCallEvent.time(GpuCallEvent.SUBMIT, submission::close);
+        GpuCallEvent.time(GpuCallEvent.PRESENT, present);
+    }
+
+    private static GpuCallEvent startEvent() {
+        if (!GpuCallEvent.isRecording())
+            return null;
+
+        GpuCallEvent start = new GpuCallEvent(GpuCallEvent.START);
+
+        start.begin();
+
+        return start;
     }
 
     private static void awaitJob(long deadline) {

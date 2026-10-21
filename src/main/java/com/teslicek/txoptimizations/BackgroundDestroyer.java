@@ -5,6 +5,7 @@ import com.mojang.renderpearl.backend.vulkan.DestructionQueue;
 import com.mojang.renderpearl.backend.vulkan.VulkanGpuBuffer;
 import com.mojang.renderpearl.backend.vulkan.VulkanGpuTexture;
 import com.mojang.renderpearl.backend.vulkan.VulkanGpuTextureView;
+import com.teslicek.txoptimizations.gpu.GpuCallEvent;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
@@ -52,11 +53,23 @@ public final class BackgroundDestroyer implements DestructionQueue.Destroyer<Des
             return;
 
         this.batch = null;
-        pending    = pending.thenRunAsync(() -> destroyables.forEach(Destroyable::destroy), EXECUTOR);
+        pending    = pending.thenRunAsync(() -> destroyAll(destroyables), EXECUTOR);
     }
 
     public static void drain() {
         pending.join();
+    }
+
+    private static void destroyAll(List<Destroyable> destroyables) {
+        Runnable destroy = () -> destroyables.forEach(Destroyable::destroy);
+
+        if (!GpuCallEvent.isRecording()) {
+            destroy.run();
+
+            return;
+        }
+
+        GpuCallEvent.time(GpuCallEvent.DESTROY, destroy);
     }
 
     private static void throwFailure() {
