@@ -22,9 +22,6 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 @Mixin(GuiRenderer.class)
 public abstract class GuiRendererAnimatedItemAtlasMixin {
 
-    @Unique
-    private static final int MINIMUM_ANIMATED_ITEMS = 3;
-
     @Shadow
     @Final
     private GuiRenderState renderState;
@@ -83,7 +80,7 @@ public abstract class GuiRendererAnimatedItemAtlasMixin {
 
     @Unique
     private boolean txoptimizations$fitAnimatedAtlas(Set<Object> animatedItems, int slotTextureSize) {
-        if (animatedItems.size() < MINIMUM_ANIMATED_ITEMS)
+        if (animatedItems.isEmpty())
             return false;
 
         int textureSize = AnimatedItemAtlas.textureSizeFor(slotTextureSize, animatedItems.size());
