@@ -141,3 +141,6 @@ accessible method net/minecraft/world/level/BaseSpawner isNearPlayer (Lnet/minec
 
 # Particle group ticking
 accessible method net/minecraft/client/particle/ParticleEngine updateCount (Lnet/minecraft/core/particles/ParticleLimit;I)V
+accessible field net/minecraft/client/particle/Particle x D
+accessible field net/minecraft/client/particle/Particle y D
+accessible field net/minecraft/client/particle/Particle z D

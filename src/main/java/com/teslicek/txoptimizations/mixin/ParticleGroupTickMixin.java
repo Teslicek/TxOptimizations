@@ -1,5 +1,6 @@
 package com.teslicek.txoptimizations.mixin;
 
+import com.teslicek.txoptimizations.ParticleGroupChanges;
 import java.util.Optional;
 import java.util.Queue;
 import net.minecraft.client.particle.Particle;
@@ -10,9 +11,13 @@ import org.spongepowered.asm.mixin.Final;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Overwrite;
 import org.spongepowered.asm.mixin.Shadow;
+import org.spongepowered.asm.mixin.Unique;
+import org.spongepowered.asm.mixin.injection.At;
+import org.spongepowered.asm.mixin.injection.Inject;
+import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 @Mixin(value = ParticleGroup.class, priority = 999)
-public abstract class ParticleGroupTickMixin<P extends Particle> {
+public abstract class ParticleGroupTickMixin<P extends Particle> implements ParticleGroupChanges {
 
     @Shadow
     @Final
@@ -22,6 +27,9 @@ public abstract class ParticleGroupTickMixin<P extends Particle> {
     @Final
     protected Queue<P> particles;
 
+    @Unique
+    private int txoptimizations$changes;
+
     @Shadow
     private void tickParticle(Particle particle) {
         throw new AssertionError();
@@ -29,6 +37,8 @@ public abstract class ParticleGroupTickMixin<P extends Particle> {
 
     @Overwrite
     public void tickParticles() {
+        this.txoptimizations$changes ++;
+
         for (int remaining = this.particles.size(); remaining > 0; remaining --) {
             P particle = this.particles.remove();
 
@@ -44,5 +54,15 @@ public abstract class ParticleGroupTickMixin<P extends Particle> {
             if (limit.isPresent())
                 this.engine.updateCount(limit.get(), -1);
         }
+    }
+
+    @Inject(method = "add", at = @At("HEAD"))
+    private void txoptimizations$countAdd(Particle particle, CallbackInfoReturnable<Boolean> cir) {
+        this.txoptimizations$changes ++;
+    }
+
+    @Override
+    public int txoptimizations$changes() {
+        return this.txoptimizations$changes;
     }
 }
