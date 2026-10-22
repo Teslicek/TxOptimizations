@@ -138,3 +138,6 @@ accessible field net/minecraft/world/level/block/entity/ChestLidController oOpen
 accessible field net/minecraft/world/level/BaseSpawner spin D
 accessible field net/minecraft/world/level/BaseSpawner oSpin D
 accessible method net/minecraft/world/level/BaseSpawner isNearPlayer (Lnet/minecraft/world/level/Level;Lnet/minecraft/core/BlockPos;)Z
+
+# Particle group ticking
+accessible method net/minecraft/client/particle/ParticleEngine updateCount (Lnet/minecraft/core/particles/ParticleLimit;I)V

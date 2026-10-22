@@ -157,6 +157,7 @@
     "ModelRenderTypeCacheMixin",
     "ModelResetPoseMixin",
     "ParticleCollisionScanMixin",
+    "ParticleGroupTickMixin",
     "BoundTickingBlockEntityIdleMixin",
     "ParticleLightCacheMixin",
     "ParticleRotationMixin",
