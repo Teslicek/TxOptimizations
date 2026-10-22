@@ -10,6 +10,8 @@ import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.chunk.ChunkAccess;
 import net.minecraft.world.level.chunk.LevelChunkSection;
+import net.minecraft.world.level.chunk.Palette;
+import net.minecraft.world.level.chunk.PalettedContainer;
 import net.minecraft.world.level.chunk.status.ChunkStatus;
 import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.shapes.CollisionContext;
@@ -56,16 +58,19 @@ public final class BlockCollisionScan {
                     if (section.hasOnlyAir())
                         continue;
 
-                    int fromY = Math.max(bottom, SectionPos.sectionToBlockCoord(sectionY));
-                    int toY   = Math.min(top, SectionPos.sectionToBlockCoord(sectionY) + 15);
+                    int inset    = mayReachNeighborCells(section) ? 0 : 1;
+                    int fromY    = Math.max(Math.max(bottom, minY + inset), SectionPos.sectionToBlockCoord(sectionY));
+                    int toY      = Math.min(Math.min(top, maxY - inset), SectionPos.sectionToBlockCoord(sectionY) + 15);
+                    int insetToZ = Math.min(toZ, maxZ - inset);
+                    int insetToX = Math.min(toX, maxX - inset);
 
                     for (int y = fromY; y <= toY; y ++) {
                         int yFaces = y == minY || y == maxY ? 1 : 0;
 
-                        for (int z = fromZ; z <= toZ; z ++) {
+                        for (int z = Math.max(fromZ, minZ + inset); z <= insetToZ; z ++) {
                             int yzFaces = yFaces + (z == minZ || z == maxZ ? 1 : 0);
 
-                            for (int x = fromX; x <= toX; x ++) {
+                            for (int x = Math.max(fromX, minX + inset); x <= insetToX; x ++) {
                                 int type = yzFaces + (x == minX || x == maxX ? 1 : 0);
 
                                 if (type == Cursor3D.TYPE_CORNER)
@@ -89,6 +94,24 @@ public final class BlockCollisionScan {
         }
 
         return true;
+    }
+
+    private static boolean mayReachNeighborCells(LevelChunkSection section) {
+        PalettedContainer<BlockState>      states  = section.getStates();
+        PalettedContainer.Data<BlockState> data    = states.data;
+        Palette<BlockState>                palette = data.palette();
+        int                                size    = palette.getSize();
+        int                                reads   = ((PaletteReads) states).txoptimizations$reads();
+        CollisionReach                     reach   = (CollisionReach) section;
+
+        if (!reach.txoptimizations$matches(data, size, reads))
+            reach.txoptimizations$remember(data, size, reads, palette.maybeHas(BlockCollisionScan::reachesNeighborCells));
+
+        return reach.txoptimizations$reaches();
+    }
+
+    private static boolean reachesNeighborCells(BlockState state) {
+        return state.hasLargeCollisionShape() || state.is(Blocks.MOVING_PISTON);
     }
 
     private static boolean mayCollide(VoxelShape shape, AABB box, int x, int y, int z) {

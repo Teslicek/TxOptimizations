@@ -158,6 +158,8 @@
     "ModelResetPoseMixin",
     "ParticleCollisionScanMixin",
     "ParticleGroupTickMixin",
+    "PalettedContainerReadsMixin",
+    "LevelChunkSectionCollisionReachMixin",
     "BoundTickingBlockEntityIdleMixin",
     "ParticleLightCacheMixin",
     "ParticleRotationMixin",
