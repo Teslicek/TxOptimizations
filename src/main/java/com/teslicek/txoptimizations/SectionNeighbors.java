@@ -2,6 +2,7 @@ package com.teslicek.txoptimizations;
 
 import net.minecraft.client.SectionUpdateTracker;
 import net.minecraft.client.multiplayer.ClientLevel;
+import net.minecraft.world.level.lighting.LevelLightEngine;
 
 public final class SectionNeighbors {
 
@@ -15,6 +16,9 @@ public final class SectionNeighbors {
     }
 
     public static boolean hasAllNeighbors(SectionUpdateTracker tracker, ClientLevel level, long sectionNode, NeighborMark mark) {
+        if (level.getLightEngine().getClass() != LevelLightEngine.class)
+            return tracker.hasAllNeighbors(level, sectionNode);
+
         int current = generation;
 
         if (mark.txoptimizations$getMissingNeighborsGeneration() == current && mark.txoptimizations$getMissingNeighborsNode() == sectionNode)
