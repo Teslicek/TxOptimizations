@@ -144,3 +144,6 @@ accessible method net/minecraft/client/particle/ParticleEngine updateCount (Lnet
 accessible field net/minecraft/client/particle/Particle x D
 accessible field net/minecraft/client/particle/Particle y D
 accessible field net/minecraft/client/particle/Particle z D
+
+# Item display item state reuse
+mutable field net/minecraft/client/renderer/entity/state/ItemDisplayEntityRenderState item Lnet/minecraft/client/renderer/item/ItemStackRenderState;

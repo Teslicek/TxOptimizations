@@ -212,6 +212,8 @@
     "EntityViewVectorMemoMixin",
     "StagedVertexBufferDrawOutlineMixin",
     "TextDisplayRendererSplitterMixin",
+    "ItemDisplayItemStateMixin",
+    "ItemDisplayRendererItemStateMixin",
     "TextureManagerVersionMixin",
     "RendererCacheMixin",
     "RotatingSectionStorageChangeMixin",
