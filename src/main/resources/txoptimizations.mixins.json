@@ -107,6 +107,7 @@
     "GuiGraphicsExtractorMapAtlasMixin",
     "GuiInitialScreensProfileMixin",
     "GuiRendererAnimatedItemAtlasMixin",
+    "GuiRendererElementOrderMixin",
     "HideLevelLoadingScreenMixin",
     "HideReloadOverlayMixin",
     "HideTitleScreenFadeMixin",
