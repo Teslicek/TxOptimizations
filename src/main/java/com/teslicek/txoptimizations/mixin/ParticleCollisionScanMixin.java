@@ -18,7 +18,7 @@ public abstract class ParticleCollisionScanMixin {
 
     @Redirect(method = "move", at = @At(value = "INVOKE", target = "Lnet/minecraft/world/entity/Entity;collideBoundingBox(Lnet/minecraft/world/phys/shapes/CollisionContext;Lnet/minecraft/world/phys/Vec3;Lnet/minecraft/world/phys/AABB;Lnet/minecraft/world/level/Level;Ljava/util/List;)Lnet/minecraft/world/phys/Vec3;"))
     private Vec3 txoptimizations$skipFreeMovement(CollisionContext context, Vec3 movement, AABB box, Level level, List<VoxelShape> colliders) {
-        if (colliders.isEmpty() && BlockCollisionScan.cannotCollide(level, context, box.expandTowards(movement)))
+        if (colliders.isEmpty() && BlockCollisionScan.cannotCollide(level, context, box, movement.x, movement.y, movement.z))
             return movement;
 
         return Entity.collideBoundingBox(context, movement, box, level, colliders);

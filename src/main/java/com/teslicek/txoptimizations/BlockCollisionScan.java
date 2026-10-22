@@ -25,17 +25,29 @@ public final class BlockCollisionScan {
     private BlockCollisionScan() {
     }
 
-    public static boolean cannotCollide(Level level, CollisionContext context, AABB box) {
+    public static boolean cannotCollide(Level level, CollisionContext context, AABB box, double xa, double ya, double za) {
         if (level.isDebug())
             return false;
 
-        int                      minX = Mth.floor(box.minX - EPSILON) - 1;
-        int                      maxX = Mth.floor(box.maxX + EPSILON) + 1;
-        int                      minY = Mth.floor(box.minY - EPSILON) - 1;
-        int                      maxY = Mth.floor(box.maxY + EPSILON) + 1;
-        int                      minZ = Mth.floor(box.minZ - EPSILON) - 1;
-        int                      maxZ = Mth.floor(box.maxZ + EPSILON) + 1;
-        BlockPos.MutableBlockPos pos  = null;
+        double                   lowX      = xa < 0.0 ? box.minX + xa : box.minX;
+        double                   lowY      = ya < 0.0 ? box.minY + ya : box.minY;
+        double                   lowZ      = za < 0.0 ? box.minZ + za : box.minZ;
+        double                   highX     = xa > 0.0 ? box.maxX + xa : box.maxX;
+        double                   highY     = ya > 0.0 ? box.maxY + ya : box.maxY;
+        double                   highZ     = za > 0.0 ? box.maxZ + za : box.maxZ;
+        double                   sweptMinX = Math.min(lowX, highX);
+        double                   sweptMinY = Math.min(lowY, highY);
+        double                   sweptMinZ = Math.min(lowZ, highZ);
+        double                   sweptMaxX = Math.max(lowX, highX);
+        double                   sweptMaxY = Math.max(lowY, highY);
+        double                   sweptMaxZ = Math.max(lowZ, highZ);
+        int                      minX      = Mth.floor(sweptMinX - EPSILON) - 1;
+        int                      maxX      = Mth.floor(sweptMaxX + EPSILON) + 1;
+        int                      minY      = Mth.floor(sweptMinY - EPSILON) - 1;
+        int                      maxY      = Mth.floor(sweptMaxY + EPSILON) + 1;
+        int                      minZ      = Mth.floor(sweptMinZ - EPSILON) - 1;
+        int                      maxZ      = Mth.floor(sweptMaxZ + EPSILON) + 1;
+        BlockPos.MutableBlockPos pos       = null;
 
         for (int chunkX = SectionPos.blockToSectionCoord(minX); chunkX <= SectionPos.blockToSectionCoord(maxX); chunkX ++) {
             for (int chunkZ = SectionPos.blockToSectionCoord(minZ); chunkZ <= SectionPos.blockToSectionCoord(maxZ); chunkZ ++) {
@@ -84,7 +96,7 @@ public final class BlockCollisionScan {
                                 if (pos == null)
                                     pos = new BlockPos.MutableBlockPos();
 
-                                if (mayCollide(context.getCollisionShape(state, level, pos.set(x, y, z)), box, x, y, z))
+                                if (mayCollide(context.getCollisionShape(state, level, pos.set(x, y, z)), sweptMinX, sweptMinY, sweptMinZ, sweptMaxX, sweptMaxY, sweptMaxZ, x, y, z))
                                     return false;
                             }
                         }
@@ -114,10 +126,10 @@ public final class BlockCollisionScan {
         return state.hasLargeCollisionShape() || state.is(Blocks.MOVING_PISTON);
     }
 
-    private static boolean mayCollide(VoxelShape shape, AABB box, int x, int y, int z) {
+    private static boolean mayCollide(VoxelShape shape, double minX, double minY, double minZ, double maxX, double maxY, double maxZ, int x, int y, int z) {
         if (shape == Shapes.block())
-            return box.intersects(x, y, z, x + 1.0, y + 1.0, z + 1.0);
+            return minX < x + 1.0 && maxX > x && minY < y + 1.0 && maxY > y && minZ < z + 1.0 && maxZ > z;
 
-        return !shape.isEmpty() && shape.min(Direction.Axis.X) + x < box.maxX && shape.max(Direction.Axis.X) + x > box.minX && shape.min(Direction.Axis.Y) + y < box.maxY && shape.max(Direction.Axis.Y) + y > box.minY && shape.min(Direction.Axis.Z) + z < box.maxZ && shape.max(Direction.Axis.Z) + z > box.minZ;
+        return !shape.isEmpty() && shape.min(Direction.Axis.X) + x < maxX && shape.max(Direction.Axis.X) + x > minX && shape.min(Direction.Axis.Y) + y < maxY && shape.max(Direction.Axis.Y) + y > minY && shape.min(Direction.Axis.Z) + z < maxZ && shape.max(Direction.Axis.Z) + z > minZ;
     }
 }

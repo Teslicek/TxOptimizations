@@ -29,6 +29,7 @@
     "BlockTintCacheLayerMemoMixin",
     "BrushableBlockExtractSkipMixin",
     "BufferBuilderDirectWriteMixin",
+    "BufferBuilderPoseVertexMixin",
     "BufferBuilderBakedQuadMixin",
     "BufferBuilderElementCacheMixin",
     "ByteBufferBuilderAccessor",
