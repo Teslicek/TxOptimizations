@@ -4,6 +4,7 @@ import com.mojang.blaze3d.vertex.CompactVectorArray;
 import com.mojang.blaze3d.vertex.MeshData;
 import com.mojang.renderpearl.api.vertex.VertexFormat;
 import com.mojang.renderpearl.api.vertex.VertexFormatElement;
+import com.teslicek.txoptimizations.DistanceSorting;
 import com.teslicek.txoptimizations.VertexFormatElementCache;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
@@ -47,11 +48,8 @@ public abstract class MeshDataCentroidMixin {
         for (int quad = 0; quad < quads; quad ++) {
             long first = base + (long) quad * quadSize;
             long third = first + vertexSize * 2L;
-            float x   = (MemoryUtil.memGetFloat(first) + MemoryUtil.memGetFloat(third)) / 2.0F;
-            float y   = (MemoryUtil.memGetFloat(first + 4) + MemoryUtil.memGetFloat(third + 4)) / 2.0F;
-            float z   = (MemoryUtil.memGetFloat(first + 8) + MemoryUtil.memGetFloat(third + 8)) / 2.0F;
 
-            centroids.set(firstQuad + quad, x, y, z);
+            centroids.set(firstQuad + quad, DistanceSorting.centroid(first, third), DistanceSorting.centroid(first + 4, third + 4), DistanceSorting.centroid(first + 8, third + 8));
         }
 
         ci.cancel();

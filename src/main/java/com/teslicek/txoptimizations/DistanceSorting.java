@@ -2,11 +2,15 @@ package com.teslicek.txoptimizations;
 
 import com.mojang.blaze3d.vertex.CompactVectorArray;
 import com.mojang.blaze3d.vertex.VertexSorting;
+import com.mojang.renderpearl.api.pipeline.PrimitiveTopology;
 import org.joml.Vector3f;
+import org.lwjgl.system.MemoryUtil;
 
 public final class DistanceSorting implements VertexSorting, SharedQuadSorter {
 
-    private static final Vector3f SHARED_SCRATCH = new Vector3f();
+    private static final Vector3f SHARED_SCRATCH    = new Vector3f();
+    private static final Vector3f ORIGIN            = new Vector3f();
+    private static final int      VERTICES_PER_QUAD = PrimitiveTopology.QUADS.primitiveLength;
 
     private final VertexSorting.DistanceFunction function;
 
@@ -43,6 +47,27 @@ public final class DistanceSorting implements VertexSorting, SharedQuadSorter {
         this.fillKeys(points, keys, length, SHARED_SCRATCH);
 
         return QuadSort.sort(keys, length);
+    }
+
+    public static int fillOriginKeys(long positions, int vertexSize, int quads, int[] keys, int firstQuad) {
+        long quadSize = (long) vertexSize * VERTICES_PER_QUAD;
+        long third    = 2L * vertexSize;
+
+        for (int quad = 0; quad < quads; quad ++) {
+            long first = positions + quad * quadSize;
+
+            keys[firstQuad + quad] = originKey(centroid(first, first + third), centroid(first + Float.BYTES, first + third + Float.BYTES), centroid(first + 2L * Float.BYTES, first + third + 2L * Float.BYTES));
+        }
+
+        return firstQuad + quads;
+    }
+
+    public static int originKey(float x, float y, float z) {
+        return QuadSort.key(ORIGIN.distanceSquared(x, y, z));
+    }
+
+    public static float centroid(long first, long third) {
+        return (MemoryUtil.memGetFloat(first) + MemoryUtil.memGetFloat(third)) / 2.0F;
     }
 
     private void fillKeys(CompactVectorArray points, int[] keys, int length, Vector3f scratch) {

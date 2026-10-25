@@ -16,7 +16,6 @@ import org.lwjgl.system.MemoryUtil;
 import org.spongepowered.asm.mixin.Final;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
-import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
@@ -35,7 +34,7 @@ public abstract class MeshDataSortStateIndexMixin {
 
     @Inject(method = "buildSortedIndexBuffer", at = @At("HEAD"), cancellable = true)
     private void txoptimizations$buildSortedIndicesDirectly(ByteBufferBuilder target, VertexSorting sorting, CallbackInfoReturnable<ByteBufferBuilder.Result> cir) {
-        boolean shortIndices = this.txoptimizations$shortIndices();
+        boolean shortIndices = TwinQuads.shortIndices(this.indexType);
         int[]   quadOrder    = sorting.sort(this.centroids);
         int     bytes        = TwinQuads.indexCount(this.centroids) * this.indexType.bytes;
         long    pointer      = target.reserve(bytes);
@@ -56,7 +55,7 @@ public abstract class MeshDataSortStateIndexMixin {
 
         ci.cancel();
 
-        boolean shortIndices = this.txoptimizations$shortIndices();
+        boolean shortIndices = TwinQuads.shortIndices(this.indexType);
 
         if (buffer.isDirect() && buffer.order() == ByteOrder.nativeOrder()) {
             int bytes = TwinQuads.indexCount(this.centroids) * this.indexType.bytes;
@@ -101,13 +100,5 @@ public abstract class MeshDataSortStateIndexMixin {
         }
 
         buffer.position(buffer.position() + indices.position() * Integer.BYTES);
-    }
-
-    @Unique
-    private boolean txoptimizations$shortIndices() {
-        if (this.indexType != IndexType.SHORT && this.indexType != IndexType.INT)
-            throw new IllegalStateException("Unknown index type " + this.indexType);
-
-        return this.indexType == IndexType.SHORT;
     }
 }

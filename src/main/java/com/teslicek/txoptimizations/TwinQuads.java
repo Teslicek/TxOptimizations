@@ -1,6 +1,7 @@
 package com.teslicek.txoptimizations;
 
 import com.mojang.blaze3d.vertex.CompactVectorArray;
+import com.mojang.renderpearl.api.pipeline.IndexType;
 import com.mojang.renderpearl.api.pipeline.PrimitiveTopology;
 import java.util.Arrays;
 import org.lwjgl.system.MemoryUtil;
@@ -69,18 +70,38 @@ public final class TwinQuads extends CompactVectorArray {
     }
 
     public static long writeIndices(long pointer, int[] quadOrder, CompactVectorArray centroids, boolean shortIndices) {
-        long[] twins = centroids instanceof TwinQuads twinQuads ? twinQuads.twins : null;
+        if (!(centroids instanceof TwinQuads twinQuads))
+            return writeIndices(pointer, quadOrder, shortIndices);
+
+        long[] twins = twinQuads.twins;
 
         for (int quad : quadOrder) {
             int first = quad * VERTICES_PER_QUAD;
 
             pointer = writeQuad(pointer, first, first + 1, first + 2, first + 3, shortIndices);
 
-            if (twins != null && (twins[quad >>> WORD_SHIFT] & 1L << quad) != 0L)
+            if ((twins[quad >>> WORD_SHIFT] & 1L << quad) != 0L)
                 pointer = writeQuad(pointer, first, first + 3, first + 2, first + 1, shortIndices);
         }
 
         return pointer;
+    }
+
+    public static long writeIndices(long pointer, int[] quadOrder, boolean shortIndices) {
+        for (int quad : quadOrder) {
+            int first = quad * VERTICES_PER_QUAD;
+
+            pointer = writeQuad(pointer, first, first + 1, first + 2, first + 3, shortIndices);
+        }
+
+        return pointer;
+    }
+
+    public static boolean shortIndices(IndexType type) {
+        if (type != IndexType.SHORT && type != IndexType.INT)
+            throw new IllegalStateException("Unknown index type " + type);
+
+        return type == IndexType.SHORT;
     }
 
     private static long writeQuad(long pointer, int first, int second, int third, int fourth, boolean shortIndices) {
