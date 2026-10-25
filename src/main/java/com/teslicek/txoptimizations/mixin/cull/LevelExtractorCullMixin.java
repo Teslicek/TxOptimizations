@@ -2,6 +2,7 @@ package com.teslicek.txoptimizations.mixin.cull;
 
 import com.llamalad7.mixinextras.injector.ModifyExpressionValue;
 import com.llamalad7.mixinextras.sugar.Local;
+import com.teslicek.txoptimizations.EntityStateReuse;
 import com.teslicek.txoptimizations.cull.Cullable;
 import com.teslicek.txoptimizations.cull.EntityCulling;
 import net.minecraft.client.renderer.entity.state.EntityRenderState;
@@ -33,7 +34,12 @@ public abstract class LevelExtractorCullMixin {
             return EntityCulling.nameTagState(entity, partialTick);
 
         cullable.txoptimizations$setOutOfCamera(false);
+        EntityStateReuse.beginWorldEntity();
 
-        return this.extractEntity(entity, partialTick);
+        try {
+            return this.extractEntity(entity, partialTick);
+        } finally {
+            EntityStateReuse.endWorldEntity();
+        }
     }
 }
