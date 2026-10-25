@@ -6,5 +6,7 @@ public interface BackgroundVertexCopy {
 
     void txoptimizations$finishOutlineBounds();
 
+    void txoptimizations$awaitVertexCopy();
+
     void txoptimizations$finishVertexCopy();
 }

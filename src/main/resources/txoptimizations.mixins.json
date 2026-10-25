@@ -33,6 +33,7 @@
     "BufferBuilderBakedQuadMixin",
     "BufferBuilderElementCacheMixin",
     "ByteBufferBuilderAccessor",
+    "ByteBufferBuilderResizeMixin",
     "ByteBufferResultAccessor",
     "CameraFluidLookupMixin",
     "CameraNearPlaneAccessor",

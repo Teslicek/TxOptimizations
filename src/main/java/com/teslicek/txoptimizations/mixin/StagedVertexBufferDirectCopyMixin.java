@@ -39,6 +39,7 @@ import org.spongepowered.asm.mixin.injection.Constant;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.ModifyConstant;
 import org.spongepowered.asm.mixin.injection.ModifyVariable;
+import org.spongepowered.asm.mixin.injection.Redirect;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 @Mixin(value = StagedVertexBuffer.class, priority = 999)
@@ -72,6 +73,9 @@ public abstract class StagedVertexBufferDirectCopyMixin implements BackgroundVer
         throw new AssertionError();
     }
 
+    @Shadow
+    protected abstract void finishLastVertexBuilder();
+
     @ModifyConstant(method = "<init>", constant = {@Constant(intValue = GpuBuffer.USAGE_COPY_DST | GpuBuffer.USAGE_VERTEX), @Constant(intValue = GpuBuffer.USAGE_COPY_DST | GpuBuffer.USAGE_INDEX)})
     private int txoptimizations$writeDirectly(int usage) {
         return usage & ~GpuBuffer.USAGE_COPY_DST | GpuBuffer.USAGE_MAP_WRITE;
@@ -79,33 +83,52 @@ public abstract class StagedVertexBufferDirectCopyMixin implements BackgroundVer
 
     @Overwrite
     private void uploadDrawsToBuffers(GpuDevice device, List<StagedVertexBuffer.Draw> draws, GpuBuffer vertexGpuBuffer, @Nullable GpuBuffer indexGpuBuffer, int vertexBufferSize, int indexBufferSize) {
-        if (this.txoptimizations$vertexView != null)
+        if (this.txoptimizations$vertexView == null) {
+            this.txoptimizations$vertexView = vertexGpuBuffer.slice(0L, vertexBufferSize).map(false, true);
+            this.txoptimizations$vertexCopy.begin();
+            this.txoptimizations$copyDraws(draws, this.txoptimizations$vertexView.data(), false);
+            this.txoptimizations$vertexCopy.seal();
+            this.txoptimizations$writeIndices(draws, indexGpuBuffer, indexBufferSize);
+
+            return;
+        }
+
+        if (!this.txoptimizations$vertexCopy.isInBackground())
             throw new IllegalStateException("The previous vertex upload has not finished");
 
-        this.txoptimizations$vertexView = vertexGpuBuffer.slice(0L, vertexBufferSize).map(false, true);
+        try (GpuBufferSlice.MappedView view = vertexGpuBuffer.slice(0L, vertexBufferSize).map(false, true)) {
+            this.txoptimizations$copyDraws(draws, view.data(), true);
+        }
 
-        ByteBuffer vertices = this.txoptimizations$vertexView.data();
+        this.txoptimizations$writeIndices(draws, indexGpuBuffer, indexBufferSize);
 
-        this.txoptimizations$vertexCopy.begin();
+        for (StagedVertexBuffer.Draw draw : draws)
+            ((StagedVertexBufferDrawAccessor) draw).txoptimizations$freeVertexData();
+    }
 
+    @Unique
+    private void txoptimizations$copyDraws(List<StagedVertexBuffer.Draw> draws, ByteBuffer vertices, boolean now) {
         for (StagedVertexBuffer.Draw draw : draws) {
             if (draw.isEmpty())
                 continue;
 
             StagedVertexBufferDrawAccessor accessor = (StagedVertexBufferDrawAccessor) draw;
 
-            this.txoptimizations$copiedDraws.add(draw);
+            if (!now)
+                this.txoptimizations$copiedDraws.add(draw);
+
             vertices.position(accessor.txoptimizations$vertexOffset());
 
             for (ByteBufferBuilder.Result slice : accessor.txoptimizations$vertexBufferSlices())
-                this.txoptimizations$queueCopy(slice, vertices);
+                this.txoptimizations$copy(slice, vertices, now);
 
             if (((OutlineDraw) draw).txoptimizations$isOutlineTracked())
-                this.txoptimizations$queueOutlineBounds((OutlineDraw) draw, accessor.txoptimizations$vertexBufferSlices());
+                this.txoptimizations$measureOutlineBounds((OutlineDraw) draw, accessor.txoptimizations$vertexBufferSlices(), now);
         }
+    }
 
-        this.txoptimizations$vertexCopy.seal();
-
+    @Unique
+    private void txoptimizations$writeIndices(List<StagedVertexBuffer.Draw> draws, @Nullable GpuBuffer indexGpuBuffer, int indexBufferSize) {
         if (indexGpuBuffer == null)
             return;
 
@@ -137,28 +160,25 @@ public abstract class StagedVertexBufferDirectCopyMixin implements BackgroundVer
         this.txoptimizations$vertexCopy.startInBackground();
 
         if (this.txoptimizations$vertexCopy.isInBackground())
-            InFlightVertexCopy.set(this);
+            InFlightVertexCopy.set(this, this.stagingBuffer);
     }
 
     @ModifyVariable(method = "getExecuteInfo", at = @At("HEAD"), argsOnly = true)
     private StagedVertexBuffer.Draw txoptimizations$finishBeforeDraw(StagedVertexBuffer.Draw draw) {
-        if (!this.txoptimizations$vertexCopy.isInBackground())
-            this.txoptimizations$finishVertexCopy();
+        this.txoptimizations$finishUnlessInBackground();
 
         return draw;
     }
 
     @Inject(method = "endDraw", at = @At("HEAD"))
     private void txoptimizations$finishBeforeRelease(CallbackInfo ci) {
-        if (!this.txoptimizations$vertexCopy.isInBackground())
-            this.txoptimizations$finishVertexCopy();
+        this.txoptimizations$finishUnlessInBackground();
     }
 
-    @ModifyVariable(method = "getVertexBuilder", at = @At("HEAD"), argsOnly = true)
-    private StagedVertexBuffer.Draw txoptimizations$finishBeforeReuse(StagedVertexBuffer.Draw draw) {
-        this.txoptimizations$finishVertexCopy();
-
-        return draw;
+    @Redirect(method = "getVertexBuilder", at = @At(value = "INVOKE", target = "Lnet/minecraft/client/renderer/StagedVertexBuffer;finishLastVertexBuilder()V"))
+    private void txoptimizations$finishBeforeReuse(StagedVertexBuffer buffer) {
+        this.txoptimizations$finishUnlessInBackground();
+        this.finishLastVertexBuilder();
     }
 
     @Inject(method = "close", at = @At("HEAD"))
@@ -203,14 +223,25 @@ public abstract class StagedVertexBufferDirectCopyMixin implements BackgroundVer
     }
 
     @Unique
-    private void txoptimizations$queueCopy(ByteBufferBuilder.Result slice, ByteBuffer buffer) {
-        int size  = slice.size();
-        int start = buffer.position();
+    private void txoptimizations$finishUnlessInBackground() {
+        if (this.txoptimizations$vertexView != null && !this.txoptimizations$vertexCopy.isInBackground())
+            this.txoptimizations$finishVertexCopy();
+    }
+
+    @Unique
+    private void txoptimizations$copy(ByteBufferBuilder.Result slice, ByteBuffer buffer, boolean now) {
+        int  size   = slice.size();
+        int  start  = buffer.position();
+        long source = this.txoptimizations$address(slice);
 
         if (size > buffer.remaining())
             throw new BufferOverflowException();
 
-        this.txoptimizations$vertexCopy.add(this.txoptimizations$address(slice), MemoryUtil.memAddress(buffer), size);
+        if (now)
+            MemoryUtil.memCopy(source, MemoryUtil.memAddress(buffer), size);
+        else
+            this.txoptimizations$vertexCopy.add(source, MemoryUtil.memAddress(buffer), size);
+
         buffer.position(start + size);
     }
 
@@ -226,7 +257,7 @@ public abstract class StagedVertexBufferDirectCopyMixin implements BackgroundVer
     }
 
     @Unique
-    private void txoptimizations$queueOutlineBounds(OutlineDraw draw, List<ByteBufferBuilder.Result> slices) {
+    private void txoptimizations$measureOutlineBounds(OutlineDraw draw, List<ByteBufferBuilder.Result> slices, boolean now) {
         int     stride = DefaultVertexFormat.POSITION_TEX_COLOR.getVertexSize();
         float[] boxes  = new float[slices.size() * PositionBounds.VALUES];
 
@@ -238,13 +269,21 @@ public abstract class StagedVertexBufferDirectCopyMixin implements BackgroundVer
             if (slice.size() % stride != 0)
                 throw new IllegalStateException("Outline slice of " + slice.size() + " bytes does not hold whole vertices of " + stride + " bytes");
 
-            this.txoptimizations$vertexCopy.addBounds(this.txoptimizations$address(slice), slice.size() / stride, stride, boxes, index * PositionBounds.VALUES);
+            if (now)
+                PositionBounds.measure(this.txoptimizations$address(slice), slice.size() / stride, stride, boxes, index * PositionBounds.VALUES);
+            else
+                this.txoptimizations$vertexCopy.addBounds(this.txoptimizations$address(slice), slice.size() / stride, stride, boxes, index * PositionBounds.VALUES);
         }
     }
 
     @Override
     public void txoptimizations$finishOutlineBounds() {
         this.txoptimizations$vertexCopy.finishBounds();
+    }
+
+    @Override
+    public void txoptimizations$awaitVertexCopy() {
+        this.txoptimizations$vertexCopy.await();
     }
 
     @Override

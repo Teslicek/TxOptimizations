@@ -87,7 +87,7 @@ public final class VertexCopy {
         if (!this.pending)
             return;
 
-        if (this.state.get() != IDLE)
+        if (this.background || this.state.get() != IDLE)
             throw new IllegalStateException("The vertex copies were already started");
 
         this.background = true;
@@ -95,7 +95,7 @@ public final class VertexCopy {
         Worker.queue(this);
     }
 
-    public void finish() {
+    public void await() {
         if (!this.pending)
             return;
 
@@ -104,7 +104,13 @@ public final class VertexCopy {
 
         while (this.state.get() == RUNNING)
             Thread.onSpinWait();
+    }
 
+    public void finish() {
+        if (!this.pending)
+            return;
+
+        this.await();
         this.pending    = false;
         this.background = false;
         Arrays.fill(this.boundsBoxes, 0, this.bounds, null);
