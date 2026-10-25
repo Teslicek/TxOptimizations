@@ -1,7 +1,8 @@
 package com.teslicek.txoptimizations.mixin;
 
 import com.teslicek.txoptimizations.GizmoLineList;
-import com.teslicek.txoptimizations.PackedGizmoLines;
+import com.teslicek.txoptimizations.GizmoPointList;
+import com.teslicek.txoptimizations.PackedGizmoPrimitives;
 import net.minecraft.client.renderer.gizmos.DrawableGizmoPrimitives;
 import net.minecraft.world.phys.Vec3;
 import org.spongepowered.asm.mixin.Final;
@@ -11,7 +12,7 @@ import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.Unique;
 
 @Mixin(value = DrawableGizmoPrimitives.class, priority = 999)
-public abstract class DrawableGizmoPrimitivesPackedMixin implements PackedGizmoLines {
+public abstract class DrawableGizmoPrimitivesPackedMixin implements PackedGizmoPrimitives {
 
     @Shadow
     private boolean isEmpty;
@@ -30,6 +31,17 @@ public abstract class DrawableGizmoPrimitivesPackedMixin implements PackedGizmoL
     @Overwrite
     public void addLine(Vec3 start, Vec3 end, int color, float width) {
         this.txoptimizations$addLine(start.x, start.y, start.z, end.x, end.y, end.z, color, width);
+    }
+
+    @Overwrite
+    public void addPoint(Vec3 pos, int color, float size) {
+        this.txoptimizations$addPoint(pos.x, pos.y, pos.z, color, size);
+    }
+
+    @Override
+    public void txoptimizations$addPoint(double x, double y, double z, int color, float size) {
+        ((GizmoPointList) this.getGroup(color).points()).add(x, y, z, color, size);
+        this.isEmpty = false;
     }
 
     @Override

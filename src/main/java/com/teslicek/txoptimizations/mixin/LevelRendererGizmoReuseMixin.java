@@ -1,6 +1,6 @@
 package com.teslicek.txoptimizations.mixin;
 
-import com.teslicek.txoptimizations.PackedGizmoLines;
+import com.teslicek.txoptimizations.PackedGizmoPrimitives;
 import net.minecraft.client.renderer.LevelRenderer;
 import net.minecraft.client.renderer.gizmos.DrawableGizmoPrimitives;
 import org.spongepowered.asm.mixin.Mixin;
@@ -22,7 +22,7 @@ public abstract class LevelRendererGizmoReuseMixin {
         if (this.txoptimizations$standard == null)
             this.txoptimizations$standard = new DrawableGizmoPrimitives();
         else
-            ((PackedGizmoLines) this.txoptimizations$standard).txoptimizations$clear();
+            ((PackedGizmoPrimitives) this.txoptimizations$standard).txoptimizations$clear();
 
         return this.txoptimizations$standard;
     }
@@ -32,7 +32,7 @@ public abstract class LevelRendererGizmoReuseMixin {
         if (this.txoptimizations$alwaysOnTop == null)
             this.txoptimizations$alwaysOnTop = new DrawableGizmoPrimitives();
         else
-            ((PackedGizmoLines) this.txoptimizations$alwaysOnTop).txoptimizations$clear();
+            ((PackedGizmoPrimitives) this.txoptimizations$alwaysOnTop).txoptimizations$clear();
 
         return this.txoptimizations$alwaysOnTop;
     }

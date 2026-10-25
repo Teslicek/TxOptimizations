@@ -20,8 +20,17 @@ public final class GizmoShapes {
     private GizmoShapes() {
     }
 
+    public static void emitPoint(GizmoPrimitives primitives, double x, double y, double z, int color, float size) {
+        if (primitives instanceof PackedGizmoPrimitives packed) {
+            packed.txoptimizations$addPoint(x, y, z, color, size);
+            return;
+        }
+
+        primitives.addPoint(new Vec3(x, y, z), color, size);
+    }
+
     public static void emitCuboid(GizmoPrimitives primitives, double x0, double y0, double z0, double x1, double y1, double z1, GizmoStyle style, boolean coloredCorner, float alphaMultiplier) {
-        if (primitives instanceof PackedGizmoLines packed && !style.hasFill()) {
+        if (primitives instanceof PackedGizmoPrimitives packed && !style.hasFill()) {
             if (!style.hasStroke())
                 return;
 
@@ -75,7 +84,7 @@ public final class GizmoShapes {
     public static void emitArrow(GizmoPrimitives primitives, double startX, double startY, double startZ, double endX, double endY, double endZ, int argb, float width, float alphaMultiplier) {
         int color = ARGB.multiplyAlpha(argb, alphaMultiplier);
 
-        if (!(primitives instanceof PackedGizmoLines packed))
+        if (!(primitives instanceof PackedGizmoPrimitives packed))
             throw new IllegalStateException("Gizmo primitives are not packed: " + primitives.getClass().getName());
 
         packed.txoptimizations$addLine(startX, startY, startZ, endX, endY, endZ, color, width);
@@ -119,7 +128,7 @@ public final class GizmoShapes {
         ROTATION_MATRIX[8] = (zz - xx - yy + ww) * k;
     }
 
-    private static void tip(PackedGizmoLines packed, double endX, double endY, double endZ, float x, float y, float z, int color, float width) {
+    private static void tip(PackedGizmoPrimitives packed, double endX, double endY, double endZ, float x, float y, float z, int color, float width) {
         float[] m    = ROTATION_MATRIX;
         float   tipX = org.joml.Math.fma(m[0], x, org.joml.Math.fma(m[1], y, m[2] * z));
         float   tipY = org.joml.Math.fma(m[3], x, org.joml.Math.fma(m[4], y, m[5] * z));

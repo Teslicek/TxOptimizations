@@ -4,6 +4,7 @@ import com.teslicek.txoptimizations.HitboxGizmos;
 import net.minecraft.client.renderer.debug.EntityHitboxDebugRenderer;
 import net.minecraft.gizmos.GizmoStyle;
 import net.minecraft.util.ARGB;
+import net.minecraft.util.Mth;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.boss.enderdragon.EnderDragon;
@@ -35,10 +36,12 @@ public abstract class EntityHitboxDebugRendererMixin {
     @Overwrite
     private void showHitboxes(Entity entity, float partialTicks, boolean isServerEntity) {
         Vec3   latestPosition  = entity.position();
-        Vec3   currentPosition = entity.getPosition(partialTicks);
-        double offsetX         = currentPosition.x + -latestPosition.x;
-        double offsetY         = currentPosition.y + -latestPosition.y;
-        double offsetZ         = currentPosition.z + -latestPosition.z;
+        double currentX        = Mth.lerp(partialTicks, entity.xo, entity.getX());
+        double currentY        = Mth.lerp(partialTicks, entity.yo, entity.getY());
+        double currentZ        = Mth.lerp(partialTicks, entity.zo, entity.getZ());
+        double offsetX         = currentX + -latestPosition.x;
+        double offsetY         = currentY + -latestPosition.y;
+        double offsetZ         = currentZ + -latestPosition.z;
         int    mainColor       = isServerEntity ? -16711936 : -1;
         AABB   bounds          = entity.getBoundingBox();
         double minX            = Math.min(bounds.minX + offsetX, bounds.maxX + offsetX);
@@ -49,7 +52,7 @@ public abstract class EntityHitboxDebugRendererMixin {
         double maxZ            = Math.max(bounds.minZ + offsetZ, bounds.maxZ + offsetZ);
 
         HitboxGizmos.cuboid(minX, minY, minZ, maxX, maxY, maxZ, isServerEntity ? SERVER_STROKE : CLIENT_STROKE);
-        HitboxGizmos.point(currentPosition, mainColor, 2.0F);
+        HitboxGizmos.point(currentX, currentY, currentZ, mainColor, 2.0F);
 
         Entity vehicle = entity.getVehicle();
 
@@ -79,9 +82,9 @@ public abstract class EntityHitboxDebugRendererMixin {
             }
         }
 
-        double eyeX       = currentPosition.x + 0.0;
-        double eyeY       = currentPosition.y + entity.getEyeHeight();
-        double eyeZ       = currentPosition.z + 0.0;
+        double eyeX       = currentX + 0.0;
+        double eyeY       = currentY + entity.getEyeHeight();
+        double eyeZ       = currentZ + 0.0;
         Vec3   viewVector = entity.getViewVector(partialTicks);
 
         HitboxGizmos.arrow(eyeX, eyeY, eyeZ, eyeX + viewVector.x * 2.0, eyeY + viewVector.y * 2.0, eyeZ + viewVector.z * 2.0, -16776961);
@@ -89,7 +92,7 @@ public abstract class EntityHitboxDebugRendererMixin {
         if (isServerEntity) {
             Vec3 deltaMovement = entity.getDeltaMovement();
 
-            HitboxGizmos.arrow(currentPosition.x, currentPosition.y, currentPosition.z, currentPosition.x + deltaMovement.x, currentPosition.y + deltaMovement.y, currentPosition.z + deltaMovement.z, -256);
+            HitboxGizmos.arrow(currentX, currentY, currentZ, currentX + deltaMovement.x, currentY + deltaMovement.y, currentZ + deltaMovement.z, -256);
         }
     }
 }

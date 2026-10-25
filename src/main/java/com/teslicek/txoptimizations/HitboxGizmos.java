@@ -53,7 +53,7 @@ public final class HitboxGizmos implements Gizmo {
 
             switch (this.kinds[index]) {
                 case CUBOID -> GizmoShapes.emitCuboid(primitives, this.values[base], this.values[base + 1], this.values[base + 2], this.values[base + 3], this.values[base + 4], this.values[base + 5], (GizmoStyle) this.objects[index], false, alphaMultiplier);
-                case POINT -> primitives.addPoint((Vec3) this.objects[index], ARGB.multiplyAlpha(this.colors[index], alphaMultiplier), this.sizes[index]);
+                case POINT -> GizmoShapes.emitPoint(primitives, this.values[base], this.values[base + 1], this.values[base + 2], ARGB.multiplyAlpha(this.colors[index], alphaMultiplier), this.sizes[index]);
                 case ARROW -> GizmoShapes.emitArrow(primitives, this.values[base], this.values[base + 1], this.values[base + 2], this.values[base + 3], this.values[base + 4], this.values[base + 5], this.colors[index], this.sizes[index], alphaMultiplier);
                 default -> throw new IllegalStateException("Unknown hitbox gizmo kind " + this.kinds[index]);
             }
@@ -113,19 +113,22 @@ public final class HitboxGizmos implements Gizmo {
         batch.objects[index] = style;
     }
 
-    public static void point(Vec3 position, int color, float size) {
+    public static void point(double x, double y, double z, int color, float size) {
         HitboxGizmos batch = batch();
 
         if (batch == null) {
-            Gizmos.point(position, color, size);
+            Gizmos.point(new Vec3(x, y, z), color, size);
             return;
         }
 
         int index = batch.reserve(POINT);
+        int base  = index * VALUES;
 
-        batch.objects[index] = position;
-        batch.colors[index]  = color;
-        batch.sizes[index]   = size;
+        batch.values[base]     = x;
+        batch.values[base + 1] = y;
+        batch.values[base + 2] = z;
+        batch.colors[index]    = color;
+        batch.sizes[index]     = size;
     }
 
     public static void arrow(double startX, double startY, double startZ, double endX, double endY, double endZ, int color) {
