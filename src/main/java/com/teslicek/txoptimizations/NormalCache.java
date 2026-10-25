@@ -113,15 +113,17 @@ public final class NormalCache {
     }
 
     private static boolean matches(Matrix3f matrix) {
-        return MATRIX[0] == Float.floatToRawIntBits(matrix.m00)
-            && MATRIX[1] == Float.floatToRawIntBits(matrix.m01)
-            && MATRIX[2] == Float.floatToRawIntBits(matrix.m02)
-            && MATRIX[3] == Float.floatToRawIntBits(matrix.m10)
-            && MATRIX[4] == Float.floatToRawIntBits(matrix.m11)
-            && MATRIX[5] == Float.floatToRawIntBits(matrix.m12)
-            && MATRIX[6] == Float.floatToRawIntBits(matrix.m20)
-            && MATRIX[7] == Float.floatToRawIntBits(matrix.m21)
-            && MATRIX[8] == Float.floatToRawIntBits(matrix.m22);
+        int difference = MATRIX[0] ^ Float.floatToRawIntBits(matrix.m00)
+                       | MATRIX[1] ^ Float.floatToRawIntBits(matrix.m01)
+                       | MATRIX[2] ^ Float.floatToRawIntBits(matrix.m02)
+                       | MATRIX[3] ^ Float.floatToRawIntBits(matrix.m10)
+                       | MATRIX[4] ^ Float.floatToRawIntBits(matrix.m11)
+                       | MATRIX[5] ^ Float.floatToRawIntBits(matrix.m12)
+                       | MATRIX[6] ^ Float.floatToRawIntBits(matrix.m20)
+                       | MATRIX[7] ^ Float.floatToRawIntBits(matrix.m21)
+                       | MATRIX[8] ^ Float.floatToRawIntBits(matrix.m22);
+
+        return difference == 0;
     }
 
     private static int[] opposites() {
