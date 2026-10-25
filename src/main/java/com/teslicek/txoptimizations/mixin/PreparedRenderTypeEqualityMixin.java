@@ -60,7 +60,7 @@ public abstract class PreparedRenderTypeEqualityMixin {
 
         hash = hash * PRIME + Objects.hashCode(this.pipeline);
         hash = hash * PRIME + txoptimizations$hash(this.oitPipelineSet);
-        hash = hash * PRIME + txoptimizations$hash(this.dynamicTransforms);
+        hash = hash * PRIME + Objects.hashCode(this.dynamicTransforms);
         hash = hash * PRIME + Objects.hashCode(this.scissorState);
 
         return hash * PRIME + Objects.hashCode(this.textures);
@@ -76,17 +76,5 @@ public abstract class PreparedRenderTypeEqualityMixin {
         hash = hash * PRIME + Objects.hashCode(pipelines.transmittancePipeline());
 
         return hash * PRIME + Objects.hashCode(pipelines.accumulatePipeline());
-    }
-
-    @Unique
-    private static int txoptimizations$hash(GpuBufferSlice slice) {
-        if (slice == null)
-            return 0;
-
-        int hash = Objects.hashCode(slice.buffer());
-
-        hash = hash * PRIME + Long.hashCode(slice.offset());
-
-        return hash * PRIME + Long.hashCode(slice.length());
     }
 }

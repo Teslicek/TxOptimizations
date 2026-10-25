@@ -176,6 +176,7 @@
     "PostChainPassesAccessor",
     "PostPassOutlineScissorMixin",
     "PreparedRenderTypeEqualityMixin",
+    "GpuBufferSliceEqualityMixin",
     "PreparedRenderTypeDrawMixin",
     "PreparedRenderTypeModelViewMixin",
     "ProjectionMatrixBufferSkipMixin",
