@@ -66,9 +66,9 @@ public final class VertexBytes {
     }
 
     public static void putEntityBits(long pointer, float x, float y, float z, int colorBits, float u, float v, long coordinateBits, int normal) {
-        putPosition(pointer, x, y, z);
-        MemoryUtil.memPutInt(pointer + 12L, colorBits);
-        putUv(pointer + 16L, u, v);
+        MemoryUtil.memPutLong(pointer, words(Float.floatToRawIntBits(x), Float.floatToRawIntBits(y)));
+        MemoryUtil.memPutLong(pointer + 8L, words(Float.floatToRawIntBits(z), colorBits));
+        MemoryUtil.memPutLong(pointer + 16L, words(Float.floatToRawIntBits(u), Float.floatToRawIntBits(v)));
         MemoryUtil.memPutLong(pointer + 24L, coordinateBits);
         putNormal(pointer + 32L, normal);
     }
@@ -147,6 +147,10 @@ public final class VertexBytes {
 
     public static int flipNormal(int packed) {
         return -(byte) packed & BYTE_MASK | (-(byte) (packed >> Byte.SIZE) & BYTE_MASK) << Byte.SIZE | (-(byte) (packed >> HALF_BITS) & BYTE_MASK) << HALF_BITS;
+    }
+
+    private static long words(int first, int second) {
+        return LITTLE_ENDIAN ? (long) second << Integer.SIZE | first & INT_MASK : (long) first << Integer.SIZE | second & INT_MASK;
     }
 
     private static int packedBits(int packed) {
