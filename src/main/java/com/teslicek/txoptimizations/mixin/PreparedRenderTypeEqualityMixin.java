@@ -11,9 +11,13 @@ import org.spongepowered.asm.mixin.Final;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Overwrite;
 import org.spongepowered.asm.mixin.Shadow;
+import org.spongepowered.asm.mixin.Unique;
 
 @Mixin(value = PreparedRenderType.class, priority = 999)
-public abstract class PreparedRenderTypeEqualsMixin {
+public abstract class PreparedRenderTypeEqualityMixin {
+
+    @Unique
+    private static final int PRIME = 31;
 
     @Shadow
     @Final
@@ -48,5 +52,41 @@ public abstract class PreparedRenderTypeEqualsMixin {
             return false;
 
         return this.pipeline == that.pipeline() && Objects.equals(this.dynamicTransforms, that.dynamicTransforms()) && Objects.equals(this.scissorState, that.scissorState()) && Objects.equals(this.oitPipelineSet, that.oitPipelineSet()) && Objects.equals(this.name, that.name()) && Objects.equals(this.textures, that.textures());
+    }
+
+    @Overwrite
+    public final int hashCode() {
+        int hash = Objects.hashCode(this.name);
+
+        hash = hash * PRIME + Objects.hashCode(this.pipeline);
+        hash = hash * PRIME + txoptimizations$hash(this.oitPipelineSet);
+        hash = hash * PRIME + txoptimizations$hash(this.dynamicTransforms);
+        hash = hash * PRIME + Objects.hashCode(this.scissorState);
+
+        return hash * PRIME + Objects.hashCode(this.textures);
+    }
+
+    @Unique
+    private static int txoptimizations$hash(OitPipelineSet pipelines) {
+        if (pipelines == null)
+            return 0;
+
+        int hash = Objects.hashCode(pipelines.depthBoundsPipeline());
+
+        hash = hash * PRIME + Objects.hashCode(pipelines.transmittancePipeline());
+
+        return hash * PRIME + Objects.hashCode(pipelines.accumulatePipeline());
+    }
+
+    @Unique
+    private static int txoptimizations$hash(GpuBufferSlice slice) {
+        if (slice == null)
+            return 0;
+
+        int hash = Objects.hashCode(slice.buffer());
+
+        hash = hash * PRIME + Long.hashCode(slice.offset());
+
+        return hash * PRIME + Long.hashCode(slice.length());
     }
 }

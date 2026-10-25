@@ -172,7 +172,7 @@
     "PostChainOutlineDepthMixin",
     "PostChainPassesAccessor",
     "PostPassOutlineScissorMixin",
-    "PreparedRenderTypeEqualsMixin",
+    "PreparedRenderTypeEqualityMixin",
     "PreparedRenderTypeDrawMixin",
     "PreparedRenderTypeModelViewMixin",
     "ProjectionMatrixBufferSkipMixin",
