@@ -37,6 +37,7 @@ public final class PackedTerrain {
 
     private static @Nullable PipelineCache checkedCache;
     private static boolean                 packedSource;
+    private static boolean                 visibleSource;
     private static boolean                 sectionsFading = true;
 
     private PackedTerrain() {
@@ -52,9 +53,6 @@ public final class PackedTerrain {
         if (!location.getPath().equals(FILE) || !source.contains(INPUTS))
             return source;
 
-        if (!source.contains(FADE))
-            throw new IllegalStateException("The vanilla terrain vertex shader no longer computes the section fade as " + FADE.strip());
-
         return source.replace(INPUTS, PACKED).replace(FADE, FADE_OR_NONE);
     }
 
@@ -62,7 +60,7 @@ public final class PackedTerrain {
         if (!CompactTerrain.active())
             return vanilla;
 
-        if (sectionsFading)
+        if (sectionsFading || !isVisibleSource())
             return COMPACT.computeIfAbsent(vanilla, pipeline -> compact(pipeline, false));
 
         return VISIBLE_COMPACT.computeIfAbsent(vanilla, pipeline -> compact(pipeline, true));
@@ -73,19 +71,31 @@ public final class PackedTerrain {
     }
 
     public static boolean isPackedSource() {
+        checkSource();
+
+        return packedSource;
+    }
+
+    private static boolean isVisibleSource() {
+        checkSource();
+
+        return visibleSource;
+    }
+
+    private static void checkSource() {
         PipelineCache cache = RenderSystemPipelineCacheAccessor.txoptimizations$currentPipelineCache();
 
         if (cache == null)
             throw new IllegalStateException("Terrain is used before any shaders were loaded");
 
-        if (cache != checkedCache) {
-            String source = ((PipelineCacheAccessor) cache).txoptimizations$shaderSource().getShader(SHADER, ShaderType.VERTEX);
+        if (cache == checkedCache)
+            return;
 
-            checkedCache = cache;
-            packedSource = source != null && source.contains(PACKED);
-        }
+        String source = ((PipelineCacheAccessor) cache).txoptimizations$shaderSource().getShader(SHADER, ShaderType.VERTEX);
 
-        return packedSource;
+        checkedCache  = cache;
+        packedSource  = source != null && source.contains(PACKED);
+        visibleSource = packedSource && source.contains(FADE_OR_NONE);
     }
 
     private static RenderPipeline compact(RenderPipeline vanilla, boolean visible) {
