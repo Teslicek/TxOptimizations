@@ -65,6 +65,7 @@ public final class SectionDrawList {
     private int                   largestIndexCount;
     private int                   lastTranslucentHash;
     private boolean               respectTranslucentOrder;
+    private boolean               fading;
 
     public void begin(int layers, boolean respectTranslucentOrder) {
         if (this.layerGroups.length != layers) {
@@ -91,6 +92,7 @@ public final class SectionDrawList {
         this.largestIndexCount       = 0;
         this.lastTranslucentHash     = 0;
         this.respectTranslucentOrder = respectTranslucentOrder;
+        this.fading                  = false;
     }
 
     public int addSection(int x, int y, int z, float visibility) {
@@ -104,6 +106,7 @@ public final class SectionDrawList {
         this.sections[start + 2] = z;
         this.sections[start + 3] = Float.floatToRawIntBits(visibility);
         this.sectionInts         = start + SECTION_INTS;
+        this.fading             |= visibility != 1.0F;
 
         return start / SECTION_INTS;
     }
@@ -188,6 +191,10 @@ public final class SectionDrawList {
 
     public int largestIndexCount() {
         return this.largestIndexCount;
+    }
+
+    public boolean fading() {
+        return this.fading;
     }
 
     public int sectionCount() {

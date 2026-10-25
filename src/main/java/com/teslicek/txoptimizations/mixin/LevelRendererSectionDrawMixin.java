@@ -8,6 +8,7 @@ import com.mojang.renderpearl.api.textures.GpuTextureView;
 import com.teslicek.txoptimizations.DrawRecordHolder;
 import com.teslicek.txoptimizations.DrawRecords;
 import com.teslicek.txoptimizations.FacingCulling;
+import com.teslicek.txoptimizations.PackedTerrain;
 import com.teslicek.txoptimizations.SectionDrawList;
 import com.teslicek.txoptimizations.SectionDrawUniforms;
 import com.teslicek.txoptimizations.SectionLayers;
@@ -213,6 +214,7 @@ public abstract class LevelRendererSectionDrawMixin {
         Arrays.fill(chunkRecords, null);
         draws.finish();
         ProfileCounters.countTerrainDraws(draws);
+        PackedTerrain.setSectionsFading(draws.fading());
 
         return draws;
     }
