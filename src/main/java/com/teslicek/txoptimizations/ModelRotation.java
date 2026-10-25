@@ -10,11 +10,19 @@ import org.joml.Options;
 
 public final class ModelRotation {
 
-    private static final float HALF                   = 0.5F;
-    private static final int   ROTATION_PROPERTIES    = Matrix4fc.PROPERTY_AFFINE | Matrix4fc.PROPERTY_ORTHONORMAL;
-    private static final int   ROTATED_PROPERTIES     = ~(Matrix4fc.PROPERTY_PERSPECTIVE | Matrix4fc.PROPERTY_IDENTITY | Matrix4fc.PROPERTY_TRANSLATION);
-    private static final int   TRANSLATION_PROPERTIES = Matrix4fc.PROPERTY_AFFINE | Matrix4fc.PROPERTY_TRANSLATION | Matrix4fc.PROPERTY_ORTHONORMAL;
-    private static final int   TRANSLATED_PROPERTIES  = ~(Matrix4fc.PROPERTY_PERSPECTIVE | Matrix4fc.PROPERTY_IDENTITY);
+    private static final float                HALF                   = 0.5F;
+    private static final int                  ROTATION_PROPERTIES    = Matrix4fc.PROPERTY_AFFINE | Matrix4fc.PROPERTY_ORTHONORMAL;
+    private static final int                  ROTATED_PROPERTIES     = ~(Matrix4fc.PROPERTY_PERSPECTIVE | Matrix4fc.PROPERTY_IDENTITY | Matrix4fc.PROPERTY_TRANSLATION);
+    private static final int                  TRANSLATION_PROPERTIES = Matrix4fc.PROPERTY_AFFINE | Matrix4fc.PROPERTY_TRANSLATION | Matrix4fc.PROPERTY_ORTHONORMAL;
+    private static final int                  TRANSLATED_PROPERTIES  = ~(Matrix4fc.PROPERTY_PERSPECTIVE | Matrix4fc.PROPERTY_IDENTITY);
+    private static final int                  ROTATION_VALUES        = 9;
+    private static final int                  CACHE_SLOTS            = 1024;
+    private static final int[]                CACHED_X               = new int[CACHE_SLOTS];
+    private static final int[]                CACHED_Y               = new int[CACHE_SLOTS];
+    private static final int[]                CACHED_Z               = new int[CACHE_SLOTS];
+    private static final boolean[]            FILLED                 = new boolean[CACHE_SLOTS];
+    private static final float[]              ROTATIONS              = new float[CACHE_SLOTS * ROTATION_VALUES];
+    private static final ThreadLocal<float[]> SCRATCH                = ThreadLocal.withInitial(() -> new float[ROTATION_VALUES]);
 
     private ModelRotation() {
     }
@@ -55,6 +63,52 @@ public final class ModelRotation {
     }
 
     private static void rotateZYX(PoseStack.Pose target, PoseStack.Pose source, float m30, float m31, float m32, float m33, int properties, float angleZ, float angleY, float angleX) {
+        float[] rotation;
+        int     base;
+
+        if (RenderThreadStack.isOwner()) {
+            rotation = ROTATIONS;
+            base     = rotationSlot(angleZ, angleY, angleX) * ROTATION_VALUES;
+        } else {
+            rotation = SCRATCH.get();
+            base     = 0;
+            fillRotation(rotation, base, angleZ, angleY, angleX);
+        }
+
+        float rm00 = rotation[base];
+        float rm01 = rotation[base + 1];
+        float rm02 = rotation[base + 2];
+        float rm10 = rotation[base + 3];
+        float rm11 = rotation[base + 4];
+        float rm12 = rotation[base + 5];
+        float rm20 = rotation[base + 6];
+        float rm21 = rotation[base + 7];
+        float rm22 = rotation[base + 8];
+
+        rotate(target.pose(), source.pose(), m30, m31, m32, m33, properties, rm00, rm01, rm02, rm10, rm11, rm12, rm20, rm21, rm22);
+        rotate(target.normal(), source.normal(), rm00, rm01, rm02, rm10, rm11, rm12, rm20, rm21, rm22);
+    }
+
+    private static int rotationSlot(float angleZ, float angleY, float angleX) {
+        int bitsX = Float.floatToRawIntBits(angleX);
+        int bitsY = Float.floatToRawIntBits(angleY);
+        int bitsZ = Float.floatToRawIntBits(angleZ);
+        int hash  = (bitsX * 31 + bitsY) * 31 + bitsZ;
+        int slot  = (hash ^ hash >>> 16) & CACHE_SLOTS - 1;
+
+        if (FILLED[slot] && CACHED_X[slot] == bitsX && CACHED_Y[slot] == bitsY && CACHED_Z[slot] == bitsZ)
+            return slot;
+
+        fillRotation(ROTATIONS, slot * ROTATION_VALUES, angleZ, angleY, angleX);
+        CACHED_X[slot] = bitsX;
+        CACHED_Y[slot] = bitsY;
+        CACHED_Z[slot] = bitsZ;
+        FILLED[slot]   = true;
+
+        return slot;
+    }
+
+    private static void fillRotation(float[] rotation, int base, float angleZ, float angleY, float angleX) {
         float halfX = angleX * HALF;
         float halfY = angleY * HALF;
         float halfZ = angleZ * HALF;
@@ -88,18 +142,16 @@ public final class ModelRotation {
         float dyz   = yz + yz;
         float xw    = x * w;
         float dxw   = xw + xw;
-        float rm00  = w2 + x2 - z2 - y2;
-        float rm01  = dxy + dzw;
-        float rm02  = dxz - dyw;
-        float rm10  = -dzw + dxy;
-        float rm11  = y2 - z2 + w2 - x2;
-        float rm12  = dyz + dxw;
-        float rm20  = dyw + dxz;
-        float rm21  = dyz - dxw;
-        float rm22  = z2 - y2 - x2 + w2;
 
-        rotate(target.pose(), source.pose(), m30, m31, m32, m33, properties, rm00, rm01, rm02, rm10, rm11, rm12, rm20, rm21, rm22);
-        rotate(target.normal(), source.normal(), rm00, rm01, rm02, rm10, rm11, rm12, rm20, rm21, rm22);
+        rotation[base]     = w2 + x2 - z2 - y2;
+        rotation[base + 1] = dxy + dzw;
+        rotation[base + 2] = dxz - dyw;
+        rotation[base + 3] = -dzw + dxy;
+        rotation[base + 4] = y2 - z2 + w2 - x2;
+        rotation[base + 5] = dyz + dxw;
+        rotation[base + 6] = dyw + dxz;
+        rotation[base + 7] = dyz - dxw;
+        rotation[base + 8] = z2 - y2 - x2 + w2;
     }
 
     private static float sin(float angle) {
