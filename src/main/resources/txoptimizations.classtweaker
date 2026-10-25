@@ -147,3 +147,6 @@ accessible field net/minecraft/client/particle/Particle z D
 
 # Item display item state reuse
 mutable field net/minecraft/client/renderer/entity/state/ItemDisplayEntityRenderState item Lnet/minecraft/client/renderer/item/ItemStackRenderState;
+
+# GUI layer bounds
+accessible class net/minecraft/client/renderer/state/gui/GuiRenderState$Node

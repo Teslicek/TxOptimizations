@@ -435,6 +435,10 @@ Every entity checked against the view frustum got a new bounding box, grown by h
 
 Every particle group built two new identity maps per frame to collect its draws and textures per layer. The maps are now cleared, when they hold anything, and reused once the frame's particles are drawn. A cleared map keeps its table size, so it lists its layers in the same order a new one would; a map that ever held enough layers to grow is dropped instead of reused.
 
+### GUI layer search
+
+Every GUI element is placed one layer above the highest element it overlaps. To find that layer, vanilla walks the layers of the current stratum from the top down and asks every element on each layer for its bounds through an interface call, until one overlaps. Elements drawn after the HUD, such as an overlay's minimap or effect list, are checked against every element already placed there, so the work grows with the square of their number: in a CubeCraft lobby with a minimap of 9 players this search was 5.85% of the render thread. Each layer now keeps the left, top, right and bottom edges of its elements in one flat array of numbers and checks those, with the same overlap test, in the same top-down order, so every element lands on the same layer. The array is filled from the layer's lists right before they are searched, so elements added any other way are counted too, and it is rebuilt from scratch if a list was replaced or got shorter. A test build that also ran vanilla's search on every layer it visited found no difference in 35 million layer checks. With 26 effects on the player the frame rate went from 8,190 to 10,890 fps and the 1% low from 3,470 to 4,200 fps over three runs per build, with identical screenshots.
+
 ### GUI glyph matrix
 
 Every GUI glyph converted its 2D pose into a new 4x4 matrix before writing its vertices. One matrix is now reset to identity and reused for each glyph, and the glyph writes its vertices before the next one starts.
