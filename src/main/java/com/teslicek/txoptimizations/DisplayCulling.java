@@ -87,6 +87,10 @@ public final class DisplayCulling {
         return isBoxHidden(pose, minX, minY, 0.0F, maxX, maxY, 0.0F);
     }
 
+    public static boolean isVanilla(Object renderer) {
+        return renderer.getClass().getName().startsWith("net.minecraft.");
+    }
+
     private static boolean isBoxHidden(Matrix4fc pose, float boxMinX, float boxMinY, float boxMinZ, float boxMaxX, float boxMaxY, float boxMaxZ) {
         float minX = Float.POSITIVE_INFINITY;
         float minY = Float.POSITIVE_INFINITY;

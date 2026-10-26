@@ -1,12 +1,12 @@
 package com.teslicek.txoptimizations.mixin;
 
+import com.teslicek.txoptimizations.DisplayCulling;
 import com.teslicek.txoptimizations.ItemBoundsCache;
 import com.teslicek.txoptimizations.ItemCullingBounds;
 import java.util.function.Consumer;
 import net.fabricmc.fabric.api.client.renderer.v1.mesh.MutableMesh;
 import net.fabricmc.fabric.impl.client.renderer.LayerRenderStateExtension;
 import net.minecraft.client.renderer.item.ItemStackRenderState;
-import net.minecraft.client.renderer.special.SpecialModelRenderer;
 import net.minecraft.world.item.ItemDisplayContext;
 import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
@@ -49,7 +49,7 @@ public abstract class ItemStackRenderStateBoundsMixin implements ItemCullingBoun
         for (int index = 0; index < this.activeLayerCount; index ++) {
             ItemLayerRenderStateAccessor layer = (ItemLayerRenderStateAccessor) this.layers[index];
 
-            if (layer.txoptimizations$extents().get().length == 0 || !txoptimizations$hasNoMeshQuads(this.layers[index]) || !txoptimizations$isVanilla(layer.txoptimizations$specialRenderer()))
+            if (layer.txoptimizations$extents().get().length == 0 || !txoptimizations$hasNoMeshQuads(this.layers[index]) || layer.txoptimizations$specialRenderer() != null && !DisplayCulling.isVanilla(layer.txoptimizations$specialRenderer()))
                 return null;
         }
 
@@ -74,11 +74,6 @@ public abstract class ItemStackRenderStateBoundsMixin implements ItemCullingBoun
         this.visitExtents(collector::include);
 
         return collector.isDefined() ? collector.build() : AABB.ofSize(Vec3.ZERO, 0.0, 0.0, 0.0);
-    }
-
-    @Unique
-    private static boolean txoptimizations$isVanilla(SpecialModelRenderer<Object> renderer) {
-        return renderer == null || renderer.getClass().getName().startsWith("net.minecraft.");
     }
 
     @Unique
