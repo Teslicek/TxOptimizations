@@ -1,8 +1,10 @@
 package com.teslicek.txoptimizations.mixin;
 
+import com.teslicek.txoptimizations.BlockEntityLight;
 import com.teslicek.txoptimizations.LightSectionTree;
 import com.teslicek.txoptimizations.LightSnapshotMap;
 import it.unimi.dsi.fastutil.longs.LongSet;
+import net.minecraft.client.multiplayer.ClientChunkCache;
 import net.minecraft.world.level.BlockGetter;
 import net.minecraft.world.level.chunk.LightChunkGetter;
 import net.minecraft.world.level.lighting.DataLayerStorageMap;
@@ -46,6 +48,9 @@ public abstract class LayerLightSectionStorageSnapshotMixin {
     @Redirect(method = "swapSectionMap", at = @At(value = "INVOKE", target = "Lnet/minecraft/world/level/lighting/DataLayerStorageMap;copy()Lnet/minecraft/world/level/lighting/DataLayerStorageMap;"))
     private DataLayerStorageMap<?> txoptimizations$snapshot(DataLayerStorageMap<?> updating) {
         LightSnapshotMap source = (LightSnapshotMap) updating;
+
+        if (this.chunkSource instanceof ClientChunkCache)
+            BlockEntityLight.changed();
 
         this.txoptimizations$tree = this.txoptimizations$tree.with(this.changedSections, source);
 
