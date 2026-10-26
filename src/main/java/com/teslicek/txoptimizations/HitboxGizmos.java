@@ -23,6 +23,7 @@ public final class HitboxGizmos implements Gizmo {
     private static final int   INITIAL     = 64;
     private static final int   POOL_SIZE   = 4;
     private static final float ARROW_WIDTH = 2.5F;
+    private static final float ARROW_HEAD  = 1.5F;
 
     private static final HitboxGizmos[] POOL = new HitboxGizmos[POOL_SIZE];
 
@@ -51,6 +52,9 @@ public final class HitboxGizmos implements Gizmo {
         for (int index = 0; index < this.count; index ++) {
             int base = index * VALUES;
 
+            if (this.isHidden(index, base))
+                continue;
+
             switch (this.kinds[index]) {
                 case CUBOID -> GizmoShapes.emitCuboid(primitives, this.values[base], this.values[base + 1], this.values[base + 2], this.values[base + 3], this.values[base + 4], this.values[base + 5], (GizmoStyle) this.objects[index], false, alphaMultiplier);
                 case POINT -> GizmoShapes.emitPoint(primitives, this.values[base], this.values[base + 1], this.values[base + 2], ARGB.multiplyAlpha(this.colors[index], alphaMultiplier), this.sizes[index]);
@@ -61,6 +65,17 @@ public final class HitboxGizmos implements Gizmo {
 
         Arrays.fill(this.objects, 0, this.count, null);
         this.emitted = true;
+    }
+
+    private boolean isHidden(int index, int base) {
+        double[] values = this.values;
+
+        return switch (this.kinds[index]) {
+            case CUBOID -> DisplayCulling.isGizmoHidden(values[base], values[base + 1], values[base + 2], values[base + 3], values[base + 4], values[base + 5], 0.0);
+            case POINT -> DisplayCulling.isGizmoHidden(values[base], values[base + 1], values[base + 2], values[base], values[base + 1], values[base + 2], 0.0);
+            case ARROW -> DisplayCulling.isGizmoHidden(Math.min(values[base], values[base + 3]), Math.min(values[base + 1], values[base + 4]), Math.min(values[base + 2], values[base + 5]), Math.max(values[base], values[base + 3]), Math.max(values[base + 1], values[base + 4]), Math.max(values[base + 2], values[base + 5]), ARROW_HEAD);
+            default -> throw new IllegalStateException("Unknown hitbox gizmo kind " + this.kinds[index]);
+        };
     }
 
     private boolean isLast(SimpleGizmoCollector current) {

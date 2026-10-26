@@ -1,10 +1,12 @@
 package com.teslicek.txoptimizations;
 
+import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.navigation.ScreenRectangle;
 import net.minecraft.client.renderer.item.ItemStackRenderState;
 import net.minecraft.world.entity.Display;
 import net.minecraft.world.phys.AABB;
+import net.minecraft.world.phys.Vec3;
 import org.joml.FrustumIntersection;
 import org.joml.Matrix4f;
 import org.joml.Matrix4fc;
@@ -14,21 +16,37 @@ public final class DisplayCulling {
 
     private static final int   TEXT_LINE_HEIGHT = 10;
     private static final float TEXT_MARGIN      = 2.0F;
+    private static final float GIZMO_MARGIN     = 16.0F;
 
     private static final Matrix4f            VIEW_PROJECTION = new Matrix4f();
+    private static final Matrix4f            GIZMO_CLIP      = new Matrix4f();
     private static final FrustumIntersection FRUSTUM         = new FrustumIntersection();
+    private static final FrustumIntersection GIZMO_FRUSTUM   = new FrustumIntersection();
     private static final Vector3f            CORNER          = new Vector3f();
 
     private static boolean active;
+    private static double  cameraX;
+    private static double  cameraY;
+    private static double  cameraZ;
 
     private DisplayCulling() {
     }
 
-    public static void begin(Matrix4fc modelView) {
+    public static void begin(Matrix4fc modelView, Vec3 camera) {
         active = LevelProjection.isBound();
 
-        if (active)
-            FRUSTUM.set(VIEW_PROJECTION.set(LevelProjection.matrix()).mul(modelView), false);
+        if (!active)
+            return;
+
+        int width  = Minecraft.getInstance().gameRenderer.mainRenderTarget().width;
+        int height = Minecraft.getInstance().gameRenderer.mainRenderTarget().height;
+
+        FRUSTUM.set(VIEW_PROJECTION.set(LevelProjection.matrix()).mul(modelView), false);
+        GIZMO_FRUSTUM.set(GIZMO_CLIP.scaling(width / (width + 2.0F * GIZMO_MARGIN), height / (height + 2.0F * GIZMO_MARGIN), 1.0F).mul(VIEW_PROJECTION), false);
+
+        cameraX = camera.x;
+        cameraY = camera.y;
+        cameraZ = camera.z;
     }
 
     public static void end() {
@@ -45,6 +63,13 @@ public final class DisplayCulling {
             return false;
 
         return isBoxHidden(pose, (float) box.minX, (float) box.minY, (float) box.minZ, (float) box.maxX, (float) box.maxY, (float) box.maxZ);
+    }
+
+    public static boolean isGizmoHidden(double minX, double minY, double minZ, double maxX, double maxY, double maxZ, double padding) {
+        if (!active)
+            return false;
+
+        return !GIZMO_FRUSTUM.testAab((float) (minX - padding - cameraX), (float) (minY - padding - cameraY), (float) (minZ - padding - cameraZ), (float) (maxX + padding - cameraX), (float) (maxY + padding - cameraY), (float) (maxZ + padding - cameraZ));
     }
 
     public static boolean isTextHidden(Font font, Matrix4fc pose, Display.TextDisplay.CachedInfo info, int backgroundColor, int width, int height, boolean shadow, Display.TextDisplay.Align alignment, int color) {

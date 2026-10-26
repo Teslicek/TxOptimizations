@@ -31,7 +31,7 @@ public final class GizmoShapes {
 
     public static void emitCuboid(GizmoPrimitives primitives, double x0, double y0, double z0, double x1, double y1, double z1, GizmoStyle style, boolean coloredCorner, float alphaMultiplier) {
         if (primitives instanceof PackedGizmoPrimitives packed && !style.hasFill()) {
-            if (!style.hasStroke())
+            if (!style.hasStroke() || x0 == x1 && y0 == y1 && z0 == z1)
                 return;
 
             int color = style.multipliedStroke(alphaMultiplier);

@@ -204,6 +204,8 @@ When a map's contents change, every one of its 16384 pixels was converted from i
 
 Each hitbox or debug cuboid created 24 corner vectors every frame for its 12 edges and 24 more when filled, although a box has 8 corners. The edges and faces now share the 8 corner vectors, which are immutable, so the same lines and quads are emitted with fewer allocations.
 
+Vanilla never culls item, block and text displays against the view unless the server gives them a culling size, so with hitboxes on every display in range drew its hitbox each frame, even behind the camera: a point, a 2-block view arrow and a box with zero size. When the hitbox batch writes its boxes, points and arrows, each one is now tested against the clip volume of the frame (the level projection the GPU draws with, including view bobbing and the hurt tilt, times the camera rotation), widened by 16 pixels on every side for line widths and point sizes, with arrows widened by the 1.5 blocks their heads can reach; anything completely outside is not written, since the GPU would have clipped all of it. A box whose corners are the same point is not written either: all of its 12 edges have zero length, and the line shader's direction for a zero-length line is not a number, so the GPU discards them. In the 360-display TxBench scene with hitboxes on, the two views rose from 2,769 to 3,218 fps (+16.2%) and from 2,676 to 3,055 (+14.2%), and the screenshots matched the old jar pixel for pixel.
+
 ### Feature renderer list
 
 Preparing each frame walked the list of feature renderers through a freshly built Guava filter that skips empty slots, three times per frame preparation. The filtered list only changes when a renderer is registered, so it is built once at registration and reused.
