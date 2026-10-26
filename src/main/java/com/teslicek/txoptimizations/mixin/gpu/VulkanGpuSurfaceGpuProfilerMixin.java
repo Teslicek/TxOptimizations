@@ -1,11 +1,13 @@
 package com.teslicek.txoptimizations.mixin.gpu;
 
+import com.llamalad7.mixinextras.injector.ModifyExpressionValue;
 import com.mojang.renderpearl.api.textures.GpuTextureView;
 import com.mojang.renderpearl.backend.api.CommandEncoderBackend;
 import com.mojang.renderpearl.backend.vulkan.VulkanDevice;
 import com.mojang.renderpearl.backend.vulkan.VulkanGpuSurface;
 import com.teslicek.txoptimizations.gpu.GpuPassProfiler;
 import it.unimi.dsi.fastutil.longs.LongList;
+import org.lwjgl.vulkan.VkCommandBuffer;
 import org.spongepowered.asm.mixin.Final;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
@@ -33,7 +35,15 @@ public abstract class VulkanGpuSurfaceGpuProfilerMixin {
         if (!GpuPassProfiler.isRunning())
             return;
 
-        GpuPassProfiler.mark(this.device, encoder, "screen copy and wait for screen image");
+        GpuPassProfiler.mark(this.device, encoder, GpuPassProfiler.SCREEN_WAIT);
         GpuPassProfiler.recordScreenFormats(this.swapchainImageFormat, this.swapchainImages.size(), textureView.texture().getFormat());
+    }
+
+    @ModifyExpressionValue(method = "blitFromTexture", at = @At(value = "INVOKE", target = "Lcom/mojang/renderpearl/backend/vulkan/VulkanCommandEncoder;allocateAndBeginTransientCommandBuffer()Lorg/lwjgl/vulkan/VkCommandBuffer;"))
+    private VkCommandBuffer txoptimizations$profileScreenCopyAfterWait(VkCommandBuffer blitCommandBuffer) {
+        if (GpuPassProfiler.isRunning())
+            GpuPassProfiler.markCommandBuffer(blitCommandBuffer, GpuPassProfiler.SCREEN_COPY);
+
+        return blitCommandBuffer;
     }
 }

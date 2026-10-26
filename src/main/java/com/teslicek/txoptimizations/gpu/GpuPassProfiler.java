@@ -8,7 +8,10 @@ import com.mojang.renderpearl.backend.vulkan.VulkanQueryPool;
 import com.mojang.renderpearl.frontend.FrontendRenderPipeline;
 import com.teslicek.txoptimizations.FramePath;
 import com.teslicek.txoptimizations.mixin.gpu.VulkanQueryPoolAccessor;
+import org.lwjgl.vulkan.KHRSynchronization2;
 import org.lwjgl.vulkan.VK12;
+import org.lwjgl.vulkan.VK13;
+import org.lwjgl.vulkan.VkCommandBuffer;
 import java.lang.management.CompilationMXBean;
 import java.lang.management.ManagementFactory;
 import java.nio.file.Path;
@@ -23,6 +26,9 @@ import net.minecraft.network.chat.MutableComponent;
 
 public final class GpuPassProfiler {
 
+    public static final String                               SCREEN_WAIT     = "wait for screen image";
+    public static final String                               SCREEN_COPY     = "screen copy";
+
     private static final int                                 SLOTS           = 3;
     private static final int                                 CAPACITY        = 4096;
     private static final long                                DURATION        = 10_000_000_000L;
@@ -36,6 +42,7 @@ public final class GpuPassProfiler {
     private static final int                                 SLOW_PASSES     = 4;
     private static final long[]                              FRAME_LIMITS    = {1_000_000L, 2_000_000L, 4_000_000L, 8_000_000L, 16_000_000L};
     private static final String                              FRAME_END       = "frame end";
+    private static final int                                 NO_TIMESTAMP    = -1;
     private static final String                              OVERFLOW        = "rest of a frame with more than " + (CAPACITY - 2) + " passes";
     private static final GpuQueryPool[]                      POOLS           = new GpuQueryPool[SLOTS];
     private static final String[][]                          LABELS          = new String[SLOTS][CAPACITY];
@@ -178,18 +185,39 @@ public final class GpuPassProfiler {
         if (POOLS[0] == null)
             openPools(frameDevice);
 
+        int index = reserve(label);
+
+        if (index != NO_TIMESTAMP)
+            frameEncoder.writeTimestamp(POOLS[slot], index);
+    }
+
+    public static void markCommandBuffer(VkCommandBuffer commandBuffer, String label) {
+        if (!recording)
+            return;
+
+        if (POOLS[0] == null)
+            throw new IllegalStateException("The GPU profile marked " + label + " before any pass of its frame");
+
+        int index = reserve(label);
+
+        if (index != NO_TIMESTAMP)
+            KHRSynchronization2.vkCmdWriteTimestamp2KHR(commandBuffer, VK13.VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT, ((VulkanQueryPoolAccessor) (VulkanQueryPool) POOLS[slot]).txoptimizations$vkQueryPool(), index);
+    }
+
+    private static int reserve(String label) {
         int    index     = COUNTS[slot];
         String passLabel = label;
 
         if (label != FRAME_END && index == CAPACITY - 1)
-            return;
+            return NO_TIMESTAMP;
 
         if (label != FRAME_END && index == CAPACITY - 2)
             passLabel = OVERFLOW;
 
-        frameEncoder.writeTimestamp(POOLS[slot], index);
         LABELS[slot][index] = passLabel;
         COUNTS[slot]        = index + 1;
+
+        return index;
     }
 
     public static void recordScreenFormats(int swapchainFormat, int swapchainImages, Object framebufferFormat) {
@@ -379,10 +407,15 @@ public final class GpuPassProfiler {
     }
 
     private static String report(double seconds) {
-        double        frameMs = gpuNanos / 1.0e6 / framesRead;
-        StringBuilder report  = new StringBuilder();
+        Pass wait = PASSES.get(SCREEN_WAIT);
 
-        report.append(String.format(Locale.ROOT, "%d frames in %.1f s (%.0f fps), GPU %.3f ms per frame, GPU busy %.0f%% of the time%n", framesRead, seconds, framesRead / seconds, frameMs, gpuNanos / 1.0e7 / seconds));
+        if (wait == null)
+            throw new IllegalStateException("GPU profile never waited for a screen image");
+
+        long          busyNanos = gpuNanos - wait.nanos;
+        StringBuilder report    = new StringBuilder();
+
+        report.append(String.format(Locale.ROOT, "%d frames in %.1f s (%.0f fps), GPU %.3f ms per frame, GPU busy %.0f%% of the time, %.3f ms per frame waiting for the screen image%n", framesRead, seconds, framesRead / seconds, busyNanos / 1.0e6 / framesRead, busyNanos / 1.0e7 / seconds, wait.nanos / 1.0e6 / framesRead));
         report.append(String.format(Locale.ROOT, "Present thread used for %.0f%% of frames%n", FramePath.workerShare() * 100.0));
         report.append(warmup).append(String.format(Locale.ROOT, "%n"));
         report.append(frameTimeReport());
