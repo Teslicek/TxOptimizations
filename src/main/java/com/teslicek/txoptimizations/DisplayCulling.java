@@ -38,15 +38,20 @@ public final class DisplayCulling {
         if (!active)
             return;
 
-        int width  = Minecraft.getInstance().gameRenderer.mainRenderTarget().width;
-        int height = Minecraft.getInstance().gameRenderer.mainRenderTarget().height;
-
+        DisplayPreCull.verify(LevelProjection.matrix(), modelView);
         FRUSTUM.set(VIEW_PROJECTION.set(LevelProjection.matrix()).mul(modelView), false);
-        GIZMO_FRUSTUM.set(GIZMO_CLIP.scaling(width / (width + 2.0F * GIZMO_MARGIN), height / (height + 2.0F * GIZMO_MARGIN), 1.0F).mul(VIEW_PROJECTION), false);
+        GIZMO_FRUSTUM.set(widen(VIEW_PROJECTION, GIZMO_CLIP), false);
 
         cameraX = camera.x;
         cameraY = camera.y;
         cameraZ = camera.z;
+    }
+
+    public static Matrix4f widen(Matrix4fc viewProjection, Matrix4f dest) {
+        int width  = Minecraft.getInstance().gameRenderer.mainRenderTarget().width;
+        int height = Minecraft.getInstance().gameRenderer.mainRenderTarget().height;
+
+        return dest.scaling(width / (width + 2.0F * GIZMO_MARGIN), height / (height + 2.0F * GIZMO_MARGIN), 1.0F).mul(viewProjection);
     }
 
     public static void end() {

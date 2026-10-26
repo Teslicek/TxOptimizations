@@ -1,11 +1,13 @@
 package com.teslicek.txoptimizations.mixin;
 
+import com.teslicek.txoptimizations.DisplayPreCull;
 import com.teslicek.txoptimizations.FrustumBoxTest;
 import com.teslicek.txoptimizations.LeashHolder;
 import com.teslicek.txoptimizations.mixin.cull.EntityRendererCullAccessor;
 import net.minecraft.client.renderer.culling.Frustum;
 import net.minecraft.client.renderer.entity.EntityRenderDispatcher;
 import net.minecraft.client.renderer.entity.EntityRenderer;
+import net.minecraft.world.entity.Display;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.Leashable;
 import net.minecraft.world.phys.AABB;
@@ -37,6 +39,9 @@ public abstract class EntityRendererCullBoxMixin<T extends Entity> {
     @Overwrite
     public boolean shouldRender(T entity, Frustum culler, double camX, double camY, double camZ, float partialTicks) {
         if (!entity.shouldRender(camX, camY, camZ))
+            return false;
+
+        if (entity instanceof Display.ItemDisplay display && DisplayPreCull.isHidden(display, partialTicks))
             return false;
 
         if (!this.affectedByCulling(entity))
