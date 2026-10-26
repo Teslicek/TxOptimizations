@@ -157,6 +157,9 @@ public abstract class StagedVertexBufferDirectCopyMixin implements BackgroundVer
 
     @Override
     public void txoptimizations$copyVerticesInBackground() {
+        if (this.txoptimizations$vertexCopy.isInBackground())
+            return;
+
         this.txoptimizations$vertexCopy.startInBackground();
 
         if (this.txoptimizations$vertexCopy.isInBackground())
