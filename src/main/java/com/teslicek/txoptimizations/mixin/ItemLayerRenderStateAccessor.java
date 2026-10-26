@@ -1,6 +1,7 @@
 package com.teslicek.txoptimizations.mixin;
 
 import java.util.function.Supplier;
+import net.minecraft.client.renderer.special.SpecialModelRenderer;
 import net.minecraft.client.resources.model.cuboid.ItemTransform;
 import org.joml.Matrix4f;
 import org.joml.Vector3fc;
@@ -21,4 +22,7 @@ public interface ItemLayerRenderStateAccessor {
 
     @Accessor("usesBlockLight")
     boolean txoptimizations$usesBlockLight();
+
+    @Accessor("specialRenderer")
+    SpecialModelRenderer<Object> txoptimizations$specialRenderer();
 }

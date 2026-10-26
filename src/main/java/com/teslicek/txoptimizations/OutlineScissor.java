@@ -1,7 +1,5 @@
 package com.teslicek.txoptimizations;
 
-import com.mojang.blaze3d.systems.RenderSystem;
-import com.mojang.renderpearl.api.buffers.GpuBufferSlice;
 import com.mojang.renderpearl.api.commands.RenderPass;
 import com.mojang.renderpearl.api.pipeline.RenderPipeline;
 import com.teslicek.txoptimizations.mixin.FeaturePreparedGroupAccessor;
@@ -28,7 +26,6 @@ import net.minecraft.resources.Identifier;
 import net.minecraft.server.packs.repository.BuiltInPackSource;
 import net.minecraft.server.packs.resources.Resource;
 import org.joml.Matrix4d;
-import org.joml.Matrix4f;
 import org.joml.Matrix4fc;
 import org.joml.Vector4d;
 
@@ -67,12 +64,10 @@ public final class OutlineScissor {
         }
     };
 
-    private static final Matrix4f PROJECTION = new Matrix4f();
     private static final Matrix4d MODEL_VIEW = new Matrix4d();
     private static final Matrix4d CLIP       = new Matrix4d();
     private static final Vector4d CORNER     = new Vector4d();
 
-    private static GpuBufferSlice  projectionSlice;
     private static PostChain       chain;
     private static List<PostPass>  passes = List.of();
     private static boolean         vanilla;
@@ -84,11 +79,6 @@ public final class OutlineScissor {
     private static double          maxY;
 
     private OutlineScissor() {
-    }
-
-    public static void captureProjection(Matrix4fc projection, GpuBufferSlice slice) {
-        PROJECTION.set(projection);
-        projectionSlice = slice;
     }
 
     public static void useChain(PostChain current) {
@@ -114,7 +104,7 @@ public final class OutlineScissor {
     public static void measure(SubmitNodeStorage storage, Map<FeatureRenderPhase<?>, ? extends List<?>> groupsByPhase, FeatureRendererMap renderers, StagedVertexBuffer vertices) {
         state = UNBOUNDED;
 
-        if (!vanilla || RenderSystem.getProjectionMatrixBuffer() != projectionSlice)
+        if (!vanilla || !LevelProjection.isBound())
             return;
 
         ((BackgroundVertexCopy) vertices).txoptimizations$finishOutlineBounds();
@@ -214,7 +204,7 @@ public final class OutlineScissor {
         if (boxes == null || modelView == null)
             return false;
 
-        CLIP.set(PROJECTION).mul(MODEL_VIEW.set(modelView));
+        CLIP.set(LevelProjection.matrix()).mul(MODEL_VIEW.set(modelView));
 
         for (int offset = 0; offset < boxes.length; offset += PositionBounds.VALUES) {
             if (!includeBox(boxes, offset))

@@ -5,7 +5,7 @@ import com.mojang.blaze3d.systems.RenderSystem;
 import com.mojang.renderpearl.api.buffers.GpuBuffer;
 import com.mojang.renderpearl.api.buffers.GpuBufferSlice;
 import com.mojang.renderpearl.backend.vulkan.VulkanGpuBuffer;
-import com.teslicek.txoptimizations.OutlineScissor;
+import com.teslicek.txoptimizations.LevelProjection;
 import com.teslicek.txoptimizations.PersistentRingBuffer;
 import net.minecraft.client.renderer.GameRenderer;
 import net.minecraft.client.renderer.MappableRingBuffer;
@@ -40,7 +40,7 @@ public abstract class GameRendererLevelProjectionRingMixin {
 
         GpuBufferSlice slice = target.slice(0L, RenderSystem.PROJECTION_MATRIX_UBO_SIZE);
 
-        OutlineScissor.captureProjection(projectionMatrix, slice);
+        LevelProjection.capture(projectionMatrix, slice);
 
         return slice;
     }
