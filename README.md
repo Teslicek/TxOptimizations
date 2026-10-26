@@ -268,6 +268,10 @@ Vanilla only culls an item or text display against the view when the server give
 
 Text displays, used for holograms and leaderboards on servers, are culled the same way. Their glyphs can come from server fonts with images taller than a line, so line metrics cannot bound them; instead each line's laid-out text is looked up in the world text layout cache under the exact key the text renderer will use, and its glyph bounds, which include shadows, italics, underlines and strikethroughs, are widened by 2 text pixels for the second copy that bold text draws. Together with the background rectangle they are put through the display's final pose and tested against the same clip volume. A line whose layout is not cached yet, such as on the first frame a text is shown, is drawn as before. With 120 text displays added to the 240 item displays, the two views rose from 3,211 to 4,534 fps and from 3,214 to 4,200, and every differing pixel against the old jar was sky or drifting cloud.
 
+### Villager textures
+
+Every villager built the identifiers of its type, profession and profession level textures again every frame, each one a new path string put together and validated character by character, and the render type lookups that followed hashed those new strings again. The identifier only depends on the layer's texture folder, the texture kind and the key, so each layer now keeps the identifiers it built and hands out the same ones. In a TxBench scene with 48 villagers the two views measured +0.0% and +2.0% fps, within noise for a cost of about 0.4% of the render thread in a BedWars lobby.
+
 ### Rain culling
 
 Rain and snow are built column by column around the camera every frame. Columns whose vertical span lies outside the camera's view are skipped. Each column draws with its own position-seeded randomness, so the visible rain looks exactly the same.

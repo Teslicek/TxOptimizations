@@ -290,6 +290,7 @@
     "UnmodifiableObject2IntMapAccessor",
     "VertexFormatElementCacheMixin",
     "VertexSortingDistanceMixin",
+    "VillagerProfessionLayerTextureMixin",
     "VulkanBackendCheckpointMixin",
     "VulkanCommandEncoderBackgroundDestroyMixin",
     "VulkanCommandEncoderDeferralMixin",
