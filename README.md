@@ -58,6 +58,10 @@ At the end of every frame, the vertex buffer pools close every spare buffer that
 
 Every time a translated text is resolved, `TranslatableContents.decomposeTemplate` runs a regular expression over the translation string to find `%s`, `%1$s` and `%%`. TxOptimizations parses each distinct translation string once, remembers the literal parts and argument positions, and replays them in the same order with the same argument lookups. Invalid translation strings are left to vanilla so they fail and fall back exactly as before. Up to 4096 strings are kept, and the cache is cleared when it fills up.
 
+### HUD text layout
+
+The F3 screen and other HUD text drawn from a plain string built every line again each frame: its visual-order sequence through the bidirectional reorder, its width for alignment and its laid-out glyphs, although most lines read the same from one frame to the next. The width of each string is now kept per string content and font, and each string content gets one shared visual-order sequence per language. Once a string has been drawn in an earlier frame, its laid-out glyphs are kept in the world text layout cache under that shared sequence, position, colors and shadow, so lines that change every frame, like the coordinates while moving, are laid out as before and never stored. These entries are dropped after 200 unused frames and on every font reload or font option change, and drawing a cached layout only reads it. In TxBench with F3 open, the lobby station rose from 8,874 to 10,556 fps (+19.0%) and from 9,643 to 10,843 fps (+12.4%) facing the other way, and the heavier template scenes by 2 to 14%; with F3 closed nothing changed.
+
 ### F3 entry checks
 
 `DebugScreenEntryList.isCurrentlyEnabled` searches the list of enabled F3 entries one by one, and it is called for many entries every frame. TxOptimizations answers from a hash set built from that list, rebuilt whenever vanilla's own version counter for the list changes. `getCurrentlyEnabled` also made a fresh immutable copy of the list on every call, several times per frame; the copy is now kept and handed out again until that same version counter changes.

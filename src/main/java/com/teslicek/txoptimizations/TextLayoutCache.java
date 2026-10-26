@@ -4,19 +4,23 @@ import java.util.HashMap;
 import java.util.IdentityHashMap;
 import java.util.Map;
 import net.minecraft.client.gui.Font;
+import net.minecraft.locale.Language;
 import net.minecraft.network.chat.FontDescription;
 import net.minecraft.network.chat.FormattedText;
 import net.minecraft.network.chat.MutableComponent;
 import net.minecraft.util.FormattedCharSequence;
+import net.minecraft.util.FormattedCharSink;
 
 public final class TextLayoutCache {
 
     private static final int  MAX_ENTRIES   = 4096;
     private static final long UNUSED_FRAMES = 200L;
 
-    private static final Map<Key, Entry>              ENTRIES = new HashMap<>();
-    private static final Map<MutableComponent, Width> WIDTHS  = new IdentityHashMap<>();
-    private static final Key                          PROBE   = new Key();
+    private static final Map<Key, Entry>              ENTRIES       = new HashMap<>();
+    private static final Map<MutableComponent, Width> WIDTHS        = new IdentityHashMap<>();
+    private static final Map<String, Width>           STRING_WIDTHS = new HashMap<>();
+    private static final Map<String, SharedText>      SEQUENCES     = new HashMap<>();
+    private static final Key                          PROBE         = new Key();
 
     private static long lastEviction;
 
@@ -80,9 +84,62 @@ public final class TextLayoutCache {
         return width;
     }
 
+    public static int width(Font font, String text) {
+        long frame = ClientClock.frame();
+
+        evictUnused(frame);
+
+        Width cached = STRING_WIDTHS.get(text);
+
+        if (cached != null && cached.font == font) {
+            cached.frame = frame;
+
+            return cached.width;
+        }
+
+        if (STRING_WIDTHS.size() >= MAX_ENTRIES)
+            STRING_WIDTHS.clear();
+
+        int width = font.width(text);
+
+        STRING_WIDTHS.put(text, new Width(font, width, frame));
+
+        return width;
+    }
+
+    public static FormattedCharSequence visualOrder(Language language, String text) {
+        long frame = ClientClock.frame();
+
+        evictUnused(frame);
+
+        SharedText cached = SEQUENCES.get(text);
+
+        if (cached != null && cached.language == language) {
+            cached.repeated |= cached.frame != frame;
+            cached.frame     = frame;
+
+            return cached;
+        }
+
+        if (SEQUENCES.size() >= MAX_ENTRIES)
+            SEQUENCES.clear();
+
+        SharedText sequence = new SharedText(language, language.getVisualOrder(FormattedText.of(text)), frame);
+
+        SEQUENCES.put(text, sequence);
+
+        return sequence;
+    }
+
+    public static boolean isRepeated(FormattedCharSequence text) {
+        return text instanceof SharedText shared && shared.repeated;
+    }
+
     public static void clear() {
         ENTRIES.clear();
         WIDTHS.clear();
+        STRING_WIDTHS.clear();
+        SEQUENCES.clear();
     }
 
     private static boolean isStable(FormattedCharSequence text) {
@@ -97,6 +154,8 @@ public final class TextLayoutCache {
 
         ENTRIES.values().removeIf(entry -> frame - entry.frame > UNUSED_FRAMES);
         WIDTHS.values().removeIf(width -> frame - width.frame > UNUSED_FRAMES);
+        STRING_WIDTHS.values().removeIf(width -> frame - width.frame > UNUSED_FRAMES);
+        SEQUENCES.values().removeIf(sequence -> frame - sequence.frame > UNUSED_FRAMES);
     }
 
     private static final class Key {
@@ -164,6 +223,25 @@ public final class TextLayoutCache {
             this.font  = font;
             this.width = width;
             this.frame = frame;
+        }
+    }
+
+    private static final class SharedText implements FormattedCharSequence {
+
+        private final Language              language;
+        private final FormattedCharSequence sequence;
+        private long                        frame;
+        private boolean                     repeated;
+
+        private SharedText(Language language, FormattedCharSequence sequence, long frame) {
+            this.language = language;
+            this.sequence = sequence;
+            this.frame    = frame;
+        }
+
+        @Override
+        public boolean accept(FormattedCharSink sink) {
+            return this.sequence.accept(sink);
         }
     }
 }
