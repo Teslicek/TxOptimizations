@@ -11,6 +11,7 @@ import com.mojang.renderpearl.api.device.GpuDevice;
 import com.mojang.renderpearl.api.pipeline.PrimitiveTopology;
 import com.mojang.renderpearl.api.vertex.VertexFormat;
 import com.mojang.renderpearl.api.vertex.VertexFormatElement;
+import com.mojang.renderpearl.backend.vulkan.VulkanGpuBuffer;
 import com.teslicek.txoptimizations.BackgroundVertexCopy;
 import com.teslicek.txoptimizations.DistanceSorting;
 import com.teslicek.txoptimizations.InFlightVertexCopy;
@@ -68,6 +69,9 @@ public abstract class StagedVertexBufferDirectCopyMixin implements BackgroundVer
     @Unique
     private GpuBufferSlice.MappedView txoptimizations$vertexView;
 
+    @Unique
+    private boolean txoptimizations$vulkanVertices;
+
     @Shadow
     private static CompactVectorArray decodeSortingPoints(StagedVertexBuffer.Draw draw) {
         throw new AssertionError();
@@ -84,7 +88,8 @@ public abstract class StagedVertexBufferDirectCopyMixin implements BackgroundVer
     @Overwrite
     private void uploadDrawsToBuffers(GpuDevice device, List<StagedVertexBuffer.Draw> draws, GpuBuffer vertexGpuBuffer, @Nullable GpuBuffer indexGpuBuffer, int vertexBufferSize, int indexBufferSize) {
         if (this.txoptimizations$vertexView == null) {
-            this.txoptimizations$vertexView = vertexGpuBuffer.slice(0L, vertexBufferSize).map(false, true);
+            this.txoptimizations$vulkanVertices = vertexGpuBuffer instanceof VulkanGpuBuffer.Direct;
+            this.txoptimizations$vertexView     = vertexGpuBuffer.slice(0L, vertexBufferSize).map(false, true);
             this.txoptimizations$vertexCopy.begin();
             this.txoptimizations$copyDraws(draws, this.txoptimizations$vertexView.data(), false);
             this.txoptimizations$vertexCopy.seal();
@@ -157,7 +162,7 @@ public abstract class StagedVertexBufferDirectCopyMixin implements BackgroundVer
 
     @Override
     public void txoptimizations$copyVerticesInBackground() {
-        if (this.txoptimizations$vertexCopy.isInBackground())
+        if (!this.txoptimizations$vulkanVertices || this.txoptimizations$vertexCopy.isInBackground())
             return;
 
         this.txoptimizations$vertexCopy.startInBackground();
