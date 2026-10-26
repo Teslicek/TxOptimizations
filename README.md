@@ -66,6 +66,8 @@ The F3 screen and other HUD text drawn from a plain string built every line agai
 
 `DebugScreenEntryList.isCurrentlyEnabled` searches the list of enabled F3 entries one by one, and it is called for many entries every frame. TxOptimizations answers from a hash set built from that list, rebuilt whenever vanilla's own version counter for the list changes. `getCurrentlyEnabled` also made a fresh immutable copy of the list on every call, several times per frame; the copy is now kept and handed out again until that same version counter changes.
 
+The F3 entries also formatted their value lines with `String.format` every frame, the slowest step of the overlay: the system specs entry alone took 4.5% of the render thread with F3 open. Each format call now keeps its last arguments and text and returns that text when the locale and every argument are equal and all of them are strings, numbers, booleans, characters or enums, whose formatted text depends only on their value; any other argument formats as before. With F3 open in TxBench the lobby station rose from 10,553 to 10,840 fps (+2.7%).
+
 ### Particle layers
 
 Every frame, each particle quad is added to `QuadParticleRenderState`, which looks up the storage for the particle's layer in a hash map. The layer is a record, so every lookup hashes its fields again. Particles only ever use six constant layer objects and the map never loses an entry, so TxOptimizations remembers each layer object it has seen together with its storage and returns that storage directly. A layer it has not seen yet still goes through the map.
