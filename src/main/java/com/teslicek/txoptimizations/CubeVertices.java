@@ -18,10 +18,10 @@ public final class CubeVertices {
 
     public static final int FACES    = 6;
     public static final int VERTICES = 24;
+    public static final int CORNERS  = 8;
     public static final int VALUES   = 7 + VERTICES * 2;
 
     private static final int     FACE_VERTICES = 4;
-    private static final int     CORNERS       = 8;
     private static final int     DOWN_FACE     = 0;
     private static final int     UP_FACE       = 1;
     private static final int     WEST_FACE     = 2;
@@ -178,33 +178,31 @@ public final class CubeVertices {
     }
 
     private static void corners(Matrix4f matrix, float[] values) {
-        float x0         = values[BOUNDS];
-        float y0         = values[BOUNDS + 1];
-        float z0         = values[BOUNDS + 2];
-        float x1         = values[BOUNDS + 3];
-        float y1         = values[BOUNDS + 4];
-        float z1         = values[BOUNDS + 5];
-        int   properties = matrix.properties();
+        transformCorners(matrix, values[BOUNDS], values[BOUNDS + 1], values[BOUNDS + 2], values[BOUNDS + 3], values[BOUNDS + 4], values[BOUNDS + 5], X, Y, Z);
+    }
+
+    public static void transformCorners(Matrix4fc matrix, float x0, float y0, float z0, float x1, float y1, float z1, float[] xs, float[] ys, float[] zs) {
+        int properties = matrix.properties();
 
         if ((properties & Matrix4fc.PROPERTY_IDENTITY) != 0) {
-            axis(X, X_BIT, x0, x1);
-            axis(Y, Y_BIT, y0, y1);
-            axis(Z, Z_BIT, z0, z1);
+            axis(xs, X_BIT, x0, x1);
+            axis(ys, Y_BIT, y0, y1);
+            axis(zs, Z_BIT, z0, z1);
 
             return;
         }
 
         if ((properties & Matrix4fc.PROPERTY_TRANSLATION) != 0) {
-            axis(X, X_BIT, x0 + matrix.m30(), x1 + matrix.m30());
-            axis(Y, Y_BIT, y0 + matrix.m31(), y1 + matrix.m31());
-            axis(Z, Z_BIT, z0 + matrix.m32(), z1 + matrix.m32());
+            axis(xs, X_BIT, x0 + matrix.m30(), x1 + matrix.m30());
+            axis(ys, Y_BIT, y0 + matrix.m31(), y1 + matrix.m31());
+            axis(zs, Z_BIT, z0 + matrix.m32(), z1 + matrix.m32());
 
             return;
         }
 
-        component(X, matrix.m00(), matrix.m10(), matrix.m20(), matrix.m30(), x0, x1, y0, y1, z0, z1);
-        component(Y, matrix.m01(), matrix.m11(), matrix.m21(), matrix.m31(), x0, x1, y0, y1, z0, z1);
-        component(Z, matrix.m02(), matrix.m12(), matrix.m22(), matrix.m32(), x0, x1, y0, y1, z0, z1);
+        component(xs, matrix.m00(), matrix.m10(), matrix.m20(), matrix.m30(), x0, x1, y0, y1, z0, z1);
+        component(ys, matrix.m01(), matrix.m11(), matrix.m21(), matrix.m31(), x0, x1, y0, y1, z0, z1);
+        component(zs, matrix.m02(), matrix.m12(), matrix.m22(), matrix.m32(), x0, x1, y0, y1, z0, z1);
     }
 
     private static void axis(float[] values, int bit, float low, float high) {

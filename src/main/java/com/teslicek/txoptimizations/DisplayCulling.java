@@ -10,7 +10,6 @@ import net.minecraft.world.phys.Vec3;
 import org.joml.FrustumIntersection;
 import org.joml.Matrix4f;
 import org.joml.Matrix4fc;
-import org.joml.Vector3f;
 
 public final class DisplayCulling {
 
@@ -22,7 +21,9 @@ public final class DisplayCulling {
     private static final Matrix4f            GIZMO_CLIP      = new Matrix4f();
     private static final FrustumIntersection FRUSTUM         = new FrustumIntersection();
     private static final FrustumIntersection GIZMO_FRUSTUM   = new FrustumIntersection();
-    private static final Vector3f            CORNER          = new Vector3f();
+    private static final float[]             CORNER_X        = new float[CubeVertices.CORNERS];
+    private static final float[]             CORNER_Y        = new float[CubeVertices.CORNERS];
+    private static final float[]             CORNER_Z        = new float[CubeVertices.CORNERS];
 
     private static boolean active;
     private static double  cameraX;
@@ -122,6 +123,8 @@ public final class DisplayCulling {
     }
 
     private static boolean isBoxHidden(Matrix4fc pose, float boxMinX, float boxMinY, float boxMinZ, float boxMaxX, float boxMaxY, float boxMaxZ) {
+        CubeVertices.transformCorners(pose, boxMinX, boxMinY, boxMinZ, boxMaxX, boxMaxY, boxMaxZ, CORNER_X, CORNER_Y, CORNER_Z);
+
         float minX = Float.POSITIVE_INFINITY;
         float minY = Float.POSITIVE_INFINITY;
         float minZ = Float.POSITIVE_INFINITY;
@@ -129,15 +132,13 @@ public final class DisplayCulling {
         float maxY = Float.NEGATIVE_INFINITY;
         float maxZ = Float.NEGATIVE_INFINITY;
 
-        for (int corner = 0; corner < 8; corner ++) {
-            pose.transformPosition(CORNER.set((corner & 1) == 0 ? boxMinX : boxMaxX, (corner & 2) == 0 ? boxMinY : boxMaxY, (corner & 4) == 0 ? boxMinZ : boxMaxZ));
-
-            minX = Math.min(minX, CORNER.x);
-            minY = Math.min(minY, CORNER.y);
-            minZ = Math.min(minZ, CORNER.z);
-            maxX = Math.max(maxX, CORNER.x);
-            maxY = Math.max(maxY, CORNER.y);
-            maxZ = Math.max(maxZ, CORNER.z);
+        for (int corner = 0; corner < CORNER_X.length; corner ++) {
+            minX = Math.min(minX, CORNER_X[corner]);
+            minY = Math.min(minY, CORNER_Y[corner]);
+            minZ = Math.min(minZ, CORNER_Z[corner]);
+            maxX = Math.max(maxX, CORNER_X[corner]);
+            maxY = Math.max(maxY, CORNER_Y[corner]);
+            maxZ = Math.max(maxZ, CORNER_Z[corner]);
         }
 
         return !FRUSTUM.testAab(minX, minY, minZ, maxX, maxY, maxZ);
