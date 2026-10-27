@@ -162,3 +162,7 @@ mutable field net/minecraft/client/renderer/entity/state/ItemDisplayEntityRender
 
 # GUI layer bounds
 accessible class net/minecraft/client/renderer/state/gui/GuiRenderState$Node
+
+# Item model lookups
+accessible field net/minecraft/client/resources/model/ModelManager bakedItemStackModels Ljava/util/Map;
+accessible field net/minecraft/client/resources/model/ModelManager itemProperties Ljava/util/Map;

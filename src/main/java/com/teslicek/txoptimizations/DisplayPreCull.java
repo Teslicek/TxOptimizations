@@ -153,7 +153,7 @@ public final class DisplayPreCull {
         if (modelId == null)
             return null;
 
-        ItemModel model = Minecraft.getInstance().getModelManager().getItemModel(modelId);
+        ItemModel model = ItemModelLookup.model(Minecraft.getInstance().getModelManager(), stack.getItem(), modelId);
 
         return model.getClass() == CuboidItemModelWrapper.class ? model : null;
     }

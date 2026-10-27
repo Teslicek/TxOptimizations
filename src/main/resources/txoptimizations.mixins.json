@@ -177,6 +177,8 @@
     "ModelRenderTypeCacheMixin",
     "ModelResetPoseMixin",
     "ParticleCollisionScanMixin",
+    "ItemModelResolverLookupMixin",
+    "ItemModelSlotMixin",
     "ParticleGroupTickMixin",
     "QuadParticleGroupPositionsMixin",
     "PalettedContainerReadsMixin",
