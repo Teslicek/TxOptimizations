@@ -333,6 +333,7 @@
     "bake.ShulkerBoxBlockEntityBakeMixin",
     "bake.SignTextCullingMixin",
     "bake.SignTextMessageCacheMixin",
+    "bake.SignTextWidthMixin",
     "bake.SkullBlockEntityBakeMixin",
     "cull.BlockEntityRenderDispatcherCullMixin",
     "cull.ClientLevelTickCullMixin",

@@ -13,14 +13,16 @@ import net.minecraft.util.FormattedCharSink;
 
 public final class TextLayoutCache {
 
-    private static final int  MAX_ENTRIES   = 4096;
-    private static final long UNUSED_FRAMES = 200L;
+    private static final int  MAX_ENTRIES         = 4096;
+    private static final int  MAX_SEQUENCE_WIDTHS = 16384;
+    private static final long UNUSED_FRAMES       = 200L;
 
-    private static final Map<Key, Entry>              ENTRIES       = new HashMap<>();
-    private static final Map<MutableComponent, Width> WIDTHS        = new IdentityHashMap<>();
-    private static final Map<String, Width>           STRING_WIDTHS = new HashMap<>();
-    private static final Map<String, SharedText>      SEQUENCES     = new HashMap<>();
-    private static final Key                          PROBE         = new Key();
+    private static final Map<Key, Entry>                   ENTRIES         = new HashMap<>();
+    private static final Map<MutableComponent, Width>      WIDTHS          = new IdentityHashMap<>();
+    private static final Map<FormattedCharSequence, Width> SEQUENCE_WIDTHS = new IdentityHashMap<>();
+    private static final Map<String, Width>                STRING_WIDTHS   = new HashMap<>();
+    private static final Map<String, SharedText>           SEQUENCES       = new HashMap<>();
+    private static final Key                               PROBE           = new Key();
 
     private static long lastEviction;
 
@@ -84,6 +86,29 @@ public final class TextLayoutCache {
         return width;
     }
 
+    public static int width(Font font, FormattedCharSequence text) {
+        long frame = ClientClock.frame();
+
+        evictUnused(frame);
+
+        Width cached = SEQUENCE_WIDTHS.get(text);
+
+        if (cached != null && cached.font == font) {
+            cached.frame = frame;
+
+            return cached.width;
+        }
+
+        if (SEQUENCE_WIDTHS.size() >= MAX_SEQUENCE_WIDTHS)
+            SEQUENCE_WIDTHS.clear();
+
+        int width = font.width(text);
+
+        SEQUENCE_WIDTHS.put(text, new Width(font, width, frame));
+
+        return width;
+    }
+
     public static int width(Font font, String text) {
         long frame = ClientClock.frame();
 
@@ -138,6 +163,7 @@ public final class TextLayoutCache {
     public static void clear() {
         ENTRIES.clear();
         WIDTHS.clear();
+        SEQUENCE_WIDTHS.clear();
         STRING_WIDTHS.clear();
         SEQUENCES.clear();
     }
@@ -154,6 +180,7 @@ public final class TextLayoutCache {
 
         ENTRIES.values().removeIf(entry -> frame - entry.frame > UNUSED_FRAMES);
         WIDTHS.values().removeIf(width -> frame - width.frame > UNUSED_FRAMES);
+        SEQUENCE_WIDTHS.values().removeIf(width -> frame - width.frame > UNUSED_FRAMES);
         STRING_WIDTHS.values().removeIf(width -> frame - width.frame > UNUSED_FRAMES);
         SEQUENCES.values().removeIf(sequence -> frame - sequence.frame > UNUSED_FRAMES);
     }

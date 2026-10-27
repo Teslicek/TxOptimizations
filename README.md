@@ -244,6 +244,8 @@ Chests, ender chests, shulker boxes, bells, skulls, banner poles, decorated pots
 
 Block entities with nothing to draw are skipped: signs without text, beacons without a beam, campfires and shelves without items and lecterns without a book. The answer is remembered on each block entity for the current client tick, so a sign that gains text shows it at most one tick later. Sign text facing away from the camera is not drawn.
 
+Every frame, each sign measured the width of each of its four lines to center it, one glyph lookup per character (13% of the render thread with 400 signs in view). A sign keeps the lines it was split into until its text changes, so the width is now kept per line object and font next to the text layouts, dropped with them after 200 unused frames and on every font reload or font option change. In a TxBench scene with 400 four-line signs, fps rose from 1,430 and 1,424 to 1,582 and 1,557, and the signs matched the old jar pixel for pixel.
+
 ### Atlases and batching
 
 - Font atlas: font glyph textures are 1024x1024 instead of 256x256, so text spans far fewer textures and needs fewer texture switches and draw calls.
