@@ -11,6 +11,7 @@ import com.teslicek.txoptimizations.VertexBytes;
 import net.minecraft.client.model.geom.ModelPart;
 import org.joml.Matrix4f;
 import org.joml.Vector3f;
+import org.jspecify.annotations.Nullable;
 import org.lwjgl.system.MemoryUtil;
 import org.spongepowered.asm.mixin.Final;
 import org.spongepowered.asm.mixin.Mixin;
@@ -24,6 +25,12 @@ public abstract class ModelPartCubeDirectWriteMixin {
     @Shadow
     @Final
     public ModelPart.Polygon[] polygons;
+
+    @Unique
+    private ModelPart.Polygon @Nullable [] txoptimizations$flattened;
+
+    @Unique
+    private float @Nullable [] txoptimizations$values;
 
     @Overwrite
     public void compile(PoseStack.Pose pose, VertexConsumer builder, int lightCoords, int overlayCoords, int color) {
@@ -48,9 +55,35 @@ public abstract class ModelPartCubeDirectWriteMixin {
     }
 
     @Unique
+    private float[] txoptimizations$values() {
+        ModelPart.Polygon[] flattened = this.txoptimizations$flattened;
+        float[]             values    = this.txoptimizations$values;
+
+        if (values != null && txoptimizations$same(flattened, this.polygons))
+            return values;
+
+        values = CubeVertices.flatten(this.polygons);
+
+        this.txoptimizations$flattened = this.polygons.clone();
+        this.txoptimizations$values    = values;
+
+        return values;
+    }
+
+    @Unique
+    private static boolean txoptimizations$same(ModelPart.Polygon[] flattened, ModelPart.Polygon[] polygons) {
+        for (int face = 0; face < CubeVertices.FACES; face ++) {
+            if (flattened[face] != polygons[face])
+                return false;
+        }
+
+        return true;
+    }
+
+    @Unique
     private boolean txoptimizations$tryPut(PoseStack.Pose pose, VertexConsumer builder, int lightCoords, int overlayCoords, int color) {
         if (this.polygons.length == CubeVertices.FACES)
-            return CubeVertices.tryPut(pose, this.polygons, builder, lightCoords, overlayCoords, color);
+            return CubeVertices.tryPut(pose, this.txoptimizations$values(), builder, lightCoords, overlayCoords, color);
 
         int vertices = 0;
 
