@@ -14,64 +14,43 @@ import org.lwjgl.system.MemoryUtil;
 
 public final class FacingCulling {
 
-    private static final int GROUPS         = 11;
-    private static final int LAST           = GROUPS - 1;
-    private static final int PLANE_BITS     = 10;
-    private static final int PLANES_PER_INT = Integer.SIZE / PLANE_BITS;
+    public static final int GROUPS   = 7;
+    public static final int RANGES   = GROUPS * 2;
+    public static final int OCCUPIED = GROUPS + 3;
 
-    public static final int RANGES = LAST + (GROUPS + PLANES_PER_INT - 1) / PLANES_PER_INT;
+    private static final int    UNASSIGNED         = 3;
+    private static final int    OPPOSITE           = GROUPS - 1;
+    private static final int    PLANES             = GROUPS;
+    private static final int    X                  = 0;
+    private static final int    Y                  = 1;
+    private static final int    Z                  = 2;
+    private static final int    SEGMENT_FIELD_BITS = 3;
+    private static final int    SEGMENT_FIELD      = (1 << SEGMENT_FIELD_BITS) - 1;
+    private static final int    VERTICES_PER_QUAD  = PrimitiveTopology.QUADS.primitiveLength;
+    private static final int    INDICES_PER_QUAD   = PrimitiveTopology.QUADS.indexCount(VERTICES_PER_QUAD);
+    private static final int    QUAD_BITS          = 28;
+    private static final int    QUAD_MASK          = (1 << QUAD_BITS) - 1;
+    private static final int    GROUP_SHIFT        = QUAD_BITS + Integer.SIZE;
+    private static final float  PLANE_STEPS        = 1024.0F;
+    private static final double MARGIN             = 3.0;
+    private static final double OFF_AXIS           = 0.5 / 127.0;
 
-    private static final int    UP                = 0;
-    private static final int    OTHER             = 1;
-    private static final int    EAST              = 2;
-    private static final int    NORTH_EAST        = 3;
-    private static final int    NORTH             = 4;
-    private static final int    NORTH_WEST        = 5;
-    private static final int    WEST              = 6;
-    private static final int    SOUTH_WEST        = 7;
-    private static final int    SOUTH             = 8;
-    private static final int    SOUTH_EAST        = 9;
-    private static final int    DOWN              = 10;
-    private static final int    PLANES            = LAST;
-    private static final int    PLANE_SHIFT       = Integer.SIZE - PLANE_BITS;
-    private static final int    PLANE_MASK        = (1 << PLANE_BITS) - 1;
-    private static final int    LOWEST_PLANE      = -(1 << PLANE_BITS - 1);
-    private static final int    HIGHEST_PLANE     = (1 << PLANE_BITS - 1) - 1;
-    private static final double PLANE_UNITS       = 8.0;
-    private static final double MARGIN            = 3.0 * PLANE_UNITS;
-    private static final double DIAGONAL_MARGIN   = MARGIN * Math.sqrt(2.0);
-    private static final int    X                 = 0;
-    private static final int    Y                 = 1;
-    private static final int    Z                 = 2;
-    private static final int    VERTICES_PER_QUAD = PrimitiveTopology.QUADS.primitiveLength;
-    private static final int    INDICES_PER_QUAD  = PrimitiveTopology.QUADS.indexCount(VERTICES_PER_QUAD);
-    private static final int    QUAD_BITS         = 27;
-    private static final int    QUAD_MASK         = (1 << QUAD_BITS) - 1;
-    private static final int    GROUP_SHIFT       = QUAD_BITS + Integer.SIZE;
-    private static final float  DEPTH_STEPS       = 1024.0F;
-    private static final double OFF_AXIS          = 0.5 / 127.0;
-    private static final int[]  NORMAL_X          = {0, 0, 1, 1, 0, -1, -1, -1, 0, 1, 0};
-    private static final int[]  NORMAL_Y          = {1, 0, 0, 0, 0, 0, 0, 0, 0, 0, -1};
-    private static final int[]  NORMAL_Z          = {0, 0, 0, -1, -1, -1, 0, 1, 1, 1, 0};
+    private static final int[] SEGMENTS = segments();
 
     private static double cameraX;
     private static double cameraY;
     private static double cameraZ;
-    private static double eyeUp;
     private static double eyeEast;
-    private static double eyeNorthEast;
-    private static double eyeNorth;
-    private static double eyeNorthWest;
-    private static double eyeWest;
-    private static double eyeSouthWest;
+    private static double eyeUp;
     private static double eyeSouth;
-    private static double eyeSouthEast;
+    private static double eyeNorth;
     private static double eyeDown;
+    private static double eyeWest;
 
     private FacingCulling() {
     }
 
-    public static void groupQuads(MeshData mesh, int indexCount, int[] ranges, int offset) {
+    public static void groupQuads(MeshData mesh, int[] ranges, int offset) {
         MeshData.DrawState state = mesh.drawState();
 
         if (state.primitiveTopology() != PrimitiveTopology.QUADS)
@@ -90,8 +69,8 @@ public final class FacingCulling {
         int        quads      = state.vertexCount() / VERTICES_PER_QUAD;
         ByteBuffer vertices   = mesh.vertexBuffer();
 
-        if ((long) quads * INDICES_PER_QUAD != indexCount)
-            throw new IllegalStateException(quads + " quads do not match the " + indexCount + " indices drawn for the mesh");
+        if ((long) quads * INDICES_PER_QUAD != state.indexCount())
+            throw new IllegalStateException(quads + " quads do not match the mesh's " + state.indexCount() + " indices");
 
         if ((long) quads * vertexSize * VERTICES_PER_QUAD > vertices.remaining())
             throw new IllegalStateException(quads + " quads of " + vertexSize * VERTICES_PER_QUAD + " bytes do not fit in " + vertices.remaining() + " bytes of vertex data");
@@ -108,100 +87,82 @@ public final class FacingCulling {
     }
 
     public static void prepareSection(int originX, int originY, int originZ) {
-        double eyeX = (cameraX - originX) * PLANE_UNITS;
-        double eyeY = (cameraY - originY) * PLANE_UNITS;
-        double eyeZ = (cameraZ - originZ) * PLANE_UNITS;
+        double eyeX = cameraX - originX;
+        double eyeY = cameraY - originY;
+        double eyeZ = cameraZ - originZ;
 
-        eyeUp        = eyeY + MARGIN;
-        eyeEast      = eyeX + MARGIN;
-        eyeNorthEast = eyeX - eyeZ + DIAGONAL_MARGIN;
-        eyeNorth     = MARGIN - eyeZ;
-        eyeNorthWest = DIAGONAL_MARGIN - eyeX - eyeZ;
-        eyeWest      = MARGIN - eyeX;
-        eyeSouthWest = eyeZ - eyeX + DIAGONAL_MARGIN;
-        eyeSouth     = eyeZ + MARGIN;
-        eyeSouthEast = eyeX + eyeZ + DIAGONAL_MARGIN;
-        eyeDown      = MARGIN - eyeY;
+        eyeEast  = eyeX + MARGIN;
+        eyeUp    = eyeY + MARGIN;
+        eyeSouth = eyeZ + MARGIN;
+        eyeNorth = MARGIN - eyeZ;
+        eyeDown  = MARGIN - eyeY;
+        eyeWest  = MARGIN - eyeX;
     }
 
-    public static void addDraws(SectionDrawList draws, int layer, int vertexBuffer, int[] ranges, int offset, int indexCount, int baseVertex, int sectionInfo) {
-        int quads  = indexCount / INDICES_PER_QUAD;
-        int culled = culledGroups(ranges, offset);
-        int run    = 0;
+    public static int visibleGroups(int[] ranges, int offset) {
+        int culled = behind(ranges, offset, OPPOSITE - X, eyeWest) | behind(ranges, offset, OPPOSITE - Y, eyeDown) | behind(ranges, offset, OPPOSITE - Z, eyeNorth) | behind(ranges, offset, X, eyeEast) | behind(ranges, offset, Y, eyeUp) | behind(ranges, offset, Z, eyeSouth);
 
-        while (culled != 0) {
-            int group = Integer.numberOfTrailingZeros(culled);
-            int start = group == 0 ? 0 : ranges[offset + group - 1];
-            int end   = group == LAST ? quads : ranges[offset + group];
+        return ranges[offset + OCCUPIED] & ~culled;
+    }
 
-            if (end != start) {
-                addRange(draws, layer, vertexBuffer, run, start, baseVertex, sectionInfo);
-                run = end;
-            }
+    public static void addDraws(SectionDrawList draws, int drawGroup, int[] ranges, int offset, int visibleGroups, int baseVertex, int sectionInfo) {
+        int segments = SEGMENTS[ranges[offset + OCCUPIED] & ~visibleGroups];
+        int count    = segments & SEGMENT_FIELD;
 
-            culled &= culled - 1;
+        for (int segment = 0; segment < count; segment ++) {
+            int shift = SEGMENT_FIELD_BITS * (1 + 2 * segment);
+            int first = segments >>> shift & SEGMENT_FIELD;
+            int start = first == 0 ? 0 : ranges[offset + first - 1];
+            int end   = ranges[offset + (segments >>> shift + SEGMENT_FIELD_BITS & SEGMENT_FIELD)];
+
+            if (end != start)
+                draws.add(drawGroup, (end - start) * INDICES_PER_QUAD, start * INDICES_PER_QUAD, baseVertex, sectionInfo);
         }
-
-        addRange(draws, layer, vertexBuffer, run, quads, baseVertex, sectionInfo);
-    }
-
-    private static int culledGroups(int[] ranges, int offset) {
-        return behind(ranges, offset, UP, eyeUp) | behind(ranges, offset, EAST, eyeEast) | behind(ranges, offset, NORTH_EAST, eyeNorthEast) | behind(ranges, offset, NORTH, eyeNorth) | behind(ranges, offset, NORTH_WEST, eyeNorthWest) | behind(ranges, offset, WEST, eyeWest) | behind(ranges, offset, SOUTH_WEST, eyeSouthWest) | behind(ranges, offset, SOUTH, eyeSouth) | behind(ranges, offset, SOUTH_EAST, eyeSouthEast) | behind(ranges, offset, DOWN, eyeDown);
-    }
-
-    private static int behind(int[] ranges, int offset, int group, double signedEye) {
-        return ranges[offset + PLANES + group / PLANES_PER_INT] << PLANE_SHIFT - PLANE_BITS * (group % PLANES_PER_INT) >> PLANE_SHIFT >= signedEye ? 1 << group : 0;
-    }
-
-    private static void addRange(SectionDrawList draws, int layer, int vertexBuffer, int start, int end, int baseVertex, int sectionInfo) {
-        if (end > start)
-            draws.add(draws.group(layer, false, vertexBuffer, DrawRecords.NO_BUFFER, 0), (end - start) * INDICES_PER_QUAD, start * INDICES_PER_QUAD, baseVertex, sectionInfo);
     }
 
     private static void groupVertices(long base, int positionOffset, int vertexSize, int quads, int[] target, int offset) {
         if (quads > QUAD_MASK + 1)
             throw new IllegalStateException(quads + " quads do not fit the " + QUAD_BITS + " bit quad numbers of the face direction order");
 
-        int    quadSize     = vertexSize * VERTICES_PER_QUAD;
-        long   positions    = base + positionOffset;
-        long[] order        = new long[quads];
-        int[]  destinations = new int[quads];
-        int[]  counts       = new int[GROUPS];
-        int[]  planes       = new int[GROUPS];
-        int[]  ranges       = new int[RANGES];
+        int     quadSize     = vertexSize * VERTICES_PER_QUAD;
+        long    positions    = base + positionOffset;
+        long[]  order        = new long[quads];
+        int[]   destinations = new int[quads];
+        int[]   ranges       = new int[RANGES];
+        float[] planes       = new float[GROUPS];
 
-        Arrays.fill(planes, HIGHEST_PLANE);
+        Arrays.fill(planes, Float.POSITIVE_INFINITY);
 
         for (int quad = 0; quad < quads; quad ++) {
             long first = positions + (long) quad * quadSize;
             int  group = classify(first, vertexSize);
             int  depth = 0;
 
-            if (group != OTHER) {
-                float plane     = plane(first, vertexSize, group);
-                int   quantized = (int) Math.floor(plane * PLANE_UNITS);
+            ranges[group] ++;
 
-                if (quantized < LOWEST_PLANE) {
-                    group = OTHER;
-                } else {
-                    planes[group] = Math.min(planes[group], quantized);
-                    depth         = Math.round(plane * DEPTH_STEPS) ^ Integer.MAX_VALUE;
-                }
+            if (group != UNASSIGNED) {
+                float plane = signedPlane(first, vertexSize, group);
+
+                planes[group] = Math.min(planes[group], plane);
+                depth         = Math.round(plane * PLANE_STEPS) ^ Integer.MAX_VALUE;
             }
 
-            counts[group] ++;
             order[quad] = (long) group << GROUP_SHIFT | (depth & 0xFFFFFFFFL) << QUAD_BITS | quad;
         }
 
-        int end = 0;
+        int end      = 0;
+        int occupied = 0;
 
-        for (int group = 0; group < LAST; group ++) {
-            end          += counts[group];
-            ranges[group] = end;
+        for (int group = 0; group < GROUPS; group ++) {
+            if (ranges[group] != 0)
+                occupied |= 1 << group;
+
+            end                   += ranges[group];
+            ranges[group]          = end;
+            ranges[PLANES + group] = Float.floatToRawIntBits(planes[group]);
         }
 
-        for (int group = 0; group < GROUPS; group ++)
-            ranges[PLANES + group / PLANES_PER_INT] |= (planes[group] & PLANE_MASK) << PLANE_BITS * (group % PLANES_PER_INT);
+        ranges[OCCUPIED] = occupied;
 
         Arrays.sort(order);
 
@@ -210,6 +171,40 @@ public final class FacingCulling {
 
         permute(base, quadSize, destinations);
         System.arraycopy(ranges, 0, target, offset, RANGES);
+    }
+
+    private static int behind(int[] ranges, int offset, int group, double signedEye) {
+        return Float.intBitsToFloat(ranges[offset + PLANES + group]) >= signedEye ? 1 << group : 0;
+    }
+
+    private static int[] segments() {
+        int[] segments = new int[1 << GROUPS];
+
+        for (int culled = 0; culled < segments.length; culled ++) {
+            int packed = 0;
+            int count  = 0;
+            int first  = -1;
+
+            for (int group = 0; group <= GROUPS; group ++) {
+                if (group < GROUPS && (culled & 1 << group) == 0) {
+                    if (first == -1)
+                        first = group;
+
+                    continue;
+                }
+
+                if (first == -1)
+                    continue;
+
+                packed |= (first | group - 1 << SEGMENT_FIELD_BITS) << SEGMENT_FIELD_BITS * (1 + 2 * count);
+                count ++;
+                first = -1;
+            }
+
+            segments[culled] = packed | count;
+        }
+
+        return segments;
     }
 
     private static int classify(long first, int vertexSize) {
@@ -228,38 +223,37 @@ public final class FacingCulling {
         double length = Math.sqrt(nx * nx + ny * ny + nz * nz);
 
         if (!(length > 0.0))
-            return OTHER;
+            return UNASSIGNED;
 
         double limit = OFF_AXIS * length;
 
         if (Math.abs(ny) < limit && Math.abs(nz) < limit)
-            return nx > 0.0 ? EAST : WEST;
+            return nx > 0.0 ? X : OPPOSITE - X;
 
         if (Math.abs(nx) < limit && Math.abs(nz) < limit)
-            return ny > 0.0 ? UP : DOWN;
+            return ny > 0.0 ? Y : OPPOSITE - Y;
 
         if (Math.abs(nx) < limit && Math.abs(ny) < limit)
-            return nz > 0.0 ? SOUTH : NORTH;
+            return nz > 0.0 ? Z : OPPOSITE - Z;
 
-        if (Math.abs(ny) >= limit || Math.abs(Math.abs(nx) - Math.abs(nz)) >= limit)
-            return OTHER;
-
-        if (nx > 0.0)
-            return nz > 0.0 ? SOUTH_EAST : NORTH_EAST;
-
-        return nz > 0.0 ? SOUTH_WEST : NORTH_WEST;
+        return UNASSIGNED;
     }
 
-    private static float plane(long first, int vertexSize, int group) {
+    private static float signedPlane(long first, int vertexSize, int group) {
+        int   axis  = axis(group);
         float plane = Float.POSITIVE_INFINITY;
 
         for (int vertex = 0; vertex < VERTICES_PER_QUAD; vertex ++) {
-            long position = first + (long) vertex * vertexSize;
+            float value = coordinate(first + (long) vertex * vertexSize, axis);
 
-            plane = Math.min(plane, NORMAL_X[group] * coordinate(position, X) + NORMAL_Y[group] * coordinate(position, Y) + NORMAL_Z[group] * coordinate(position, Z));
+            plane = Math.min(plane, group < UNASSIGNED ? value : -value);
         }
 
         return plane;
+    }
+
+    private static int axis(int group) {
+        return group < UNASSIGNED ? group : OPPOSITE - group;
     }
 
     private static float coordinate(long vertex, int axis) {

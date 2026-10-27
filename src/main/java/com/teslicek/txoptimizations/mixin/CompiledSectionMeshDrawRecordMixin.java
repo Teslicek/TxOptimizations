@@ -65,7 +65,7 @@ public abstract class CompiledSectionMeshDrawRecordMixin implements SectionAlloc
             DrawRecords.setDraw(record, layer.ordinal(), layer.translucent(), draw.indexCount(), draw.hasCustomIndexBuffer(), draw.indexType().ordinal());
 
             if (!layer.translucent())
-                FacingCulling.groupQuads(entry.getValue(), draw.indexCount(), record, DrawRecords.facing(record, layer.ordinal()));
+                FacingCulling.groupQuads(entry.getValue(), record, DrawRecords.facing(record, layer.ordinal()));
 
             if (CompactTerrain.active())
                 CompactTerrain.encode(entry.getValue());

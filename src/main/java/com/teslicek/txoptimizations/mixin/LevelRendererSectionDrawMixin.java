@@ -242,7 +242,13 @@ public abstract class LevelRendererSectionDrawMixin {
                     prepared = true;
                 }
 
-                FacingCulling.addDraws(draws, layer, vertexBuffer, record, block + DrawRecords.FACING, indexCount, firstVertex, sectionInfo);
+                int facing        = block + DrawRecords.FACING;
+                int visibleGroups = FacingCulling.visibleGroups(record, facing);
+
+                if (visibleGroups == 0)
+                    continue;
+
+                FacingCulling.addDraws(draws, draws.group(layer, false, vertexBuffer, DrawRecords.NO_BUFFER, 0), record, facing, visibleGroups, firstVertex, sectionInfo);
                 continue;
             }
 
