@@ -185,6 +185,7 @@
     "BoundTickingBlockEntityIdleMixin",
     "ParticleLightCacheMixin",
     "ParticleRotationMixin",
+    "SingleQuadParticleSnapshotMixin",
     "PatchedDataComponentMapEmptyPatchMixin",
     "PostChainOutlineDepthMixin",
     "PostChainPassesAccessor",
