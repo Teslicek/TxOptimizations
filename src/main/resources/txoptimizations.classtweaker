@@ -104,6 +104,7 @@ accessible field net/minecraft/client/renderer/block/BlockModelResolver modelMan
 accessible field net/minecraft/client/renderer/block/model/BlockStateModelWrapper model Lnet/minecraft/client/renderer/block/dispatch/BlockStateModel;
 accessible field net/minecraft/client/renderer/block/model/BlockStateModelWrapper tints Ljava/util/List;
 accessible field net/minecraft/client/renderer/block/dispatch/SingleVariant model Lnet/minecraft/client/renderer/block/dispatch/BlockStateModelPart;
+accessible field net/minecraft/client/renderer/block/dispatch/WeightedVariants list Lnet/minecraft/util/random/WeightedList;
 # Section tree walk
 accessible class net/minecraft/client/renderer/Octree$Branch
 accessible class net/minecraft/client/renderer/Octree$AxisSorting

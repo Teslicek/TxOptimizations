@@ -186,6 +186,8 @@
     "ParticleLightCacheMixin",
     "ParticleRotationMixin",
     "SingleQuadParticleSnapshotMixin",
+    "BlockModelResolverSharedModelMixin",
+    "BlockModelRenderStateCopyMixin",
     "PatchedDataComponentMapEmptyPatchMixin",
     "PostChainOutlineDepthMixin",
     "PostChainPassesAccessor",
