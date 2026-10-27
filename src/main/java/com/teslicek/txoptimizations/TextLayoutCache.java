@@ -25,8 +25,13 @@ public final class TextLayoutCache {
     private static final Key                               PROBE           = new Key();
 
     private static long lastEviction;
+    private static int  generation;
 
     private TextLayoutCache() {
+    }
+
+    public static int generation() {
+        return generation;
     }
 
     public static Font.PreparedText find(Font font, FormattedCharSequence text, float x, float y, int color, boolean dropShadow, int backgroundColor, boolean outline) {
@@ -166,6 +171,7 @@ public final class TextLayoutCache {
         SEQUENCE_WIDTHS.clear();
         STRING_WIDTHS.clear();
         SEQUENCES.clear();
+        generation ++;
     }
 
     private static boolean isStable(FormattedCharSequence text) {

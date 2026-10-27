@@ -10,6 +10,7 @@ import net.minecraft.world.phys.Vec3;
 import org.joml.FrustumIntersection;
 import org.joml.Matrix4f;
 import org.joml.Matrix4fc;
+import org.jspecify.annotations.Nullable;
 
 public final class DisplayCulling {
 
@@ -82,6 +83,30 @@ public final class DisplayCulling {
         if (!active || info.lines().isEmpty())
             return false;
 
+        TextCullingSlot slot       = (TextCullingSlot) (Object) info;
+        TextCullingBox  box        = slot.txoptimizations$cullingBox();
+        int             generation = TextLayoutCache.generation();
+
+        if (box == null || !box.isFor(font, generation, backgroundColor, width, height, shadow, alignment, color)) {
+            box = textBox(font, info, generation, backgroundColor, width, height, shadow, alignment, color);
+
+            if (box == null)
+                return false;
+
+            slot.txoptimizations$setCullingBox(box);
+        }
+
+        if (box.minX() > box.maxX())
+            return false;
+
+        return isBoxHidden(pose, box.minX(), box.minY(), 0.0F, box.maxX(), box.maxY(), 0.0F);
+    }
+
+    public static boolean isVanilla(Object renderer) {
+        return renderer.getClass().getName().startsWith("net.minecraft.");
+    }
+
+    private static @Nullable TextCullingBox textBox(Font font, Display.TextDisplay.CachedInfo info, int generation, int backgroundColor, int width, int height, boolean shadow, Display.TextDisplay.Align alignment, int color) {
         float minX = backgroundColor != 0 ? -1.0F : Float.POSITIVE_INFINITY;
         float minY = backgroundColor != 0 ? -1.0F : Float.POSITIVE_INFINITY;
         float maxX = backgroundColor != 0 ? width : Float.NEGATIVE_INFINITY;
@@ -98,7 +123,7 @@ public final class DisplayCulling {
             Font.PreparedText text = TextLayoutCache.find(font, line.contents(), offset, y, color, shadow, 0, false);
 
             if (text == null)
-                return false;
+                return null;
 
             ScreenRectangle bounds = text.bounds();
 
@@ -112,14 +137,7 @@ public final class DisplayCulling {
             y += TEXT_LINE_HEIGHT;
         }
 
-        if (minX > maxX)
-            return false;
-
-        return isBoxHidden(pose, minX, minY, 0.0F, maxX, maxY, 0.0F);
-    }
-
-    public static boolean isVanilla(Object renderer) {
-        return renderer.getClass().getName().startsWith("net.minecraft.");
+        return new TextCullingBox(font, generation, backgroundColor, width, height, shadow, alignment, color, minX, minY, maxX, maxY);
     }
 
     private static boolean isBoxHidden(Matrix4fc pose, float boxMinX, float boxMinY, float boxMinZ, float boxMaxX, float boxMaxY, float boxMaxZ) {

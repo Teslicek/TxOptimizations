@@ -284,6 +284,7 @@
     "StagedVertexBufferDirectCopyMixin",
     "StagedVertexBufferDrawAccessor",
     "TextDisplayRendererCullingMixin",
+    "TextCullingSlotMixin",
     "TextFeatureRendererLayoutCacheMixin",
     "SubmitNodeCollectionNameWidthMixin",
     "TextureAtlasBatchedAnimationMixin",
