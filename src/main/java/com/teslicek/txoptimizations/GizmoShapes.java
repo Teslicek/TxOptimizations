@@ -13,9 +13,14 @@ public final class GizmoShapes {
     private static final int         X_CORNER_TINT   = -34953;
     private static final int         Y_CORNER_TINT   = -8913033;
     private static final int         Z_CORNER_TINT   = -8947713;
+    private static final int         TIP_SLOTS       = 1024;
+    private static final int         TIP_VALUES      = 12;
     private static final Quaternionf ROTATION        = new Quaternionf();
     private static final Vector3f    DIRECTION       = new Vector3f();
     private static final float[]     ROTATION_MATRIX = new float[9];
+    private static final long[]      TIP_KEYS        = new long[TIP_SLOTS * 3];
+    private static final boolean[]   TIP_FILLED      = new boolean[TIP_SLOTS];
+    private static final float[]     TIPS            = new float[TIP_SLOTS * TIP_VALUES];
 
     private GizmoShapes() {
     }
@@ -88,20 +93,38 @@ public final class GizmoShapes {
             throw new IllegalStateException("Gizmo primitives are not packed: " + primitives.getClass().getName());
 
         packed.txoptimizations$addLine(startX, startY, startZ, endX, endY, endZ, color, width);
-        DIRECTION.set((float) (endX + -startX), (float) (endY + -startY), (float) (endZ + -startZ)).normalize();
-        ROTATION.rotationTo(1.0F, 0.0F, 0.0F, DIRECTION.x, DIRECTION.y, DIRECTION.z);
 
         double distanceX = startX - endX;
         double distanceY = startY - endY;
         double distanceZ = startZ - endZ;
-        float  len       = (float) Mth.clamp(Math.sqrt(distanceX * distanceX + distanceY * distanceY + distanceZ * distanceZ) * 0.1F, 0.1F, 1.0);
+        long   keyX      = Double.doubleToRawLongBits(distanceX);
+        long   keyY      = Double.doubleToRawLongBits(distanceY);
+        long   keyZ      = Double.doubleToRawLongBits(distanceZ);
+        long   mixed     = (keyX * 0x9E3779B97F4A7C15L + keyY) * 0x9E3779B97F4A7C15L + keyZ;
+        int    slot      = (int) (mixed * 0x9E3779B97F4A7C15L >>> 54);
+        int    keyBase   = slot * 3;
+        int    tipBase   = slot * TIP_VALUES;
 
-        prepareRotationMatrix();
+        if (!TIP_FILLED[slot] || TIP_KEYS[keyBase] != keyX || TIP_KEYS[keyBase + 1] != keyY || TIP_KEYS[keyBase + 2] != keyZ) {
+            DIRECTION.set((float) (endX + -startX), (float) (endY + -startY), (float) (endZ + -startZ)).normalize();
+            ROTATION.rotationTo(1.0F, 0.0F, 0.0F, DIRECTION.x, DIRECTION.y, DIRECTION.z);
 
-        tip(packed, endX, endY, endZ, -len, len, 0.0F, color, width);
-        tip(packed, endX, endY, endZ, -len, 0.0F, len, color, width);
-        tip(packed, endX, endY, endZ, -len, -len, 0.0F, color, width);
-        tip(packed, endX, endY, endZ, -len, 0.0F, -len, color, width);
+            float len = (float) Mth.clamp(Math.sqrt(distanceX * distanceX + distanceY * distanceY + distanceZ * distanceZ) * 0.1F, 0.1F, 1.0);
+
+            prepareRotationMatrix();
+            rotateTip(tipBase, -len, len, 0.0F);
+            rotateTip(tipBase + 3, -len, 0.0F, len);
+            rotateTip(tipBase + 6, -len, -len, 0.0F);
+            rotateTip(tipBase + 9, -len, 0.0F, -len);
+
+            TIP_KEYS[keyBase]     = keyX;
+            TIP_KEYS[keyBase + 1] = keyY;
+            TIP_KEYS[keyBase + 2] = keyZ;
+            TIP_FILLED[slot]      = true;
+        }
+
+        for (int tip = tipBase; tip < tipBase + TIP_VALUES; tip += 3)
+            packed.txoptimizations$addLine(endX + TIPS[tip], endY + TIPS[tip + 1], endZ + TIPS[tip + 2], endX, endY, endZ, color, width);
     }
 
     private static void prepareRotationMatrix() {
@@ -128,12 +151,11 @@ public final class GizmoShapes {
         ROTATION_MATRIX[8] = (zz - xx - yy + ww) * k;
     }
 
-    private static void tip(PackedGizmoPrimitives packed, double endX, double endY, double endZ, float x, float y, float z, int color, float width) {
-        float[] m    = ROTATION_MATRIX;
-        float   tipX = org.joml.Math.fma(m[0], x, org.joml.Math.fma(m[1], y, m[2] * z));
-        float   tipY = org.joml.Math.fma(m[3], x, org.joml.Math.fma(m[4], y, m[5] * z));
-        float   tipZ = org.joml.Math.fma(m[6], x, org.joml.Math.fma(m[7], y, m[8] * z));
+    private static void rotateTip(int base, float x, float y, float z) {
+        float[] m = ROTATION_MATRIX;
 
-        packed.txoptimizations$addLine(endX + tipX, endY + tipY, endZ + tipZ, endX, endY, endZ, color, width);
+        TIPS[base]     = org.joml.Math.fma(m[0], x, org.joml.Math.fma(m[1], y, m[2] * z));
+        TIPS[base + 1] = org.joml.Math.fma(m[3], x, org.joml.Math.fma(m[4], y, m[5] * z));
+        TIPS[base + 2] = org.joml.Math.fma(m[6], x, org.joml.Math.fma(m[7], y, m[8] * z));
     }
 }
