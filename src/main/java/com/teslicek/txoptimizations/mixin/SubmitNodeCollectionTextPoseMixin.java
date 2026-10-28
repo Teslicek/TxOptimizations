@@ -1,6 +1,10 @@
 package com.teslicek.txoptimizations.mixin;
 
+import com.teslicek.txoptimizations.RenderThreadStack;
+import com.teslicek.txoptimizations.TextContentCache;
 import net.minecraft.client.renderer.SubmitNodeCollection;
+import net.minecraft.client.renderer.feature.TextFeatureRenderer;
+import net.minecraft.util.FormattedCharSequence;
 import org.joml.Matrix4f;
 import org.joml.Matrix4fc;
 import org.jspecify.annotations.Nullable;
@@ -27,6 +31,14 @@ public abstract class SubmitNodeCollectionTextPoseMixin {
         this.txoptimizations$lastTextPose = copy;
 
         return copy;
+    }
+
+    @Redirect(method = "submitText", at = @At(value = "NEW", target = "(FFLnet/minecraft/util/FormattedCharSequence;ZIII)Lnet/minecraft/client/renderer/feature/TextFeatureRenderer$Content$Text;"))
+    private TextFeatureRenderer.Content.Text txoptimizations$reuseText(float x, float y, FormattedCharSequence string, boolean dropShadow, int color, int backgroundColor, int outlineColor) {
+        if (!RenderThreadStack.isOwner())
+            return new TextFeatureRenderer.Content.Text(x, y, string, dropShadow, color, backgroundColor, outlineColor);
+
+        return TextContentCache.text(x, y, string, dropShadow, color, backgroundColor, outlineColor);
     }
 
     @Unique
