@@ -3,6 +3,7 @@ package com.teslicek.txoptimizations.mixin;
 import com.mojang.renderpearl.api.buffers.GpuBuffer;
 import com.mojang.renderpearl.api.buffers.GpuBufferSlice;
 import com.mojang.renderpearl.backend.vulkan.VulkanGpuBuffer;
+import com.teslicek.txoptimizations.LastWrittenData;
 import com.teslicek.txoptimizations.NativeWrites;
 import com.teslicek.txoptimizations.PersistentRingBuffer;
 import com.teslicek.txoptimizations.SectionCommandStorage;
@@ -23,7 +24,7 @@ import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.Unique;
 
 @Mixin(value = DynamicGpuDataStorageMapped.class, priority = 999)
-public abstract class DynamicGpuDataStoragePersistentWriteMixin<T extends DynamicGpuDataStorage.DynamicGpuData> implements SectionCommandStorage, SectionInfoStorage {
+public abstract class DynamicGpuDataStoragePersistentWriteMixin<T extends DynamicGpuDataStorage.DynamicGpuData> implements SectionCommandStorage, SectionInfoStorage, LastWrittenData {
 
     @Shadow
     @Final
@@ -57,6 +58,11 @@ public abstract class DynamicGpuDataStoragePersistentWriteMixin<T extends Dynami
 
     @Shadow
     protected abstract void resizeBuffers(int newCapacity);
+
+    @Override
+    public DynamicGpuDataStorage.@Nullable DynamicGpuData txoptimizations$lastData() {
+        return this.lastData;
+    }
 
     @Overwrite
     public GpuBufferSlice writeData(T gpuData) {

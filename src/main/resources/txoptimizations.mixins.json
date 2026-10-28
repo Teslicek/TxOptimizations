@@ -64,6 +64,7 @@
     "DynamicAtlasAllocatorDiscardMixin",
     "DynamicChunkSectionWriteMixin",
     "DynamicGpuDataSectionDrawMixin",
+    "DynamicGpuDataTransformsAccessor",
     "DynamicGpuDataStoragePersistentWriteMixin",
     "DynamicTransformEqualsMixin",
     "EntityEquipmentCullingHeadMixin",
