@@ -21,6 +21,7 @@ public final class VertexBytes {
     private static final int    BYTE_MASK          = 0xFF;
     private static final int    HALF_BITS          = 16;
     private static final long   INT_MASK           = 0xFFFFFFFFL;
+    private static final int    NORMAL_MASK        = 0xFFFFFF;
     private static final byte   NORMAL_SCALE       = 127;
     private static final long   LINE_EDGE_BYTES    = 4L * LINE_STRIDE;
 
@@ -56,9 +57,10 @@ public final class VertexBytes {
         return LITTLE_ENDIAN ? (long) second << Integer.SIZE | first & INT_MASK : (long) packedBits(first) << Integer.SIZE | packedBits(second) & INT_MASK;
     }
 
-    public static void putNormal(long pointer, int packed) {
-        MemoryUtil.memPutShort(pointer, (short) (LITTLE_ENDIAN ? packed : (packed & BYTE_MASK) << Byte.SIZE | packed >> Byte.SIZE & BYTE_MASK));
-        MemoryUtil.memPutByte(pointer + 2L, (byte) (packed >> HALF_BITS));
+    public static void putPaddedNormal(long pointer, int packed) {
+        int normal = packed & NORMAL_MASK;
+
+        MemoryUtil.memPutInt(pointer, LITTLE_ENDIAN ? normal : Integer.reverseBytes(normal));
     }
 
     public static void putEntity(long pointer, float x, float y, float z, int argb, float u, float v, int overlay, int light, int normal) {
@@ -70,7 +72,7 @@ public final class VertexBytes {
         MemoryUtil.memPutLong(pointer + 8L, words(Float.floatToRawIntBits(z), colorBits));
         MemoryUtil.memPutLong(pointer + 16L, words(Float.floatToRawIntBits(u), Float.floatToRawIntBits(v)));
         MemoryUtil.memPutLong(pointer + 24L, coordinateBits);
-        putNormal(pointer + 32L, normal);
+        putPaddedNormal(pointer + 32L, normal);
     }
 
     public static void putBlock(long pointer, float x, float y, float z, int argb, float u, float v, int light) {
