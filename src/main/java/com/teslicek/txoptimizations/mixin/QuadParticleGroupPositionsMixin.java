@@ -1,8 +1,11 @@
 package com.teslicek.txoptimizations.mixin;
 
 import com.teslicek.txoptimizations.ClientClock;
+import com.teslicek.txoptimizations.FrustumBoxTest;
+import com.teslicek.txoptimizations.FrustumPlanes;
 import com.teslicek.txoptimizations.ParticleGroupChanges;
 import com.teslicek.txoptimizations.ParticleSnapshot;
+import java.util.Arrays;
 import net.minecraft.CrashReport;
 import net.minecraft.CrashReportCategory;
 import net.minecraft.ReportedException;
@@ -34,6 +37,18 @@ public abstract class QuadParticleGroupPositionsMixin extends ParticleGroup<Sing
     private static final int MAX_PARTICLES = 16384;
 
     @Unique
+    private static final int BLOCK_SHIFT = 6;
+
+    @Unique
+    private static final int BLOCK = 1 << BLOCK_SHIFT;
+
+    @Unique
+    private static final int BOUNDS = 6;
+
+    @Unique
+    private static final double[] PLANES = FrustumPlanes.newPlanes();
+
+    @Unique
     private static final Quaternionf ROTATION = new Quaternionf();
 
     @Shadow
@@ -60,6 +75,15 @@ public abstract class QuadParticleGroupPositionsMixin extends ParticleGroup<Sing
     private Object[] txoptimizations$refs = new Object[0];
 
     @Unique
+    private Object[] txoptimizations$order = new Object[0];
+
+    @Unique
+    private double[] txoptimizations$bounds = new double[0];
+
+    @Unique
+    private int txoptimizations$count;
+
+    @Unique
     private int txoptimizations$snapshotChanges = -1;
 
     @Unique
@@ -74,13 +98,26 @@ public abstract class QuadParticleGroupPositionsMixin extends ParticleGroup<Sing
         this.txoptimizations$snapshot();
 
         double[] positions = this.txoptimizations$positions;
-        int      index     = 0;
+        double[] bounds    = this.txoptimizations$bounds;
+        Object[] order     = this.txoptimizations$order;
+        int      count     = this.txoptimizations$count;
+        double[] planes    = PLANES;
 
-        for (Object particle : this.particles) {
-            if (frustum.pointInFrustum(positions[index * AXES], positions[index * AXES + 1], positions[index * AXES + 2]))
-                this.txoptimizations$extract((SingleQuadParticle) particle, index, camera, partialTickTime);
+        ((FrustumBoxTest) frustum).txoptimizations$capturePlanes(planes);
 
-            index ++;
+        for (int start = 0; start < count; start += BLOCK) {
+            int at    = (start >> BLOCK_SHIFT) * BOUNDS;
+            int shape = FrustumPlanes.classifyPoints(planes, bounds[at], bounds[at + 1], bounds[at + 2], bounds[at + 3], bounds[at + 4], bounds[at + 5]);
+
+            if (shape == FrustumBoxTest.OUTSIDE)
+                continue;
+
+            int end = Math.min(start + BLOCK, count);
+
+            for (int index = start; index < end; index ++) {
+                if (shape == FrustumBoxTest.INSIDE || frustum.pointInFrustum(positions[index * AXES], positions[index * AXES + 1], positions[index * AXES + 2]))
+                    this.txoptimizations$extract((SingleQuadParticle) order[index], index, camera, partialTickTime);
+            }
         }
 
         return this.particleTypeRenderState;
@@ -104,22 +141,42 @@ public abstract class QuadParticleGroupPositionsMixin extends ParticleGroup<Sing
             this.txoptimizations$floats    = new float[capacity * ParticleSnapshot.FLOATS];
             this.txoptimizations$ints      = new int[capacity * ParticleSnapshot.INTS];
             this.txoptimizations$refs      = new Object[capacity * ParticleSnapshot.REFS];
+            this.txoptimizations$order     = new Object[capacity];
+            this.txoptimizations$bounds    = new double[(capacity + BLOCK - 1) / BLOCK * BOUNDS];
         }
 
         double[] positions = this.txoptimizations$positions;
+        double[] bounds    = this.txoptimizations$bounds;
+        Object[] order     = this.txoptimizations$order;
         int      index     = 0;
+
+        Arrays.fill(order, count, order.length, null);
 
         for (SingleQuadParticle particle : this.particles) {
             positions[index * AXES]     = particle.x;
             positions[index * AXES + 1] = particle.y;
             positions[index * AXES + 2] = particle.z;
+            order[index]                = particle;
+
+            txoptimizations$include(bounds, (index >> BLOCK_SHIFT) * BOUNDS, (index & BLOCK - 1) == 0, particle.x, particle.y, particle.z);
 
             ((ParticleSnapshot) particle).txoptimizations$snapshot(this.txoptimizations$floats, index * ParticleSnapshot.FLOATS, this.txoptimizations$ints, index * ParticleSnapshot.INTS, this.txoptimizations$refs, index * ParticleSnapshot.REFS, this.txoptimizations$previous, index * AXES);
             index ++;
         }
 
+        this.txoptimizations$count           = index;
         this.txoptimizations$snapshotChanges = changes;
         this.txoptimizations$snapshotTick    = tick;
+    }
+
+    @Unique
+    private static void txoptimizations$include(double[] bounds, int at, boolean first, double x, double y, double z) {
+        bounds[at]     = first ? x : Math.min(bounds[at], x);
+        bounds[at + 1] = first ? y : Math.min(bounds[at + 1], y);
+        bounds[at + 2] = first ? z : Math.min(bounds[at + 2], z);
+        bounds[at + 3] = first ? x : Math.max(bounds[at + 3], x);
+        bounds[at + 4] = first ? y : Math.max(bounds[at + 4], y);
+        bounds[at + 5] = first ? z : Math.max(bounds[at + 5], z);
     }
 
     @Unique

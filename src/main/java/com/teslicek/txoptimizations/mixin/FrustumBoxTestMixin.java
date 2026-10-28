@@ -1,6 +1,7 @@
 package com.teslicek.txoptimizations.mixin;
 
 import com.teslicek.txoptimizations.FrustumBoxTest;
+import com.teslicek.txoptimizations.FrustumPlanes;
 import net.minecraft.client.renderer.culling.Frustum;
 import net.minecraft.world.phys.AABB;
 import org.joml.FrustumIntersection;
@@ -33,5 +34,10 @@ public abstract class FrustumBoxTestMixin implements FrustumBoxTest {
     @Override
     public boolean txoptimizations$isBoxVisible(double minX, double minY, double minZ, double maxX, double maxY, double maxZ) {
         return this.intersection.testAab((float) (minX - this.camX), (float) (minY - this.camY), (float) (minZ - this.camZ), (float) (maxX - this.camX), (float) (maxY - this.camY), (float) (maxZ - this.camZ));
+    }
+
+    @Override
+    public void txoptimizations$capturePlanes(double[] planes) {
+        FrustumPlanes.capture(this.intersection, this.camX, this.camY, this.camZ, planes);
     }
 }
