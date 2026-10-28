@@ -28,7 +28,7 @@ import net.minecraft.client.renderer.state.OptionsRenderState;
 import net.minecraft.client.renderer.state.level.LevelRenderState;
 import net.minecraft.client.renderer.texture.TextureAtlas;
 import net.minecraft.client.renderer.texture.TextureManager;
-import net.minecraft.core.BlockPos;
+import net.minecraft.core.SectionPos;
 import net.minecraft.util.Util;
 import org.joml.Matrix4fc;
 import org.jspecify.annotations.Nullable;
@@ -194,14 +194,14 @@ public abstract class LevelRendererSectionDrawMixin {
                 if (DrawRecords.drawable(flags) == 0)
                     continue;
 
-                SectionRenderDispatcher.RenderSection section      = chunkSections[index];
-                BlockPos                              renderOffset = section.getRenderOrigin();
+                SectionRenderDispatcher.RenderSection section = chunkSections[index];
+                long                                  node    = section.getSectionNode();
 
                 chunkRecords[drawn] = record;
                 chunkFlags[drawn]   = flags;
-                chunkX[drawn]       = renderOffset.getX();
-                chunkY[drawn]       = renderOffset.getY();
-                chunkZ[drawn]       = renderOffset.getZ();
+                chunkX[drawn]       = SectionPos.sectionToBlockCoord(SectionPos.x(node));
+                chunkY[drawn]       = SectionPos.sectionToBlockCoord(SectionPos.y(node));
+                chunkZ[drawn]       = SectionPos.sectionToBlockCoord(SectionPos.z(node));
                 chunkFades[drawn]   = section.getVisibility(now, fadeDuration);
                 drawn ++;
             }
