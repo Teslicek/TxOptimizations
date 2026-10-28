@@ -103,12 +103,14 @@ public abstract class QuadParticleGroupPositionsMixin extends ParticleGroup<Sing
         Object[] order     = this.txoptimizations$order;
         int      count     = this.txoptimizations$count;
         double[] planes    = PLANES;
+        boolean  vanilla   = frustum.getClass() == Frustum.class;
 
-        ((FrustumBoxTest) frustum).txoptimizations$capturePlanes(planes);
+        if (vanilla)
+            ((FrustumBoxTest) frustum).txoptimizations$capturePlanes(planes);
 
         for (int start = 0; start < count; start += BLOCK) {
             int at    = (start >> BLOCK_SHIFT) * BOUNDS;
-            int shape = FrustumPlanes.classifyPoints(planes, bounds[at], bounds[at + 1], bounds[at + 2], bounds[at + 3], bounds[at + 4], bounds[at + 5]);
+            int shape = vanilla ? FrustumPlanes.classifyPoints(planes, bounds[at], bounds[at + 1], bounds[at + 2], bounds[at + 3], bounds[at + 4], bounds[at + 5]) : FrustumBoxTest.MIXED;
 
             if (shape == FrustumBoxTest.OUTSIDE)
                 continue;
