@@ -1,6 +1,6 @@
 package com.teslicek.txoptimizations.mixin;
 
-import it.unimi.dsi.fastutil.objects.Object2IntOpenHashMap;
+import it.unimi.dsi.fastutil.objects.Reference2IntOpenHashMap;
 import java.util.List;
 import net.minecraft.client.renderer.rendertype.PreparedRenderType;
 import org.spongepowered.asm.mixin.Mixin;
@@ -18,14 +18,19 @@ public abstract class RenderTypeGroupIndexMixin {
     private static final int LINEAR_SEARCH_LIMIT = 8;
 
     @Unique
-    private Object2IntOpenHashMap<PreparedRenderType> txoptimizations$index;
+    private Reference2IntOpenHashMap<PreparedRenderType> txoptimizations$index;
 
     @Redirect(method = "getOrAddDraw", at = @At(value = "INVOKE", target = "Ljava/util/List;indexOf(Ljava/lang/Object;)I"))
     private int txoptimizations$findIndexed(List<PreparedRenderType> list, Object type) {
-        if (this.txoptimizations$index == null)
-            return list.indexOf(type);
+        if (this.txoptimizations$index != null)
+            return this.txoptimizations$index.getInt(type);
 
-        return this.txoptimizations$index.getInt(type);
+        for (int position = 0; position < list.size(); position ++) {
+            if (list.get(position) == type)
+                return position;
+        }
+
+        return NOT_FOUND;
     }
 
     @Redirect(method = "getOrAddDraw", at = @At(value = "INVOKE", target = "Ljava/util/List;add(Ljava/lang/Object;)Z", ordinal = 1))
@@ -39,7 +44,7 @@ public abstract class RenderTypeGroupIndexMixin {
         }
 
         if (list.size() > LINEAR_SEARCH_LIMIT) {
-            Object2IntOpenHashMap<PreparedRenderType> index = new Object2IntOpenHashMap<>(list.size() * 2);
+            Reference2IntOpenHashMap<PreparedRenderType> index = new Reference2IntOpenHashMap<>(list.size() * 2);
 
             index.defaultReturnValue(NOT_FOUND);
 
