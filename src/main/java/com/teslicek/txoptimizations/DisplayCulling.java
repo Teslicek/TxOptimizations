@@ -72,11 +72,11 @@ public final class DisplayCulling {
         return isBoxHidden(pose, (float) box.minX, (float) box.minY, (float) box.minZ, (float) box.maxX, (float) box.maxY, (float) box.maxZ);
     }
 
-    public static boolean isGizmoHidden(double minX, double minY, double minZ, double maxX, double maxY, double maxZ, double padding) {
+    public static boolean isGizmoHidden(double minX, double minY, double minZ, double maxX, double maxY, double maxZ) {
         if (!active)
             return false;
 
-        return !GIZMO_FRUSTUM.testAab((float) (minX - padding - cameraX), (float) (minY - padding - cameraY), (float) (minZ - padding - cameraZ), (float) (maxX + padding - cameraX), (float) (maxY + padding - cameraY), (float) (maxZ + padding - cameraZ));
+        return !GIZMO_FRUSTUM.testAab((float) (minX - cameraX), (float) (minY - cameraY), (float) (minZ - cameraZ), (float) (maxX - cameraX), (float) (maxY - cameraY), (float) (maxZ - cameraZ));
     }
 
     public static boolean isTextHidden(Font font, Matrix4fc pose, Display.TextDisplay.CachedInfo info, int backgroundColor, int width, int height, boolean shadow, Display.TextDisplay.Align alignment, int color) {

@@ -51,6 +51,7 @@ public abstract class EntityHitboxDebugRendererMixin {
         double maxY            = Math.max(bounds.minY + offsetY, bounds.maxY + offsetY);
         double maxZ            = Math.max(bounds.minZ + offsetZ, bounds.maxZ + offsetZ);
 
+        HitboxGizmos.beginEntity();
         HitboxGizmos.cuboid(minX, minY, minZ, maxX, maxY, maxZ, isServerEntity ? SERVER_STROKE : CLIENT_STROKE);
         HitboxGizmos.point(currentX, currentY, currentZ, mainColor, 2.0F);
 
@@ -94,5 +95,7 @@ public abstract class EntityHitboxDebugRendererMixin {
 
             HitboxGizmos.arrow(currentX, currentY, currentZ, currentX + deltaMovement.x, currentY + deltaMovement.y, currentZ + deltaMovement.z, -256);
         }
+
+        HitboxGizmos.endEntity();
     }
 }

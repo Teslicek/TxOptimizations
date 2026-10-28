@@ -19,6 +19,7 @@ public final class HitboxGizmos implements Gizmo {
     private static final int   CUBOID      = 0;
     private static final int   POINT       = 1;
     private static final int   ARROW       = 2;
+    private static final int   GROUP       = 3;
     private static final int   VALUES      = 6;
     private static final int   INITIAL     = 64;
     private static final int   POOL_SIZE   = 4;
@@ -39,6 +40,7 @@ public final class HitboxGizmos implements Gizmo {
     private @Nullable SimpleGizmoCollector collector;
     private @Nullable GizmoProperties      instance;
     private int                            position;
+    private int                            group   = -1;
     private volatile boolean               emitted;
 
     private HitboxGizmos() {
@@ -49,13 +51,16 @@ public final class HitboxGizmos implements Gizmo {
         if (this.emitted)
             throw new IllegalStateException("Hitbox gizmos were emitted twice");
 
+        this.closeGroup();
+
         for (int index = 0; index < this.count; index ++) {
             int base = index * VALUES;
 
-            if (this.isHidden(index, base))
-                continue;
-
             switch (this.kinds[index]) {
+                case GROUP -> {
+                    if (DisplayCulling.isGizmoHidden(this.values[base], this.values[base + 1], this.values[base + 2], this.values[base + 3], this.values[base + 4], this.values[base + 5]))
+                        index += this.colors[index];
+                }
                 case CUBOID -> GizmoShapes.emitCuboid(primitives, this.values[base], this.values[base + 1], this.values[base + 2], this.values[base + 3], this.values[base + 4], this.values[base + 5], (GizmoStyle) this.objects[index], false, alphaMultiplier);
                 case POINT -> GizmoShapes.emitPoint(primitives, this.values[base], this.values[base + 1], this.values[base + 2], ARGB.multiplyAlpha(this.colors[index], alphaMultiplier), this.sizes[index]);
                 case ARROW -> GizmoShapes.emitArrow(primitives, this.values[base], this.values[base + 1], this.values[base + 2], this.values[base + 3], this.values[base + 4], this.values[base + 5], this.colors[index], this.sizes[index], alphaMultiplier);
@@ -67,15 +72,26 @@ public final class HitboxGizmos implements Gizmo {
         this.emitted = true;
     }
 
-    private boolean isHidden(int index, int base) {
-        double[] values = this.values;
+    private void closeGroup() {
+        if (this.group < 0)
+            return;
 
-        return switch (this.kinds[index]) {
-            case CUBOID -> DisplayCulling.isGizmoHidden(values[base], values[base + 1], values[base + 2], values[base + 3], values[base + 4], values[base + 5], 0.0);
-            case POINT -> DisplayCulling.isGizmoHidden(values[base], values[base + 1], values[base + 2], values[base], values[base + 1], values[base + 2], 0.0);
-            case ARROW -> DisplayCulling.isGizmoHidden(Math.min(values[base], values[base + 3]), Math.min(values[base + 1], values[base + 4]), Math.min(values[base + 2], values[base + 5]), Math.max(values[base], values[base + 3]), Math.max(values[base + 1], values[base + 4]), Math.max(values[base + 2], values[base + 5]), ARROW_HEAD);
-            default -> throw new IllegalStateException("Unknown hitbox gizmo kind " + this.kinds[index]);
-        };
+        this.colors[this.group] = this.count - this.group - 1;
+        this.group              = -1;
+    }
+
+    private void include(double minX, double minY, double minZ, double maxX, double maxY, double maxZ) {
+        if (this.group < 0)
+            return;
+
+        int base = this.group * VALUES;
+
+        this.values[base]     = Math.min(this.values[base], minX);
+        this.values[base + 1] = Math.min(this.values[base + 1], minY);
+        this.values[base + 2] = Math.min(this.values[base + 2], minZ);
+        this.values[base + 3] = Math.max(this.values[base + 3], maxX);
+        this.values[base + 4] = Math.max(this.values[base + 4], maxY);
+        this.values[base + 5] = Math.max(this.values[base + 5], maxZ);
     }
 
     private boolean isLast(SimpleGizmoCollector current) {
@@ -114,6 +130,30 @@ public final class HitboxGizmos implements Gizmo {
         this.values[base + 5] = sixth;
     }
 
+    public static void beginEntity() {
+        HitboxGizmos batch = batch();
+
+        if (batch == null)
+            return;
+
+        batch.closeGroup();
+
+        int index = batch.reserve(GROUP);
+
+        batch.putValues(index, Double.POSITIVE_INFINITY, Double.POSITIVE_INFINITY, Double.POSITIVE_INFINITY, Double.NEGATIVE_INFINITY, Double.NEGATIVE_INFINITY, Double.NEGATIVE_INFINITY);
+        batch.group = index;
+    }
+
+    public static void endEntity() {
+        if (!RenderThreadStack.isOwner())
+            return;
+
+        HitboxGizmos batch = open;
+
+        if (batch != null)
+            batch.closeGroup();
+    }
+
     public static void cuboid(double x1, double y1, double z1, double x2, double y2, double z2, GizmoStyle style) {
         HitboxGizmos batch = batch();
 
@@ -124,8 +164,16 @@ public final class HitboxGizmos implements Gizmo {
 
         int index = batch.reserve(CUBOID);
 
-        batch.putValues(index, Math.min(x1, x2), Math.min(y1, y2), Math.min(z1, z2), Math.max(x1, x2), Math.max(y1, y2), Math.max(z1, z2));
+        double minX = Math.min(x1, x2);
+        double minY = Math.min(y1, y2);
+        double minZ = Math.min(z1, z2);
+        double maxX = Math.max(x1, x2);
+        double maxY = Math.max(y1, y2);
+        double maxZ = Math.max(z1, z2);
+
+        batch.putValues(index, minX, minY, minZ, maxX, maxY, maxZ);
         batch.objects[index] = style;
+        batch.include(minX, minY, minZ, maxX, maxY, maxZ);
     }
 
     public static void point(double x, double y, double z, int color, float size) {
@@ -144,6 +192,7 @@ public final class HitboxGizmos implements Gizmo {
         batch.values[base + 2] = z;
         batch.colors[index]    = color;
         batch.sizes[index]     = size;
+        batch.include(x, y, z, x, y, z);
     }
 
     public static void arrow(double startX, double startY, double startZ, double endX, double endY, double endZ, int color) {
@@ -159,6 +208,7 @@ public final class HitboxGizmos implements Gizmo {
         batch.putValues(index, startX, startY, startZ, endX, endY, endZ);
         batch.colors[index] = color;
         batch.sizes[index]  = ARROW_WIDTH;
+        batch.include(Math.min(startX, endX) - ARROW_HEAD, Math.min(startY, endY) - ARROW_HEAD, Math.min(startZ, endZ) - ARROW_HEAD, Math.max(startX, endX) + ARROW_HEAD, Math.max(startY, endY) + ARROW_HEAD, Math.max(startZ, endZ) + ARROW_HEAD);
     }
 
     private static @Nullable HitboxGizmos batch() {

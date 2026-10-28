@@ -95,7 +95,6 @@
     "FontTextureSizeMixin",
     "FontManagerTextLayoutCacheMixin",
     "FormattedBidiReorderFastPathMixin",
-    "FramerateLimiterMixin",
     "FrontendGpuSurfaceDiscardMixin",
     "FrontendRenderPassBindingMixin",
     "FrontendRenderPipelinePassStampMixin",
