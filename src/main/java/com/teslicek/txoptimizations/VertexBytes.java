@@ -58,9 +58,19 @@ public final class VertexBytes {
     }
 
     public static void putPaddedNormal(long pointer, int packed) {
-        int normal = packed & NORMAL_MASK;
+        MemoryUtil.memPutInt(pointer, paddedNormalBits(packed));
+    }
 
-        MemoryUtil.memPutInt(pointer, LITTLE_ENDIAN ? normal : Integer.reverseBytes(normal));
+    public static void putEntityPair(long pointer, float x0, float y0, float z0, int colorBits0, float u0, float v0, long coordinateBits0, int normal0, float x1, float y1, float z1, int colorBits1, float u1, float v1, long coordinateBits1, int normal1) {
+        MemoryUtil.memPutLong(pointer, words(Float.floatToRawIntBits(x0), Float.floatToRawIntBits(y0)));
+        MemoryUtil.memPutLong(pointer + 8L, words(Float.floatToRawIntBits(z0), colorBits0));
+        MemoryUtil.memPutLong(pointer + 16L, words(Float.floatToRawIntBits(u0), Float.floatToRawIntBits(v0)));
+        MemoryUtil.memPutLong(pointer + 24L, coordinateBits0);
+        MemoryUtil.memPutLong(pointer + 32L, words(paddedNormalBits(normal0), Float.floatToRawIntBits(x1)));
+        MemoryUtil.memPutLong(pointer + 40L, words(Float.floatToRawIntBits(y1), Float.floatToRawIntBits(z1)));
+        MemoryUtil.memPutLong(pointer + 48L, words(colorBits1, Float.floatToRawIntBits(u1)));
+        MemoryUtil.memPutLong(pointer + 56L, words(Float.floatToRawIntBits(v1), firstWord(coordinateBits1)));
+        MemoryUtil.memPutLong(pointer + 64L, words(secondWord(coordinateBits1), paddedNormalBits(normal1)));
     }
 
     public static void putEntity(long pointer, float x, float y, float z, int argb, float u, float v, int overlay, int light, int normal) {
@@ -153,6 +163,20 @@ public final class VertexBytes {
 
     private static long words(int first, int second) {
         return LITTLE_ENDIAN ? (long) second << Integer.SIZE | first & INT_MASK : (long) first << Integer.SIZE | second & INT_MASK;
+    }
+
+    private static int paddedNormalBits(int packed) {
+        int normal = packed & NORMAL_MASK;
+
+        return LITTLE_ENDIAN ? normal : Integer.reverseBytes(normal);
+    }
+
+    private static int firstWord(long bits) {
+        return (int) (LITTLE_ENDIAN ? bits : bits >>> Integer.SIZE);
+    }
+
+    private static int secondWord(long bits) {
+        return (int) (LITTLE_ENDIAN ? bits >>> Integer.SIZE : bits);
     }
 
     private static int packedBits(int packed) {
