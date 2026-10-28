@@ -19,6 +19,9 @@ public abstract class RenderSectionDrawRecordMixin implements SectionDrawRecord 
     @Unique
     private volatile int @Nullable [] txoptimizations$drawRecord;
 
+    @Unique
+    private volatile boolean txoptimizations$translucentGeometry;
+
     @Shadow
     public abstract SectionMesh getSectionMesh();
 
@@ -42,13 +45,19 @@ public abstract class RenderSectionDrawRecordMixin implements SectionDrawRecord 
         return this.txoptimizations$drawRecord;
     }
 
+    @Override
+    public boolean txoptimizations$hasTranslucentGeometry() {
+        return this.txoptimizations$translucentGeometry;
+    }
+
     @Unique
     private void txoptimizations$readRecord() {
         SectionMesh mesh;
 
         do {
-            mesh                            = this.getSectionMesh();
-            this.txoptimizations$drawRecord = mesh instanceof DrawRecordHolder holder ? holder.txoptimizations$drawRecord() : null;
+            mesh                                     = this.getSectionMesh();
+            this.txoptimizations$drawRecord          = mesh instanceof DrawRecordHolder holder ? holder.txoptimizations$drawRecord() : null;
+            this.txoptimizations$translucentGeometry = mesh.hasTranslucentGeometry();
         } while (this.getSectionMesh() != mesh);
     }
 }

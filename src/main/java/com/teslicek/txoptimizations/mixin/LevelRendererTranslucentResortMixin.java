@@ -1,5 +1,6 @@
 package com.teslicek.txoptimizations.mixin;
 
+import com.teslicek.txoptimizations.SectionDrawRecord;
 import net.minecraft.client.renderer.GameRenderer;
 import net.minecraft.client.renderer.LevelRenderer;
 import net.minecraft.client.renderer.chunk.SectionMesh;
@@ -20,7 +21,7 @@ public abstract class LevelRendererTranslucentResortMixin {
 
     @Overwrite
     private void scheduleResort(SectionRenderDispatcher.RenderSection section, TranslucencyPointOfView pointOfView, Vec3 cameraPos, boolean blockPosChanged, boolean isNearby) {
-        if (this.gameRenderer.useImprovedTransparency())
+        if (this.gameRenderer.useImprovedTransparency() || !((SectionDrawRecord) section).txoptimizations$hasTranslucentGeometry())
             return;
 
         SectionMesh sectionMesh = section.getSectionMesh();
