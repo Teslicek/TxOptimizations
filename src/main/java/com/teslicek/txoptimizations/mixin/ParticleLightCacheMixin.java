@@ -1,6 +1,7 @@
 package com.teslicek.txoptimizations.mixin;
 
 import com.teslicek.txoptimizations.ClientClock;
+import com.teslicek.txoptimizations.ParticleLightShare;
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.client.particle.Particle;
 import net.minecraft.core.BlockPos;
@@ -61,8 +62,27 @@ public abstract class ParticleLightCacheMixin {
         this.txoptimizations$lightX    = this.x;
         this.txoptimizations$lightY    = this.y;
         this.txoptimizations$lightZ    = this.z;
-        this.txoptimizations$light     = this.level.hasChunkAt(pos) ? LightCoordsUtil.getLightCoords(this.level, pos) : UNLOADED_LIGHT;
+        this.txoptimizations$light     = ParticleLightShare.isActive() ? this.txoptimizations$sharedLight(pos) : this.txoptimizations$lookUpLight(pos);
 
         return this.txoptimizations$light;
+    }
+
+    @Unique
+    private int txoptimizations$sharedLight(BlockPos pos) {
+        long block = pos.asLong();
+        int  light = ParticleLightShare.find(block);
+
+        if (!ParticleLightShare.isMissing(light))
+            return light;
+
+        light = this.txoptimizations$lookUpLight(pos);
+        ParticleLightShare.store(block, light);
+
+        return light;
+    }
+
+    @Unique
+    private int txoptimizations$lookUpLight(BlockPos pos) {
+        return this.level.hasChunkAt(pos) ? LightCoordsUtil.getLightCoords(this.level, pos) : UNLOADED_LIGHT;
     }
 }

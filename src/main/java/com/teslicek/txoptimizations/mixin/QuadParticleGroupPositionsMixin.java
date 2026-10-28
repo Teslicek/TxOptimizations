@@ -3,6 +3,7 @@ package com.teslicek.txoptimizations.mixin;
 import com.teslicek.txoptimizations.ClientClock;
 import com.teslicek.txoptimizations.FrustumBoxTest;
 import com.teslicek.txoptimizations.FrustumPlanes;
+import com.teslicek.txoptimizations.ParticleLightShare;
 import com.teslicek.txoptimizations.ParticleGroupChanges;
 import com.teslicek.txoptimizations.ParticleSnapshot;
 import java.util.Arrays;
@@ -151,17 +152,22 @@ public abstract class QuadParticleGroupPositionsMixin extends ParticleGroup<Sing
         int      index     = 0;
 
         Arrays.fill(order, count, order.length, null);
+        ParticleLightShare.begin();
 
-        for (SingleQuadParticle particle : this.particles) {
-            positions[index * AXES]     = particle.x;
-            positions[index * AXES + 1] = particle.y;
-            positions[index * AXES + 2] = particle.z;
-            order[index]                = particle;
+        try {
+            for (SingleQuadParticle particle : this.particles) {
+                positions[index * AXES]     = particle.x;
+                positions[index * AXES + 1] = particle.y;
+                positions[index * AXES + 2] = particle.z;
+                order[index]                = particle;
 
-            txoptimizations$include(bounds, (index >> BLOCK_SHIFT) * BOUNDS, (index & BLOCK - 1) == 0, particle.x, particle.y, particle.z);
+                txoptimizations$include(bounds, (index >> BLOCK_SHIFT) * BOUNDS, (index & BLOCK - 1) == 0, particle.x, particle.y, particle.z);
 
-            ((ParticleSnapshot) particle).txoptimizations$snapshot(this.txoptimizations$floats, index * ParticleSnapshot.FLOATS, this.txoptimizations$ints, index * ParticleSnapshot.INTS, this.txoptimizations$refs, index * ParticleSnapshot.REFS, this.txoptimizations$previous, index * AXES);
-            index ++;
+                ((ParticleSnapshot) particle).txoptimizations$snapshot(this.txoptimizations$floats, index * ParticleSnapshot.FLOATS, this.txoptimizations$ints, index * ParticleSnapshot.INTS, this.txoptimizations$refs, index * ParticleSnapshot.REFS, this.txoptimizations$previous, index * AXES);
+                index ++;
+            }
+        } finally {
+            ParticleLightShare.end();
         }
 
         this.txoptimizations$count           = index;
