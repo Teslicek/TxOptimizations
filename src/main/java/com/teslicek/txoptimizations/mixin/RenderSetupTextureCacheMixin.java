@@ -126,12 +126,13 @@ public abstract class RenderSetupTextureCacheMixin {
 
     @Unique
     private boolean txoptimizations$matches(TextureList prepared, TextureManager textureManager, SamplerCache samplerCache, GpuTextureView overlayTexture, GpuTextureView lightmapTexture) {
-        int index = 0;
+        int        index   = 0;
+        GpuSampler clamped = this.useOverlay || this.useLightmap ? samplerCache.getClampToEdge(FilterMode.LINEAR) : null;
 
-        if (this.useOverlay && !txoptimizations$same(prepared.get(index ++), "Sampler1", overlayTexture, samplerCache.getClampToEdge(FilterMode.LINEAR)))
+        if (this.useOverlay && !txoptimizations$same(prepared.get(index ++), overlayTexture, clamped))
             return false;
 
-        if (this.useLightmap && !txoptimizations$same(prepared.get(index ++), "Sampler2", lightmapTexture, samplerCache.getClampToEdge(FilterMode.LINEAR)))
+        if (this.useLightmap && !txoptimizations$same(prepared.get(index ++), lightmapTexture, clamped))
             return false;
 
         AbstractTexture[] textures = this.txoptimizations$resolve(textureManager);
@@ -140,7 +141,7 @@ public abstract class RenderSetupTextureCacheMixin {
             AbstractTexture texture         = textures[binding];
             GpuSampler      samplerOverride = this.txoptimizations$bindings[binding].sampler().get();
 
-            if (!txoptimizations$same(prepared.get(index ++), this.txoptimizations$names[binding], texture.getTextureView(), samplerOverride != null ? samplerOverride : texture.getSampler()))
+            if (!txoptimizations$same(prepared.get(index ++), texture.getTextureView(), samplerOverride != null ? samplerOverride : texture.getSampler()))
                 return false;
         }
 
@@ -148,7 +149,7 @@ public abstract class RenderSetupTextureCacheMixin {
     }
 
     @Unique
-    private static boolean txoptimizations$same(PreparedRenderType.Texture texture, String name, GpuTextureView textureView, GpuSampler sampler) {
-        return texture.name().equals(name) && texture.textureView() == textureView && texture.sampler() == sampler;
+    private static boolean txoptimizations$same(PreparedRenderType.Texture texture, GpuTextureView textureView, GpuSampler sampler) {
+        return texture.textureView() == textureView && texture.sampler() == sampler;
     }
 }

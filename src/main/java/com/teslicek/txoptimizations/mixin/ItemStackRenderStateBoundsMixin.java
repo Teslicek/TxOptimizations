@@ -4,12 +4,15 @@ import com.teslicek.txoptimizations.DisplayCulling;
 import com.teslicek.txoptimizations.ItemBoundsCache;
 import com.teslicek.txoptimizations.ItemCullingBounds;
 import java.util.function.Consumer;
+import java.util.function.Supplier;
 import net.fabricmc.fabric.api.client.renderer.v1.mesh.MutableMesh;
 import net.fabricmc.fabric.impl.client.renderer.LayerRenderStateExtension;
 import net.minecraft.client.renderer.item.ItemStackRenderState;
+import net.minecraft.client.resources.model.cuboid.ItemTransform;
 import net.minecraft.world.item.ItemDisplayContext;
 import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
+import org.joml.Matrix4f;
 import org.joml.Vector3fc;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Overwrite;
@@ -30,6 +33,9 @@ public abstract class ItemStackRenderStateBoundsMixin implements ItemCullingBoun
 
     @Shadow
     private ItemStackRenderState.LayerRenderState[] layers;
+
+    @Unique
+    private ItemBoundsCache.Entry txoptimizations$lastBounds;
 
     @Shadow
     public abstract void visitExtents(Consumer<Vector3fc> output);
@@ -58,13 +64,23 @@ public abstract class ItemStackRenderStateBoundsMixin implements ItemCullingBoun
 
     @Unique
     private AABB txoptimizations$cachedBounds(ItemLayerRenderStateAccessor layer) {
-        boolean leftHand = this.displayContext.leftHand();
-        AABB    cached   = ItemBoundsCache.find(layer.txoptimizations$extents(), layer.txoptimizations$itemTransform(), leftHand, layer.txoptimizations$localTransform());
+        boolean               leftHand       = this.displayContext.leftHand();
+        Supplier<Vector3fc[]> extents        = layer.txoptimizations$extents();
+        ItemTransform         itemTransform  = layer.txoptimizations$itemTransform();
+        Matrix4f              localTransform = layer.txoptimizations$localTransform();
+        ItemBoundsCache.Entry entry          = this.txoptimizations$lastBounds;
 
-        if (cached != null)
-            return cached;
+        if (entry != null && entry.matches(extents, itemTransform, leftHand, localTransform))
+            return entry.bounds();
 
-        return ItemBoundsCache.store(this.txoptimizations$computeBounds(), layer.txoptimizations$extents(), layer.txoptimizations$itemTransform(), leftHand, layer.txoptimizations$localTransform());
+        entry = ItemBoundsCache.find(extents, itemTransform, leftHand, localTransform);
+
+        if (entry == null)
+            entry = ItemBoundsCache.store(this.txoptimizations$computeBounds(), extents, itemTransform, leftHand, localTransform);
+
+        this.txoptimizations$lastBounds = entry;
+
+        return entry.bounds();
     }
 
     @Unique
