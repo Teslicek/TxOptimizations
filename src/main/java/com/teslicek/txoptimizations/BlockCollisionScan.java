@@ -25,7 +25,7 @@ public final class BlockCollisionScan {
     private BlockCollisionScan() {
     }
 
-    public static boolean cannotCollide(Level level, CollisionContext context, AABB box, double xa, double ya, double za) {
+    public static boolean cannotCollide(Level level, double contextY, AABB box, double xa, double ya, double za) {
         if (level.isDebug())
             return false;
 
@@ -48,6 +48,7 @@ public final class BlockCollisionScan {
         int                      minZ      = Mth.floor(sweptMinZ - EPSILON) - 1;
         int                      maxZ      = Mth.floor(sweptMaxZ + EPSILON) + 1;
         BlockPos.MutableBlockPos pos       = null;
+        CollisionContext         context   = null;
 
         for (int chunkX = SectionPos.blockToSectionCoord(minX); chunkX <= SectionPos.blockToSectionCoord(maxX); chunkX ++) {
             for (int chunkZ = SectionPos.blockToSectionCoord(minZ); chunkZ <= SectionPos.blockToSectionCoord(maxZ); chunkZ ++) {
@@ -93,8 +94,10 @@ public final class BlockCollisionScan {
                                 if (state.isAir() || type == Cursor3D.TYPE_FACE && !state.hasLargeCollisionShape() || type == Cursor3D.TYPE_EDGE && !state.is(Blocks.MOVING_PISTON))
                                     continue;
 
-                                if (pos == null)
-                                    pos = new BlockPos.MutableBlockPos();
+                                if (pos == null) {
+                                    pos     = new BlockPos.MutableBlockPos();
+                                    context = CollisionContext.positionContext(contextY);
+                                }
 
                                 if (mayCollide(context.getCollisionShape(state, level, pos.set(x, y, z)), sweptMinX, sweptMinY, sweptMinZ, sweptMaxX, sweptMaxY, sweptMaxZ, x, y, z))
                                     return false;
