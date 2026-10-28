@@ -5,11 +5,11 @@ import com.mojang.renderpearl.api.buffers.GpuBuffer;
 import com.mojang.renderpearl.api.buffers.GpuBufferSlice;
 import com.mojang.renderpearl.api.pipeline.PrimitiveTopology;
 import com.mojang.renderpearl.api.textures.GpuTextureView;
-import com.teslicek.txoptimizations.DrawRecordHolder;
 import com.teslicek.txoptimizations.DrawRecords;
 import com.teslicek.txoptimizations.FacingCulling;
 import com.teslicek.txoptimizations.PackedTerrain;
 import com.teslicek.txoptimizations.SectionDrawList;
+import com.teslicek.txoptimizations.SectionDrawRecord;
 import com.teslicek.txoptimizations.SectionDrawUniforms;
 import com.teslicek.txoptimizations.SectionLayers;
 import com.teslicek.txoptimizations.gpu.ProfileCounters;
@@ -180,7 +180,7 @@ public abstract class LevelRendererSectionDrawMixin {
                 SectionRenderDispatcher.RenderSection section = (SectionRenderDispatcher.RenderSection) visible[chunkStart + index];
 
                 chunkSections[index] = section;
-                chunkRecords[index]  = section.getSectionMesh() instanceof DrawRecordHolder mesh ? mesh.txoptimizations$drawRecord() : null;
+                chunkRecords[index]  = ((SectionDrawRecord) section).txoptimizations$sectionDrawRecord();
             }
 
             for (int index = 0; index < chunkSize; index ++) {
