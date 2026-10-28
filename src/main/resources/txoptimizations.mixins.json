@@ -35,6 +35,7 @@
     "BufferBuilderPoseVertexMixin",
     "BufferBuilderBakedQuadMixin",
     "BufferBuilderElementCacheMixin",
+    "BufferBuilderRestartMixin",
     "ByteBufferBuilderAccessor",
     "ByteBufferBuilderResizeMixin",
     "ByteBufferResultAccessor",

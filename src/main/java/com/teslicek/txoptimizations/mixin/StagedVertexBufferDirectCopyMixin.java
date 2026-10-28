@@ -1,5 +1,6 @@
 package com.teslicek.txoptimizations.mixin;
 
+import com.mojang.blaze3d.vertex.BufferBuilder;
 import com.mojang.blaze3d.vertex.ByteBufferBuilder;
 import com.mojang.blaze3d.vertex.CompactVectorArray;
 import com.mojang.blaze3d.vertex.DefaultVertexFormat;
@@ -18,6 +19,7 @@ import com.teslicek.txoptimizations.InFlightVertexCopy;
 import com.teslicek.txoptimizations.OutlineDraw;
 import com.teslicek.txoptimizations.PositionBounds;
 import com.teslicek.txoptimizations.QuadSort;
+import com.teslicek.txoptimizations.RestartableBuilder;
 import com.teslicek.txoptimizations.TwinQuads;
 import com.teslicek.txoptimizations.VertexCopy;
 import com.teslicek.txoptimizations.VertexFormatElementCache;
@@ -61,7 +63,19 @@ public abstract class StagedVertexBufferDirectCopyMixin implements BackgroundVer
     private List<StagedVertexBuffer.Draw> draws;
 
     @Unique
+    private static final int BUILDER_POOL = 8;
+
+    @Shadow
+    private BufferBuilder lastVertexBuilder;
+
+    @Unique
     private final VertexCopy txoptimizations$vertexCopy = new VertexCopy();
+
+    @Unique
+    private final BufferBuilder[] txoptimizations$finishedBuilders = new BufferBuilder[BUILDER_POOL];
+
+    @Unique
+    private int txoptimizations$nextFinished;
 
     @Unique
     private final List<StagedVertexBuffer.Draw> txoptimizations$copiedDraws = new ArrayList<>();
@@ -185,13 +199,52 @@ public abstract class StagedVertexBufferDirectCopyMixin implements BackgroundVer
 
     @Redirect(method = "getVertexBuilder", at = @At(value = "INVOKE", target = "Lnet/minecraft/client/renderer/StagedVertexBuffer;finishLastVertexBuilder()V"))
     private void txoptimizations$finishBeforeReuse(StagedVertexBuffer buffer) {
+        BufferBuilder finished = this.lastVertexBuilder;
+
         this.txoptimizations$finishUnlessInBackground();
         this.finishLastVertexBuilder();
+
+        if (finished != null && finished.getClass() == BufferBuilder.class)
+            this.txoptimizations$keepFinished(finished);
+    }
+
+    @Redirect(method = "getVertexBuilder", at = @At(value = "NEW", target = "(Lcom/mojang/blaze3d/vertex/ByteBufferBuilder;Lcom/mojang/renderpearl/api/pipeline/PrimitiveTopology;Lcom/mojang/renderpearl/api/vertex/VertexFormat;)Lcom/mojang/blaze3d/vertex/BufferBuilder;"))
+    private BufferBuilder txoptimizations$restartFinished(ByteBufferBuilder buffer, PrimitiveTopology topology, VertexFormat format) {
+        BufferBuilder[] finished = this.txoptimizations$finishedBuilders;
+
+        for (int index = 0; index < finished.length; index ++) {
+            BufferBuilder builder = finished[index];
+
+            if (builder != null && ((RestartableBuilder) builder).txoptimizations$builds(format, topology)) {
+                finished[index] = null;
+                ((RestartableBuilder) builder).txoptimizations$restart();
+
+                return builder;
+            }
+        }
+
+        return new BufferBuilder(buffer, topology, format);
+    }
+
+    @Unique
+    private void txoptimizations$keepFinished(BufferBuilder builder) {
+        BufferBuilder[] finished = this.txoptimizations$finishedBuilders;
+
+        for (int index = 0; index < finished.length; index ++) {
+            if (finished[index] == null) {
+                finished[index] = builder;
+                return;
+            }
+        }
+
+        finished[this.txoptimizations$nextFinished] = builder;
+        this.txoptimizations$nextFinished           = (this.txoptimizations$nextFinished + 1) % finished.length;
     }
 
     @Inject(method = "close", at = @At("HEAD"))
     private void txoptimizations$finishBeforeClose(CallbackInfo ci) {
         this.txoptimizations$finishVertexCopy();
+        Arrays.fill(this.txoptimizations$finishedBuilders, null);
     }
 
     @Unique
