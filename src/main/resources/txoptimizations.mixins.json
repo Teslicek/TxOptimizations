@@ -240,6 +240,8 @@
     "TextDisplayRendererSplitterMixin",
     "ItemDisplayItemStateMixin",
     "ItemDisplayRendererItemStateMixin",
+    "ShelfBlockEntityItemStatesMixin",
+    "ShelfRendererItemStateMixin",
     "TextureManagerVersionMixin",
     "RendererCacheMixin",
     "RotatingSectionStorageChangeMixin",
