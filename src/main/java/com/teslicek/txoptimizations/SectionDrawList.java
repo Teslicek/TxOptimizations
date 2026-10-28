@@ -3,6 +3,7 @@ package com.teslicek.txoptimizations;
 import com.mojang.renderpearl.api.buffers.GpuBuffer;
 import com.mojang.renderpearl.api.pipeline.IndexType;
 import it.unimi.dsi.fastutil.HashCommon;
+import java.nio.IntBuffer;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -31,8 +32,9 @@ public final class SectionDrawList {
     private static final int COMMAND_FIRST_INDEX    = 2;
     private static final int COMMAND_BASE_VERTEX    = 3;
     private static final int COMMAND_BASE_INSTANCE  = 4;
-    private static final int INITIAL_GROUPS  = 16;
-    private static final int INITIAL_DRAWS   = 4096;
+    private static final int INITIAL_GROUPS      = 16;
+    private static final int INITIAL_DRAWS       = 4096;
+    private static final int INITIAL_GROUP_DRAWS = 256;
 
     private static final IndexType[] INDEX_TYPES       = IndexType.values();
     private static final int[]       INDEX_TYPE_HASHES = indexTypeHashes();
@@ -43,6 +45,7 @@ public final class SectionDrawList {
     private int[]                 groupLayers   = new int[INITIAL_GROUPS];
     private int[]                 groupStarts   = new int[INITIAL_GROUPS];
     private int[]                 groupCursors  = new int[INITIAL_GROUPS];
+    private int[][]               groupDraws    = new int[INITIAL_GROUPS][];
     private int[]                 drawCounts    = new int[INITIAL_GROUPS];
     private int[]                 order         = new int[INITIAL_GROUPS];
     private int[]                 cacheKeys     = new int[INITIAL_GROUPS * 2];
@@ -61,11 +64,13 @@ public final class SectionDrawList {
     private int                   groups;
     private int                   cacheSize;
     private int                   drawInts;
+    private int                   drawCount;
     private int                   sectionInts;
     private int                   largestIndexCount;
     private int                   lastTranslucentHash;
     private boolean               respectTranslucentOrder;
     private boolean               fading;
+    private boolean               perGroup;
 
     public void begin(int layers, boolean respectTranslucentOrder) {
         if (this.layerGroups.length != layers) {
@@ -88,6 +93,8 @@ public final class SectionDrawList {
         this.groups                  = 0;
         this.cacheSize               = 0;
         this.drawInts                = 0;
+        this.drawCount               = 0;
+        this.perGroup                = FramePath.frameUsesWorker();
         this.sectionInts             = 0;
         this.largestIndexCount       = 0;
         this.lastTranslucentHash     = 0;
@@ -153,6 +160,11 @@ public final class SectionDrawList {
     }
 
     public void add(int group, int indexCount, int firstIndex, int baseVertex, int baseInstance) {
+        if (this.perGroup) {
+            this.addToGroup(group, indexCount, firstIndex, baseVertex, baseInstance);
+            return;
+        }
+
         int draw = this.drawInts;
 
         if (draw + DRAW_INTS > this.draws.length)
@@ -184,7 +196,8 @@ public final class SectionDrawList {
         if (index != this.groups)
             throw new IllegalStateException(this.groups + " section draw groups were made but the layers list " + index);
 
-        this.placeCommands();
+        if (!this.perGroup)
+            this.placeCommands();
 
         return this;
     }
@@ -202,7 +215,7 @@ public final class SectionDrawList {
     }
 
     public int commandCount() {
-        return this.drawInts / DRAW_INTS;
+        return this.perGroup ? this.drawCount : this.drawInts / DRAW_INTS;
     }
 
     public int groupCount() {
@@ -242,19 +255,39 @@ public final class SectionDrawList {
     }
 
     public void writeCommands(long address) {
-        MemoryUtil.memIntBuffer(address, this.drawInts).put(this.draws, 0, this.drawInts);
+        if (!this.perGroup) {
+            MemoryUtil.memIntBuffer(address, this.drawInts).put(this.draws, 0, this.drawInts);
+            return;
+        }
+
+        IntBuffer target = MemoryUtil.memIntBuffer(address, this.drawCount * DRAW_INTS);
+
+        for (int index = 0; index < this.groups; index ++) {
+            int   group    = this.order[index];
+            int   ints     = this.drawCounts[group] * DRAW_INTS;
+            int[] commands = this.groupDraws[group];
+
+            if (!this.reversed[this.groupLayers[group]]) {
+                target.put(commands, 0, ints);
+                continue;
+            }
+
+            for (int command = ints - DRAW_INTS; command >= 0; command -= DRAW_INTS)
+                target.put(commands, command, DRAW_INTS);
+        }
     }
 
     public void countDraws(long[] layerDraws, long[] layerTriangles) {
         for (int group = 0; group < this.groups; group ++) {
-            int layer = this.groupLayers[group];
-            int start = this.groupStarts[group];
-            int end   = start + this.drawCounts[group];
+            int   layer    = this.groupLayers[group];
+            int   ints     = this.drawCounts[group] * DRAW_INTS;
+            int[] commands = this.perGroup ? this.groupDraws[group] : this.draws;
+            int   start    = this.perGroup ? 0 : this.groupStarts[group] * DRAW_INTS;
 
             layerDraws[layer] += this.drawCounts[group];
 
-            for (int slot = start; slot < end; slot ++)
-                layerTriangles[layer] += this.draws[slot * DRAW_INTS + COMMAND_INDEX_COUNT] / 3;
+            for (int command = start; command < start + ints; command += DRAW_INTS)
+                layerTriangles[layer] += commands[command + COMMAND_INDEX_COUNT] / 3;
         }
     }
 
@@ -270,17 +303,32 @@ public final class SectionDrawList {
 
     public List<DynamicGpuData.IndexedDraw> indexedDraws(int group) {
         int                              count    = this.drawCounts[group];
-        int                              start    = this.groupStarts[group];
+        int[]                            commands = this.perGroup ? this.groupDraws[group] : this.draws;
+        int                              start    = this.perGroup ? 0 : this.groupStarts[group];
         boolean                          reversed = this.reversed[this.groupLayers[group]];
         List<DynamicGpuData.IndexedDraw> draws    = new ArrayList<>(count);
 
         for (int position = 0; position < count; position ++) {
             int command = (reversed ? start + count - 1 - position : start + position) * DRAW_INTS;
 
-            draws.add(new DynamicGpuData.IndexedDraw(this.draws[command + COMMAND_INDEX_COUNT], INSTANCE_COUNT, this.draws[command + COMMAND_FIRST_INDEX], this.draws[command + COMMAND_BASE_VERTEX], this.draws[command + COMMAND_BASE_INSTANCE]));
+            draws.add(new DynamicGpuData.IndexedDraw(commands[command + COMMAND_INDEX_COUNT], INSTANCE_COUNT, commands[command + COMMAND_FIRST_INDEX], commands[command + COMMAND_BASE_VERTEX], commands[command + COMMAND_BASE_INSTANCE]));
         }
 
         return draws;
+    }
+
+    private void addToGroup(int group, int indexCount, int firstIndex, int baseVertex, int baseInstance) {
+        int[] commands = this.groupDraws[group];
+        int   command  = this.drawCounts[group] * DRAW_INTS;
+
+        if (command + DRAW_INTS > commands.length) {
+            commands               = Arrays.copyOf(commands, commands.length * 2);
+            this.groupDraws[group] = commands;
+        }
+
+        putCommand(commands, command, indexCount, firstIndex, baseVertex, baseInstance);
+        this.drawCounts[group] ++;
+        this.drawCount ++;
     }
 
     private void placeCommands() {
@@ -366,6 +414,9 @@ public final class SectionDrawList {
         this.groups               = group + 1;
         this.reversed[layer]      = translucent && this.respectTranslucentOrder;
 
+        if (this.groupDraws[group] == null)
+            this.groupDraws[group] = new int[INITIAL_GROUP_DRAWS * DRAW_INTS];
+
         int count = this.layerCounts[layer];
 
         if (count == this.layerGroups[layer].length)
@@ -386,6 +437,7 @@ public final class SectionDrawList {
         this.groupLayers   = Arrays.copyOf(this.groupLayers, capacity);
         this.groupStarts   = Arrays.copyOf(this.groupStarts, capacity);
         this.groupCursors  = Arrays.copyOf(this.groupCursors, capacity);
+        this.groupDraws    = Arrays.copyOf(this.groupDraws, capacity);
         this.drawCounts    = Arrays.copyOf(this.drawCounts, capacity);
         this.order         = Arrays.copyOf(this.order, capacity);
     }
