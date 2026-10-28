@@ -3,16 +3,18 @@ package com.teslicek.txoptimizations;
 import com.mojang.blaze3d.vertex.CompactVectorArray;
 import com.mojang.renderpearl.api.pipeline.IndexType;
 import com.mojang.renderpearl.api.pipeline.PrimitiveTopology;
+import java.nio.ByteOrder;
 import java.util.Arrays;
 import org.lwjgl.system.MemoryUtil;
 
 public final class TwinQuads extends CompactVectorArray {
 
-    private static final int   VERTICES_PER_QUAD = PrimitiveTopology.QUADS.primitiveLength;
-    private static final int   INDICES_PER_QUAD  = PrimitiveTopology.QUADS.indexCount(VERTICES_PER_QUAD);
-    private static final int   WORD_BITS         = Long.SIZE;
-    private static final int   WORD_SHIFT        = 6;
-    private static final int[] REVERSED          = {0, 3, 2, 1};
+    private static final int     VERTICES_PER_QUAD = PrimitiveTopology.QUADS.primitiveLength;
+    private static final int     INDICES_PER_QUAD  = PrimitiveTopology.QUADS.indexCount(VERTICES_PER_QUAD);
+    private static final int     WORD_BITS         = Long.SIZE;
+    private static final int     WORD_SHIFT        = 6;
+    private static final int[]   REVERSED          = {0, 3, 2, 1};
+    private static final boolean LITTLE_ENDIAN     = ByteOrder.nativeOrder() == ByteOrder.LITTLE_ENDIAN;
 
     private final long[] twins;
     private final int    indexCount;
@@ -105,6 +107,9 @@ public final class TwinQuads extends CompactVectorArray {
     }
 
     private static long writeQuad(long pointer, int first, int second, int third, int fourth, boolean shortIndices) {
+        if (LITTLE_ENDIAN)
+            return writeQuadLittleEndian(pointer, first, second, third, fourth, shortIndices);
+
         if (shortIndices) {
             MemoryUtil.memPutShort(pointer, (short) first);
             MemoryUtil.memPutShort(pointer + 2L, (short) second);
@@ -122,6 +127,24 @@ public final class TwinQuads extends CompactVectorArray {
         MemoryUtil.memPutInt(pointer + 12L, third);
         MemoryUtil.memPutInt(pointer + 16L, fourth);
         MemoryUtil.memPutInt(pointer + 20L, first);
+
+        return pointer + INDICES_PER_QUAD * Integer.BYTES;
+    }
+
+    private static long writeQuadLittleEndian(long pointer, int first, int second, int third, int fourth, boolean shortIndices) {
+        if (shortIndices) {
+            long low  = first & 0xFFFFL;
+            long high = (long) (second & 0xFFFF) << 16 | (long) (third & 0xFFFF) << 32 | (long) (third & 0xFFFF) << 48;
+
+            MemoryUtil.memPutLong(pointer, low | high);
+            MemoryUtil.memPutInt(pointer + 8L, fourth & 0xFFFF | (first & 0xFFFF) << 16);
+
+            return pointer + INDICES_PER_QUAD * Short.BYTES;
+        }
+
+        MemoryUtil.memPutLong(pointer, first & 0xFFFFFFFFL | (long) second << 32);
+        MemoryUtil.memPutLong(pointer + 8L, third & 0xFFFFFFFFL | (long) third << 32);
+        MemoryUtil.memPutLong(pointer + 16L, fourth & 0xFFFFFFFFL | (long) first << 32);
 
         return pointer + INDICES_PER_QUAD * Integer.BYTES;
     }
