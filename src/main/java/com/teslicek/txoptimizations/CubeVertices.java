@@ -130,18 +130,14 @@ public final class CubeVertices {
         for (int face = 0; face < FACES; face ++) {
             int normal = NormalCache.selected(normals[face]);
 
-            for (int slot = 0; slot < FACE_VERTICES; slot += 2) {
-                int   first  = face * FACE_VERTICES + slot;
-                int   second = first + 1;
-                int   corner = corners[first];
-                int   next   = corners[second];
-                float u0     = mapping == null ? values[UVS + first * 2] : mapping.getU(values[UVS + first * 2]);
-                float v0     = mapping == null ? values[UVS + first * 2 + 1] : mapping.getV(values[UVS + first * 2 + 1]);
-                float u1     = mapping == null ? values[UVS + second * 2] : mapping.getU(values[UVS + second * 2]);
-                float v1     = mapping == null ? values[UVS + second * 2 + 1] : mapping.getV(values[UVS + second * 2 + 1]);
+            for (int slot = 0; slot < FACE_VERTICES; slot ++) {
+                int   index  = face * FACE_VERTICES + slot;
+                int   corner = corners[index];
+                float u      = mapping == null ? values[UVS + index * 2] : mapping.getU(values[UVS + index * 2]);
+                float v      = mapping == null ? values[UVS + index * 2 + 1] : mapping.getV(values[UVS + index * 2 + 1]);
 
-                VertexBytes.putEntityPair(pointer, X[corner], Y[corner], Z[corner], colorBits, u0, v0, coordinates, normal, X[next], Y[next], Z[next], colorBits, u1, v1, coordinates, normal);
-                pointer += 2L * VertexBytes.ENTITY_STRIDE;
+                VertexBytes.putEntityBits(pointer, X[corner], Y[corner], Z[corner], colorBits, u, v, coordinates, normal);
+                pointer += VertexBytes.ENTITY_STRIDE;
             }
         }
     }
