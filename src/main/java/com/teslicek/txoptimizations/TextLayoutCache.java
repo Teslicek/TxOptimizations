@@ -17,7 +17,7 @@ public final class TextLayoutCache {
     private static final int  MAX_SEQUENCE_WIDTHS = 16384;
     private static final long UNUSED_FRAMES       = 200L;
 
-    private static final Map<Key, Entry>                   ENTRIES         = new HashMap<>();
+    private static final Map<Key, Key>                     ENTRIES         = new HashMap<>();
     private static final Map<MutableComponent, Width>      WIDTHS          = new IdentityHashMap<>();
     private static final Map<FormattedCharSequence, Width> SEQUENCE_WIDTHS = new IdentityHashMap<>();
     private static final Map<String, Width>                STRING_WIDTHS   = new HashMap<>();
@@ -40,14 +40,14 @@ public final class TextLayoutCache {
         evictUnused(frame);
         PROBE.set(font, text, x, y, color, dropShadow, backgroundColor, outline);
 
-        Entry entry = ENTRIES.get(PROBE);
+        Key entry = ENTRIES.get(PROBE);
 
         if (entry == null)
             return null;
 
         entry.frame = frame;
 
-        return entry.text;
+        return entry.prepared;
     }
 
     public static Font.PreparedText store(Font.PreparedText prepared, Font font, FormattedCharSequence text, float x, float y, int color, boolean dropShadow, int backgroundColor, boolean outline) {
@@ -60,7 +60,9 @@ public final class TextLayoutCache {
         Key key = new Key();
 
         key.set(font, text, x, y, color, dropShadow, backgroundColor, outline);
-        ENTRIES.put(key, new Entry(prepared, ClientClock.frame()));
+        key.prepared = prepared;
+        key.frame    = ClientClock.frame();
+        ENTRIES.put(key, key);
 
         return prepared;
     }
@@ -202,6 +204,8 @@ public final class TextLayoutCache {
         private int                   backgroundColor;
         private boolean               outline;
         private int                   hash;
+        private Font.PreparedText     prepared;
+        private long                  frame;
 
         private void set(Font font, FormattedCharSequence text, float x, float y, int color, boolean dropShadow, int backgroundColor, boolean outline) {
             this.font            = font;
@@ -232,17 +236,6 @@ public final class TextLayoutCache {
         @Override
         public int hashCode() {
             return this.hash;
-        }
-    }
-
-    private static final class Entry {
-
-        private final Font.PreparedText text;
-        private long                    frame;
-
-        private Entry(Font.PreparedText text, long frame) {
-            this.text  = text;
-            this.frame = frame;
         }
     }
 
