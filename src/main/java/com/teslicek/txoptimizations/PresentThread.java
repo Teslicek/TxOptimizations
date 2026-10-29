@@ -83,6 +83,10 @@ public final class PresentThread {
             LockSupport.unpark(WORKER);
     }
 
+    public static boolean isParked() {
+        return workerParked;
+    }
+
     public static boolean isCapturing() {
         return capturing;
     }
