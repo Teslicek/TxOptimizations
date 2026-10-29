@@ -32,6 +32,9 @@ public abstract class ModelPartCubeDirectWriteMixin {
     @Unique
     private float @Nullable [] txoptimizations$values;
 
+    @Unique
+    private boolean txoptimizations$flattenedBox;
+
     @Overwrite
     public void compile(PoseStack.Pose pose, VertexConsumer builder, int lightCoords, int overlayCoords, int color) {
         if (NormalCache.usable() && this.txoptimizations$tryPut(pose, builder, lightCoords, overlayCoords, color))
@@ -55,17 +58,17 @@ public abstract class ModelPartCubeDirectWriteMixin {
     }
 
     @Unique
-    private float[] txoptimizations$values() {
+    private float @Nullable [] txoptimizations$values() {
         ModelPart.Polygon[] flattened = this.txoptimizations$flattened;
-        float[]             values    = this.txoptimizations$values;
 
-        if (values != null && txoptimizations$same(flattened, this.polygons))
-            return values;
+        if (this.txoptimizations$flattenedBox && txoptimizations$same(flattened, this.polygons))
+            return this.txoptimizations$values;
 
-        values = CubeVertices.flatten(this.polygons);
+        float[] values = CubeVertices.flatten(this.polygons);
 
-        this.txoptimizations$flattened = this.polygons.clone();
-        this.txoptimizations$values    = values;
+        this.txoptimizations$flattened    = this.polygons.clone();
+        this.txoptimizations$values       = values;
+        this.txoptimizations$flattenedBox = true;
 
         return values;
     }
@@ -82,8 +85,10 @@ public abstract class ModelPartCubeDirectWriteMixin {
 
     @Unique
     private boolean txoptimizations$tryPut(PoseStack.Pose pose, VertexConsumer builder, int lightCoords, int overlayCoords, int color) {
-        if (this.polygons.length == CubeVertices.FACES)
-            return CubeVertices.tryPut(pose, this.txoptimizations$values(), builder, lightCoords, overlayCoords, color);
+        float[] values = this.polygons.length == CubeVertices.FACES ? this.txoptimizations$values() : null;
+
+        if (values != null)
+            return CubeVertices.tryPut(pose, values, builder, lightCoords, overlayCoords, color);
 
         int vertices = 0;
 

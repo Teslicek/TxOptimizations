@@ -12,6 +12,7 @@ import org.joml.Math;
 import org.joml.Matrix4f;
 import org.joml.Matrix4fc;
 import org.joml.Vector3fc;
+import org.jspecify.annotations.Nullable;
 import org.lwjgl.system.MemoryUtil;
 
 public final class CubeVertices {
@@ -21,31 +22,36 @@ public final class CubeVertices {
     public static final int CORNERS  = 8;
     public static final int VALUES   = 7 + VERTICES * 2;
 
-    private static final int     FACE_VERTICES = 4;
-    private static final int     DOWN_FACE     = 0;
-    private static final int     UP_FACE       = 1;
-    private static final int     WEST_FACE     = 2;
-    private static final int     ORIGIN        = 0;
-    private static final int     FAR_BOTTOM    = 5;
-    private static final int     NEAR_TOP      = 3;
-    private static final int     X_BIT         = 1;
-    private static final int     Y_BIT         = 2;
-    private static final int     Z_BIT         = 4;
-    private static final int     MIRROR        = 0;
-    private static final int     BOUNDS        = 1;
-    private static final int     UVS           = 7;
-    private static final byte[]  FACE_CORNERS  = {5, 4, 0, 1, 3, 2, 6, 7, 0, 4, 6, 2, 1, 0, 2, 3, 5, 1, 3, 7, 4, 5, 7, 6};
-    private static final Faces   PLAIN         = Faces.of(FACE_CORNERS, Direction.DOWN, Direction.UP, Direction.WEST, Direction.NORTH, Direction.EAST, Direction.SOUTH);
-    private static final Faces   MIRRORED      = Faces.of(reversedFaces(FACE_CORNERS), Direction.DOWN, Direction.UP, Direction.EAST, Direction.NORTH, Direction.WEST, Direction.SOUTH);
-    private static final float[] X             = new float[CORNERS];
-    private static final float[] Y             = new float[CORNERS];
-    private static final float[] Z             = new float[CORNERS];
+    private static final int         FACE_VERTICES = 4;
+    private static final int         DOWN_FACE     = 0;
+    private static final int         UP_FACE       = 1;
+    private static final int         WEST_FACE     = 2;
+    private static final int         ORIGIN        = 0;
+    private static final int         FAR_BOTTOM    = 5;
+    private static final int         NEAR_TOP      = 3;
+    private static final int         X_BIT         = 1;
+    private static final int         Y_BIT         = 2;
+    private static final int         Z_BIT         = 4;
+    private static final int         MIRROR        = 0;
+    private static final int         BOUNDS        = 1;
+    private static final int         UVS           = 7;
+    private static final byte[]      FACE_CORNERS  = {5, 4, 0, 1, 3, 2, 6, 7, 0, 4, 6, 2, 1, 0, 2, 3, 5, 1, 3, 7, 4, 5, 7, 6};
+    private static final Faces       PLAIN         = Faces.of(FACE_CORNERS, Direction.DOWN, Direction.UP, Direction.WEST, Direction.NORTH, Direction.EAST, Direction.SOUTH);
+    private static final Faces       MIRRORED      = Faces.of(reversedFaces(FACE_CORNERS), Direction.DOWN, Direction.UP, Direction.EAST, Direction.NORTH, Direction.WEST, Direction.SOUTH);
+    private static final Direction[] DIRECTIONS    = Direction.values();
+    private static final float[]     X             = new float[CORNERS];
+    private static final float[]     Y             = new float[CORNERS];
+    private static final float[]     Z             = new float[CORNERS];
 
     private CubeVertices() {
     }
 
-    public static float[] flatten(ModelPart.Polygon[] polygons) {
-        Faces   faces  = faces(polygons);
+    public static float @Nullable [] flatten(ModelPart.Polygon[] polygons) {
+        Faces faces = faces(polygons);
+
+        if (faces == null)
+            return null;
+
         float[] values = new float[VALUES];
 
         values[MIRROR] = faces == MIRRORED ? 1.0F : 0.0F;
@@ -65,11 +71,19 @@ public final class CubeVertices {
         for (int face = 0; face < FACES; face ++) {
             ModelPart.Vertex[] vertices = polygons[face].vertices();
 
-            for (int slot = 0; slot < FACE_VERTICES; slot ++) {
-                int at = UVS + (face * FACE_VERTICES + slot) * 2;
+            if (vertices.length != FACE_VERTICES || polygons[face].normal() != DIRECTIONS[faces.normals()[face]].getUnitVec3f())
+                return null;
 
-                values[at]     = vertices[slot].u();
-                values[at + 1] = vertices[slot].v();
+            for (int slot = 0; slot < FACE_VERTICES; slot ++) {
+                int              at     = UVS + (face * FACE_VERTICES + slot) * 2;
+                int              corner = faces.corners()[face * FACE_VERTICES + slot];
+                ModelPart.Vertex vertex = vertices[slot];
+
+                if (vertex.worldX() != values[BOUNDS + ((corner & X_BIT) == 0 ? 0 : 3)] || vertex.worldY() != values[BOUNDS + ((corner & Y_BIT) == 0 ? 1 : 4)] || vertex.worldZ() != values[BOUNDS + ((corner & Z_BIT) == 0 ? 2 : 5)])
+                    return null;
+
+                values[at]     = vertex.u();
+                values[at + 1] = vertex.v();
             }
         }
 
@@ -162,9 +176,9 @@ public final class CubeVertices {
         }
     }
 
-    private static Faces faces(ModelPart.Polygon[] polygons) {
-        if (polygons.length != FACES)
-            throw new IllegalArgumentException("A cube with " + polygons.length + " faces has no shared corners");
+    private static @Nullable Faces faces(ModelPart.Polygon[] polygons) {
+        if (polygons.length != FACES || polygons[DOWN_FACE].vertices().length != FACE_VERTICES || polygons[UP_FACE].vertices().length != FACE_VERTICES)
+            return null;
 
         Vector3fc normal = polygons[WEST_FACE].normal();
 
@@ -174,7 +188,7 @@ public final class CubeVertices {
         if (normal == Direction.EAST.getUnitVec3f())
             return MIRRORED;
 
-        throw new IllegalStateException("Cube face " + WEST_FACE + " faces " + normal + " instead of west or east");
+        return null;
     }
 
     private static void corners(Matrix4f matrix, float[] values) {
