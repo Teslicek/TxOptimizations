@@ -193,7 +193,8 @@ final class OcclusionTracer {
                 continue;
 
             if (this.traceRay()) {
-                this.setState(x, y, z, VISIBLE);
+                if (!this.isOpaque(x, y, z))
+                    this.setState(x, y, z, VISIBLE);
 
                 return true;
             }
