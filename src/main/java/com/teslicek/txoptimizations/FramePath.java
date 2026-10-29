@@ -5,10 +5,13 @@ import com.teslicek.txoptimizations.gpu.GpuPassProfiler;
 public final class FramePath {
 
     private static final int    WINDOW_FRAMES = 128;
+    private static final int    PROBE_WINDOWS = 32;
     private static final double WAIT_LIMIT    = 0.10;
     private static final double ACQUIRE_LIMIT = 0.08;
 
     private static boolean worker;
+    private static boolean trial;
+    private static boolean trialLost;
     private static boolean frameUsesWorker;
     private static boolean frameEligible;
     private static long    lastSubmit;
@@ -16,6 +19,8 @@ public final class FramePath {
     private static long    windowWaitNanos;
     private static long    windowAcquireNanos;
     private static int     windowFrames;
+    private static long    settledNanos;
+    private static int     windowsSinceTrial;
     private static long    workerFrames;
     private static long    inlineFrames;
 
@@ -91,10 +96,28 @@ public final class FramePath {
         if (windowFrames < WINDOW_FRAMES)
             return;
 
-        if (worker)
-            worker = windowAcquireNanos <= windowFrameNanos * ACQUIRE_LIMIT;
-        else
-            worker = windowWaitNanos < windowFrameNanos * WAIT_LIMIT;
+        if (trial) {
+            trial             = false;
+            trialLost         = windowFrameNanos >= settledNanos;
+            windowsSinceTrial = 0;
+
+            if (trialLost)
+                worker = !worker;
+
+            resetWindow();
+
+            return;
+        }
+
+        settledNanos = windowFrameNanos;
+        windowsSinceTrial ++;
+
+        boolean wantsOther = worker ? windowAcquireNanos > windowFrameNanos * ACQUIRE_LIMIT : windowWaitNanos < windowFrameNanos * WAIT_LIMIT;
+
+        if ((wantsOther && !trialLost) || windowsSinceTrial >= PROBE_WINDOWS) {
+            trial  = true;
+            worker = !worker;
+        }
 
         resetWindow();
     }
