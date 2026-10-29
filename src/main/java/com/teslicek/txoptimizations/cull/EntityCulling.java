@@ -20,7 +20,6 @@ import net.minecraft.client.renderer.entity.state.EntityRenderState;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.SectionPos;
 import net.minecraft.util.Mth;
-import net.minecraft.world.entity.Display;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EntityAttachment;
 import net.minecraft.world.entity.EntityTypes;
@@ -28,8 +27,6 @@ import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.ai.attributes.Attributes;
 import net.minecraft.world.entity.decoration.ArmorStand;
 import net.minecraft.world.entity.player.Player;
-import net.minecraft.world.entity.projectile.FireworkRocketEntity;
-import net.minecraft.world.entity.vehicle.VehicleEntity;
 import net.minecraft.world.level.block.entity.BannerBlockEntity;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.chunk.LevelChunk;
@@ -123,12 +120,10 @@ public final class EntityCulling {
 
         Minecraft minecraft = Minecraft.getInstance();
 
-        return !(entity instanceof Player)
+        return entity instanceof LivingEntity
+            && !(entity instanceof Player)
             && entity != minecraft.getCameraEntity()
             && !entity.isVehicle()
-            && !(entity instanceof VehicleEntity)
-            && !(entity instanceof Display)
-            && !(entity instanceof FireworkRocketEntity)
             && ((EntityRendererCullAccessor) minecraft.getEntityRenderDispatcher().getRenderer(entity)).txoptimizations$affectedByCulling(entity);
     }
 
