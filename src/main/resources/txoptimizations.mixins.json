@@ -185,6 +185,7 @@
     "MinecraftGlowSpectatorCacheMixin",
     "MinecraftRenderThreadStackMixin",
     "ModelManagerBackgroundWarningsMixin",
+    "ModelManagerItemBoundsMixin",
     "ModelPartIdentityMixin",
     "ModelPartCubeDirectWriteMixin",
     "ModelRenderTypeCacheMixin",

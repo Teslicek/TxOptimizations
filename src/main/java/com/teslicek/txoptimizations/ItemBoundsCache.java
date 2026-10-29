@@ -25,6 +25,10 @@ public final class ItemBoundsCache {
         return BOUNDS.get(PROBE);
     }
 
+    public static void clear() {
+        BOUNDS.clear();
+    }
+
     public static Entry store(AABB bounds, Supplier<Vector3fc[]> extents, ItemTransform itemTransform, boolean leftHand, Matrix4fc localTransform) {
         if (BOUNDS.size() >= MAX_ENTRIES)
             BOUNDS.clear();
