@@ -4,6 +4,7 @@ import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.math.Axis;
 import java.util.List;
 import java.util.Map;
+import java.util.Queue;
 import java.util.concurrent.ConcurrentHashMap;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.model.geom.ModelLayers;
@@ -61,7 +62,7 @@ public final class Cushions {
         Baking.rebuild(pos);
     }
 
-    public static void forEachMeshed(SectionPos section, MeshConsumer consumer) {
+    public static void forEachMeshed(SectionPos section, Queue<Runnable> sectionTasks, MeshConsumer consumer) {
         Map<Integer, Snapshot> cushions = SECTIONS.get(section);
 
         if (cushions == null)
@@ -76,7 +77,7 @@ public final class Cushions {
                 continue;
             }
 
-            ChunkTasks.add(section, () -> {
+            sectionTasks.add(() -> {
                 Entity entity = Minecraft.getInstance().level.getEntity(snapshot.id());
 
                 if (entity != null)

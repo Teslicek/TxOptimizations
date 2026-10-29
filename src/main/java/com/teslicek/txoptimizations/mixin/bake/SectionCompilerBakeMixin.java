@@ -8,8 +8,11 @@ import com.llamalad7.mixinextras.sugar.ref.LocalRef;
 import com.mojang.blaze3d.vertex.BufferBuilder;
 import com.mojang.blaze3d.vertex.VertexSorting;
 import com.teslicek.txoptimizations.bake.Baking;
+import com.teslicek.txoptimizations.bake.ChunkTasks;
 import com.teslicek.txoptimizations.bake.Cushions;
+import com.teslicek.txoptimizations.bake.SectionTasks;
 import java.util.Map;
+import java.util.Queue;
 import net.fabricmc.fabric.api.client.renderer.v1.Renderer;
 import net.fabricmc.fabric.api.client.renderer.v1.mesh.QuadEmitter;
 import net.fabricmc.fabric.api.client.renderer.v1.render.AltModelBlockRenderer;
@@ -66,8 +69,8 @@ public abstract class SectionCompilerBakeMixin {
     }
 
     @ModifyExpressionValue(method = "compile", at = @At(value = "INVOKE", target = "Lnet/minecraft/world/level/block/state/BlockState;getRenderShape()Lnet/minecraft/world/level/block/RenderShape;"))
-    private RenderShape txoptimizations$meshBakedBlockEntities(RenderShape shape, @Local(argsOnly = true) SectionPos section, @Share("blockEntity") LocalRef<BlockEntity> blockEntity) {
-        return Baking.meshedRenderShape(blockEntity.get(), section, shape);
+    private RenderShape txoptimizations$meshBakedBlockEntities(RenderShape shape, @Local(name = "results") SectionCompiler.Results results, @Share("blockEntity") LocalRef<BlockEntity> blockEntity) {
+        return Baking.meshedRenderShape(blockEntity.get(), ((SectionTasks) (Object) results).txoptimizations$getSectionTasks(), shape);
     }
 
     @ModifyExpressionValue(method = "compile", at = @At(value = "INVOKE", target = "Lnet/minecraft/client/renderer/block/BlockStateModelSet;get(Lnet/minecraft/world/level/block/state/BlockState;)Lnet/minecraft/client/renderer/block/dispatch/BlockStateModel;"))
@@ -75,8 +78,23 @@ public abstract class SectionCompilerBakeMixin {
         return Baking.meshedModel(blockEntity.get(), model);
     }
 
+    @Inject(method = "compile", at = @At("HEAD"))
+    private void txoptimizations$claimPendingTasks(SectionPos section, RenderSectionRegion region, VertexSorting vertexSorting, SectionBufferBuilderPack builders, CallbackInfoReturnable<SectionCompiler.Results> cir, @Share("pendingTasks") LocalRef<Queue<Runnable>> pendingTasks) {
+        pendingTasks.set(ChunkTasks.claim(section));
+    }
+
+    @Inject(method = "compile", at = @At("RETURN"))
+    private void txoptimizations$keepPendingTasks(SectionPos section, RenderSectionRegion region, VertexSorting vertexSorting, SectionBufferBuilderPack builders, CallbackInfoReturnable<SectionCompiler.Results> cir, @Share("pendingTasks") LocalRef<Queue<Runnable>> pendingTasks) {
+        Queue<Runnable> pending = pendingTasks.get();
+
+        if (pending == null)
+            return;
+
+        ((SectionTasks) (Object) cir.getReturnValue()).txoptimizations$getSectionTasks().addAll(pending);
+    }
+
     @Inject(method = "compile", at = @At(value = "INVOKE", target = "Ljava/util/Map;entrySet()Ljava/util/Set;"))
-    private void txoptimizations$meshCushions(SectionPos section, RenderSectionRegion region, VertexSorting vertexSorting, SectionBufferBuilderPack builders, CallbackInfoReturnable<SectionCompiler.Results> cir, @Local(name = "startedLayers") Map<ChunkSectionLayer, BufferBuilder> startedLayers) {
+    private void txoptimizations$meshCushions(SectionPos section, RenderSectionRegion region, VertexSorting vertexSorting, SectionBufferBuilderPack builders, CallbackInfoReturnable<SectionCompiler.Results> cir, @Local(name = "results") SectionCompiler.Results results, @Local(name = "startedLayers") Map<ChunkSectionLayer, BufferBuilder> startedLayers) {
         if (!Cushions.hasCushions(section))
             return;
 
@@ -84,6 +102,6 @@ public abstract class SectionCompilerBakeMixin {
         QuadEmitter           emitter  = Renderer.get().quadEmitter(quad -> quad.buffer(OverlayTexture.NO_OVERLAY, this.getOrBeginLayer(startedLayers, builders, quad.chunkLayer())));
         BlockState            air      = Blocks.AIR.defaultBlockState();
 
-        Cushions.forEachMeshed(section, (pos, model) -> renderer.tesselateBlock(emitter, SectionPos.sectionRelative(pos.getX()), SectionPos.sectionRelative(pos.getY()), SectionPos.sectionRelative(pos.getZ()), region, pos, air, model, air.getSeed(pos)));
+        Cushions.forEachMeshed(section, ((SectionTasks) (Object) results).txoptimizations$getSectionTasks(), (pos, model) -> renderer.tesselateBlock(emitter, SectionPos.sectionRelative(pos.getX()), SectionPos.sectionRelative(pos.getY()), SectionPos.sectionRelative(pos.getZ()), region, pos, air, model, air.getSeed(pos)));
     }
 }

@@ -8,25 +8,25 @@ import net.minecraft.core.SectionPos;
 
 public final class ChunkTasks {
 
-    private static final Map<SectionPos, Queue<Runnable>> TASKS = new ConcurrentHashMap<>();
+    private static final Map<SectionPos, Queue<Runnable>> PENDING = new ConcurrentHashMap<>();
 
     private ChunkTasks() {
     }
 
     public static void add(SectionPos section, Runnable task) {
-        TASKS.computeIfAbsent(section, _ -> new ConcurrentLinkedQueue<>()).add(task);
+        PENDING.computeIfAbsent(section, _ -> new ConcurrentLinkedQueue<>()).add(task);
     }
 
-    public static void run(long sectionNode) {
-        if (TASKS.isEmpty())
-            return;
+    public static Queue<Runnable> claim(SectionPos section) {
+        return PENDING.remove(section);
+    }
 
-        Queue<Runnable> tasks = TASKS.remove(SectionPos.of(sectionNode));
-
-        if (tasks == null)
-            return;
-
+    public static void run(Queue<Runnable> tasks) {
         for (Runnable task = tasks.poll(); task != null; task = tasks.poll())
             task.run();
+    }
+
+    public static void clear() {
+        PENDING.clear();
     }
 }

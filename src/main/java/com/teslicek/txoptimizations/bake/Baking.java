@@ -1,9 +1,9 @@
 package com.teslicek.txoptimizations.bake;
 
+import java.util.Queue;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.block.dispatch.BlockStateModel;
 import net.minecraft.core.BlockPos;
-import net.minecraft.core.SectionPos;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.level.block.RenderShape;
 import net.minecraft.world.level.block.entity.BlockEntity;
@@ -86,7 +86,7 @@ public final class Baking {
         minecraft.levelExtractor.blockChanged(pos, REBUILD_FLAGS);
     }
 
-    public static RenderShape meshedRenderShape(BlockEntity blockEntity, SectionPos section, RenderShape vanilla) {
+    public static RenderShape meshedRenderShape(BlockEntity blockEntity, Queue<Runnable> sectionTasks, RenderShape vanilla) {
         if (blockEntity == null)
             return vanilla;
 
@@ -96,7 +96,7 @@ public final class Baking {
             return vanilla;
 
         if (bakeable.txoptimizations$getRenderMode() != bakeable.txoptimizations$getPendingMode())
-            ChunkTasks.add(section, () -> bakeable.txoptimizations$setRenderMode(bakeable.txoptimizations$getPendingMode()));
+            sectionTasks.add(() -> bakeable.txoptimizations$setRenderMode(bakeable.txoptimizations$getPendingMode()));
 
         if (bakeable.txoptimizations$getPendingMode() == RenderMode.TERRAIN && !bakeable.txoptimizations$isForcedEntity())
             return RenderShape.MODEL;
