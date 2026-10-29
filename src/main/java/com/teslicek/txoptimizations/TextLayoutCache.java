@@ -200,7 +200,7 @@ public final class TextLayoutCache {
     }
 
     private static void evictUnused(long frame) {
-        if (frame - lastEviction < UNUSED_FRAMES)
+        if (frame - lastEviction < UNUSED_FRAMES || !RenderThreadStack.isOwner())
             return;
 
         lastEviction = frame;
