@@ -33,6 +33,6 @@ public abstract class SkullBlockEntityBakeMixin {
         state.txoptimizations$setRenderMode(RenderMode.ENTITY);
 
         if (wasTerrain && skull.hasLevel())
-            Baking.rebuild(skull.getBlockPos());
+            Baking.rebuild(skull.getBlockPos(), true);
     }
 }
