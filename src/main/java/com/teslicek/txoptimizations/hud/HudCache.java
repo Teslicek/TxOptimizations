@@ -185,6 +185,7 @@ public final class HudCache {
 
         current.uncache();
         framebuffers().dropFrame();
+        framebuffers().markForCatchUp();
         orderChanged = true;
     }
 
@@ -224,6 +225,7 @@ public final class HudCache {
             return;
 
         framebuffers().dropFrame();
+        framebuffers().markForCatchUp();
         orderChanged = true;
     }
 
