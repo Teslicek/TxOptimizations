@@ -51,10 +51,16 @@ public final class ParallelFeatures {
 
         allowed = false;
 
-        for (Map.Entry<FeatureRendererType<?>, List<?>> entry : groupsByFeature.entrySet()) {
-            FeatureWorker worker = workerFor(entry.getKey(), entry.getValue(), context.font(), submits);
+        boolean text     = TEXT.claimFrame();
+        boolean geometry = GEOMETRY.claimFrame();
 
-            if (worker == null)
+        if (!text && !geometry)
+            return;
+
+        for (Map.Entry<FeatureRendererType<?>, List<?>> entry : groupsByFeature.entrySet()) {
+            FeatureWorker worker = workerFor(entry.getKey());
+
+            if (worker == null || !(worker == TEXT ? text : geometry) || !runsOffThread(entry.getKey(), entry.getValue(), context.font(), submits))
                 continue;
 
             worker.groups().addAll(entry.getValue());
@@ -135,20 +141,24 @@ public final class ParallelFeatures {
         LOCK.unlock();
     }
 
-    private static FeatureWorker workerFor(FeatureRendererType<?> type, List<?> groups, Font font, List<SubmitNode> submits) {
-        if (type == TextFeatureRenderer.TYPE)
-            return layoutsCached(font, groups, submits) ? TEXT : null;
-
-        if (type == GizmoFeatureRenderer.TYPE)
-            return withoutTexts(groups, submits) ? TEXT : null;
-
-        if (type == QuadParticleFeatureRenderer.TYPE)
+    private static FeatureWorker workerFor(FeatureRendererType<?> type) {
+        if (type == TextFeatureRenderer.TYPE || type == GizmoFeatureRenderer.TYPE || type == QuadParticleFeatureRenderer.TYPE)
             return TEXT;
 
         if (type == ItemFeatureRenderer.TYPE || type == BlockModelFeatureRenderer.TYPE || type == ShadowFeatureRenderer.TYPE || type == FlameFeatureRenderer.TYPE || type == LeashFeatureRenderer.TYPE || type == ShapeOutlineFeatureRenderer.TYPE)
             return GEOMETRY;
 
         return null;
+    }
+
+    private static boolean runsOffThread(FeatureRendererType<?> type, List<?> groups, Font font, List<SubmitNode> submits) {
+        if (type == TextFeatureRenderer.TYPE)
+            return layoutsCached(font, groups, submits);
+
+        if (type == GizmoFeatureRenderer.TYPE)
+            return withoutTexts(groups, submits);
+
+        return true;
     }
 
     private static boolean layoutsCached(Font font, List<?> groups, List<SubmitNode> submits) {

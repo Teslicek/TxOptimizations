@@ -15,6 +15,8 @@ import net.minecraft.client.renderer.feature.submit.SubmitNode;
 final class FeatureWorker {
 
     private static final int INITIAL_CAPACITY = 1 << 20;
+    private static final int WINDOW_FRAMES    = 64;
+    private static final int PROBE_FRAMES     = 256;
 
     private final AtomicReference<Runnable> job    = new AtomicReference<>();
     private final List<Object>              groups = new ArrayList<>();
@@ -22,6 +24,10 @@ final class FeatureWorker {
     private final Thread                    thread;
     private volatile boolean                done   = true;
     private volatile Throwable              failure;
+    private int                             windowFrames;
+    private int                             windowSteals;
+    private int                             inlineFrames;
+    private boolean                         inline;
 
     FeatureWorker(String name) {
         this.shard  = new StagedVertexBuffer((Supplier<String>) () -> name, INITIAL_CAPACITY);
@@ -34,6 +40,21 @@ final class FeatureWorker {
 
     boolean isCurrentThread() {
         return Thread.currentThread() == this.thread;
+    }
+
+    boolean claimFrame() {
+        if (!this.inline)
+            return true;
+
+        this.inlineFrames ++;
+
+        if (this.inlineFrames < PROBE_FRAMES)
+            return false;
+
+        this.inline       = false;
+        this.inlineFrames = 0;
+
+        return true;
     }
 
     void start(FeatureFrameContext context, FeatureRendererMap renderers, List<SubmitNode> submits) {
@@ -57,6 +78,8 @@ final class FeatureWorker {
         if (pending != null)
             this.run(pending);
 
+        this.recordFrame(pending != null);
+
         while (!this.done)
             Thread.onSpinWait();
 
@@ -79,6 +102,20 @@ final class FeatureWorker {
         }
 
         shardDraws.clear();
+    }
+
+    private void recordFrame(boolean stolen) {
+        this.windowFrames ++;
+
+        if (stolen)
+            this.windowSteals ++;
+
+        if (this.windowFrames < WINDOW_FRAMES)
+            return;
+
+        this.inline       = this.windowSteals == WINDOW_FRAMES;
+        this.windowFrames = 0;
+        this.windowSteals = 0;
     }
 
     private void prepare(FeatureFrameContext context, FeatureRendererMap renderers, List<SubmitNode> submits) {
