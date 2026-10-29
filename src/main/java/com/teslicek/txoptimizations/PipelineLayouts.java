@@ -16,10 +16,12 @@ public final class PipelineLayouts {
     }
 
     public static long key(List<BindGroupLayout.UniformDescription> uniforms, int pushConstantsSize) {
-        List<Object> definition = new ArrayList<>(uniforms.size() + 1);
+        List<Object> definition = new ArrayList<>(uniforms.size() * 2 + 1);
 
-        for (BindGroupLayout.UniformDescription uniform : uniforms)
+        for (BindGroupLayout.UniformDescription uniform : uniforms) {
             definition.add(uniform.type());
+            definition.add(uniform.gpuFormat());
+        }
 
         definition.add(pushConstantsSize);
 
