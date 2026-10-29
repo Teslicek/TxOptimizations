@@ -4,10 +4,11 @@ import com.teslicek.txoptimizations.gpu.GpuPassProfiler;
 
 public final class FramePath {
 
-    private static final int    WINDOW_FRAMES = 128;
-    private static final int    PROBE_WINDOWS = 32;
-    private static final double WAIT_LIMIT    = 0.10;
-    private static final double ACQUIRE_LIMIT = 0.08;
+    private static final int    WINDOW_FRAMES     = 128;
+    private static final int    PROBE_WINDOWS     = 32;
+    private static final int    MAX_PROBE_WINDOWS = 1024;
+    private static final double WAIT_LIMIT        = 0.10;
+    private static final double ACQUIRE_LIMIT     = 0.08;
 
     private static boolean worker;
     private static boolean trial;
@@ -21,6 +22,7 @@ public final class FramePath {
     private static int     windowFrames;
     private static long    settledNanos;
     private static int     windowsSinceTrial;
+    private static int     probeWindows = PROBE_WINDOWS;
     private static long    workerFrames;
     private static long    inlineFrames;
 
@@ -85,6 +87,11 @@ public final class FramePath {
         FrameSpin.recordFrame(frameNanos);
 
         if (!frameEligible) {
+            if (trial) {
+                trial  = false;
+                worker = !worker;
+            }
+
             resetWindow();
 
             return;
@@ -101,6 +108,8 @@ public final class FramePath {
             trialLost         = windowFrameNanos >= settledNanos;
             windowsSinceTrial = 0;
 
+            probeWindows = trialLost ? Math.min(probeWindows * 2, MAX_PROBE_WINDOWS) : PROBE_WINDOWS;
+
             if (trialLost)
                 worker = !worker;
 
@@ -114,7 +123,7 @@ public final class FramePath {
 
         boolean wantsOther = worker ? windowAcquireNanos > windowFrameNanos * ACQUIRE_LIMIT : windowWaitNanos < windowFrameNanos * WAIT_LIMIT;
 
-        if ((wantsOther && !trialLost) || windowsSinceTrial >= PROBE_WINDOWS) {
+        if ((wantsOther && !trialLost) || windowsSinceTrial >= probeWindows) {
             trial  = true;
             worker = !worker;
         }
