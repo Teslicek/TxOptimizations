@@ -157,6 +157,8 @@ public final class SpirvCache {
 
                     while (view.hasRemaining())
                         channel.write(view);
+
+                    channel.force(true);
                 }
 
                 Files.move(temporary, file);
