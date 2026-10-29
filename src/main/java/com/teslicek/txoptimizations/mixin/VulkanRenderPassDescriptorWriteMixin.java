@@ -14,6 +14,7 @@ import com.mojang.renderpearl.backend.vulkan.VulkanRenderPipeline;
 import com.mojang.renderpearl.backend.vulkan.VulkanUtils;
 import com.mojang.renderpearl.util.TextureViewAndSampler;
 import com.teslicek.txoptimizations.DynamicStateCache;
+import com.teslicek.txoptimizations.PipelineLayoutKey;
 import com.teslicek.txoptimizations.TexelViewCache;
 import it.unimi.dsi.fastutil.objects.ReferenceList;
 import java.util.List;
@@ -74,7 +75,7 @@ public abstract class VulkanRenderPassDescriptorWriteMixin {
         if (!this.anyDescriptorDirty)
             return;
 
-        if (!DynamicStateCache.changesDescriptors(this.commandBuffer.address(), this.pipeline.pipelineLayout(), this.uniforms)) {
+        if (!DynamicStateCache.changesDescriptors(this.commandBuffer.address(), ((PipelineLayoutKey) (Object) this.pipeline).txoptimizations$layoutKey(), this.uniforms)) {
             this.anyDescriptorDirty = false;
             return;
         }

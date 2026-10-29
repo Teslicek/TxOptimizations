@@ -336,6 +336,7 @@
     "VulkanRenderPassDescriptorWriteMixin",
     "VulkanRenderPassUniformResetMixin",
     "VulkanRenderPassVertexBindMixin",
+    "VulkanRenderPipelineLayoutKeyMixin",
     "VulkanSubmissionDrainMixin",
     "VulkanSubmissionFrontMixin",
     "VulkanTransientMemoryLazyMixin",
