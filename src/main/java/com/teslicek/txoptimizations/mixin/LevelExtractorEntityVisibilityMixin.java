@@ -75,7 +75,7 @@ public abstract class LevelExtractorEntityVisibilityMixin {
         if (this.level == null)
             return false;
 
-        return this.levelRenderer.entityRenderDispatcher().getRenderer(entity).shouldRender(entity, frustum, camX, camY, camZ, partialTicks) || this.minecraft.player != null && entity.hasIndirectPassenger(this.minecraft.player);
+        return this.levelRenderer.entityRenderDispatcher().shouldRender(entity, frustum, camX, camY, camZ, partialTicks) || this.minecraft.player != null && entity.hasIndirectPassenger(this.minecraft.player);
     }
 
     @Unique
