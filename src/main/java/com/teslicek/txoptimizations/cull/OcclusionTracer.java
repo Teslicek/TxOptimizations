@@ -218,7 +218,7 @@ final class OcclusionTracer {
         double entry    = Math.max(Math.max(Math.min(nearX, farX), Math.min(nearY, farY)), Math.min(nearZ, farZ));
         double exit     = Math.min(Math.min(Math.max(nearX, farX), Math.max(nearY, farY)), Math.max(nearZ, farZ));
 
-        return !(exit > 0.0) && !(entry > exit);
+        return !(exit > 0.0) && !(entry < -1.0) && !(entry > exit);
     }
 
     private boolean traceRay() {
