@@ -225,7 +225,7 @@ public class FastFilePackResources extends AbstractPackMetadataResources impleme
 
             ZipEntry entry = zf.getEntry(filePath);
 
-            if (entry == null)
+            if (entry == null || entry.isDirectory())
                 continue;
 
             resourceOutput.accept(location, IoSupplier.create(zf, entry));
