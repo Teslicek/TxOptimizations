@@ -119,14 +119,17 @@ public final class ParallelFeatures {
         }
     }
 
-    public static void lock() {
-        if (active)
-            LOCK.lock();
+    public static boolean lock() {
+        if (!active)
+            return false;
+
+        LOCK.lock();
+
+        return true;
     }
 
     public static void unlock() {
-        if (LOCK.isHeldByCurrentThread())
-            LOCK.unlock();
+        LOCK.unlock();
     }
 
     private static FeatureWorker workerFor(FeatureRendererType<?> type, List<?> groups, Font font, List<SubmitNode> submits) {
