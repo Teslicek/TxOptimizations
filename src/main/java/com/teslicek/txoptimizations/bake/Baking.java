@@ -60,7 +60,7 @@ public final class Baking {
             return;
 
         bakeable.txoptimizations$setPendingMode(mode);
-        rebuild(blockEntity.getBlockPos());
+        rebuild(blockEntity.getBlockPos(), true);
     }
 
     public static boolean canBeTerrain(BlockEntity blockEntity) {
@@ -73,19 +73,19 @@ public final class Baking {
         return kind != null && kind.canBake(state);
     }
 
-    public static void rebuild(BlockPos pos) {
+    public static void rebuild(BlockPos pos, boolean playerChanged) {
         Minecraft minecraft = Minecraft.getInstance();
 
         if (minecraft.level == null)
             return;
 
         if (!minecraft.isSameThread()) {
-            minecraft.execute(() -> rebuild(pos));
+            minecraft.execute(() -> rebuild(pos, playerChanged));
 
             return;
         }
 
-        ((LevelExtractorSectionDirtyInvoker) minecraft.levelExtractor).txoptimizations$setSectionDirty(SectionPos.blockToSectionCoord(pos.getX()), SectionPos.blockToSectionCoord(pos.getY()), SectionPos.blockToSectionCoord(pos.getZ()), true);
+        ((LevelExtractorSectionDirtyInvoker) minecraft.levelExtractor).txoptimizations$setSectionDirty(SectionPos.blockToSectionCoord(pos.getX()), SectionPos.blockToSectionCoord(pos.getY()), SectionPos.blockToSectionCoord(pos.getZ()), playerChanged);
     }
 
     public static RenderShape meshedRenderShape(BlockEntity blockEntity, Queue<Runnable> sectionTasks, RenderShape vanilla) {

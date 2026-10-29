@@ -42,7 +42,7 @@ public final class Cushions {
 
         section(pos).put(entity.getId(), new Snapshot(entity.level(), entity.getId(), cushion.getPos(), cushion.position(), cushion.getRotationVector().y, cushion.getColor()));
         ((Bakeable) entity).txoptimizations$setPendingMode(RenderMode.TERRAIN);
-        Baking.rebuild(pos);
+        Baking.rebuild(pos, true);
     }
 
     public static void untrack(Entity entity) {
@@ -60,7 +60,7 @@ public final class Cushions {
             SECTIONS.remove(section, cushions);
 
         ChunkTasks.add(section, () -> ((Bakeable) entity).txoptimizations$setRenderMode(RenderMode.ENTITY));
-        Baking.rebuild(pos);
+        Baking.rebuild(pos, true);
     }
 
     public static void forEachMeshed(SectionPos section, Queue<Runnable> sectionTasks, MeshConsumer consumer) {

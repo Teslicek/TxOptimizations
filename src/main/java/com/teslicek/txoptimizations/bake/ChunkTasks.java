@@ -51,7 +51,7 @@ public final class ChunkTasks {
 
             return restored;
         });
-        Baking.rebuild(claim.section().origin());
+        Baking.rebuild(claim.section().origin(), false);
     }
 
     public static void clear() {
