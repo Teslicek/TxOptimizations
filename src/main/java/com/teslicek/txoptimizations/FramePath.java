@@ -109,8 +109,8 @@ public final class FramePath {
 
             trial             = false;
             windowsSinceTrial = 0;
-            lostWindows       = lost ? PROBE_WINDOWS : 0;
             probeWindows      = lost ? Math.min(probeWindows * 2, MAX_PROBE_WINDOWS) : PROBE_WINDOWS;
+            lostWindows       = lost ? probeWindows : 0;
 
             if (lost)
                 worker = !worker;
