@@ -17,7 +17,6 @@ final class FeatureWorker {
     private static final int  INITIAL_CAPACITY = 1 << 20;
     private static final int  WINDOW_FRAMES    = 64;
     private static final int  PROBE_FRAMES     = 256;
-    private static final int  IDLE_FRAMES      = WINDOW_FRAMES * 7 / 8;
     private static final long OVERHEAD_NANOS   = 3_000L;
 
     private final AtomicReference<Runnable> job    = new AtomicReference<>();
@@ -28,7 +27,7 @@ final class FeatureWorker {
     private volatile Throwable              failure;
     private volatile long                   jobNanos;
     private int                             windowFrames;
-    private int                             windowUselessFrames;
+    private long                            windowSavedNanos;
     private int                             inlineFrames;
     private boolean                         inline;
 
@@ -110,16 +109,14 @@ final class FeatureWorker {
 
     private void recordFrame(long waitNanos, long workNanos) {
         this.windowFrames ++;
-
-        if (workNanos - waitNanos < OVERHEAD_NANOS)
-            this.windowUselessFrames ++;
+        this.windowSavedNanos += Math.max(0L, workNanos - waitNanos);
 
         if (this.windowFrames < WINDOW_FRAMES)
             return;
 
-        this.inline              = this.windowUselessFrames >= IDLE_FRAMES;
-        this.windowFrames        = 0;
-        this.windowUselessFrames = 0;
+        this.inline           = this.windowSavedNanos < OVERHEAD_NANOS * WINDOW_FRAMES;
+        this.windowFrames     = 0;
+        this.windowSavedNanos = 0L;
     }
 
     private void prepare(FeatureFrameContext context, FeatureRendererMap renderers, List<SubmitNode> submits) {
