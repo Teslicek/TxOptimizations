@@ -11,6 +11,7 @@ import net.minecraft.client.model.geom.ModelLayers;
 import net.minecraft.client.renderer.block.dispatch.BlockStateModel;
 import net.minecraft.client.renderer.entity.CushionRenderer;
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
 import net.minecraft.core.SectionPos;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.decoration.Cushion;
@@ -30,7 +31,7 @@ public final class Cushions {
         if (!isTracked(entity))
             return;
 
-        if (entity.isRemoved()) {
+        if (entity.isRemoved() || entity.isCurrentlyGlowing()) {
             untrack(entity);
 
             return;
@@ -107,13 +108,14 @@ public final class Cushions {
     }
 
     private static BlockStateModel model(Snapshot snapshot) {
-        Vec3     offset = snapshot.position().subtract(Vec3.atLowerCornerOf(snapshot.blockPos()));
-        ModelKey key    = new ModelKey(offset, snapshot.yRot(), snapshot.color());
+        Vec3     offset   = snapshot.position().subtract(Vec3.atLowerCornerOf(snapshot.blockPos()));
+        float    rotation = 180.0F - Direction.fromYRot(snapshot.yRot()).toYRot();
+        ModelKey key      = new ModelKey(offset, rotation, snapshot.color());
 
         return MODELS.computeIfAbsent(key, _ -> {
             PoseStack poseStack = new PoseStack();
             poseStack.translate(offset.x, offset.y, offset.z);
-            poseStack.rotate(Axis.YP.rotationDegrees(snapshot.yRot()));
+            poseStack.rotate(Axis.YP.rotationDegrees(rotation));
             poseStack.rotate(Axis.XP.rotationDegrees(180.0F));
             poseStack.translate(0.0, -0.25, 0.0);
 
@@ -129,6 +131,6 @@ public final class Cushions {
     private record Snapshot(Level level, int id, BlockPos blockPos, Vec3 position, float yRot, DyeColor color) {
     }
 
-    private record ModelKey(Vec3 offset, float yRot, DyeColor color) {
+    private record ModelKey(Vec3 offset, float rotation, DyeColor color) {
     }
 }
