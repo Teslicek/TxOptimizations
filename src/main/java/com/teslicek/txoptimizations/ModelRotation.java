@@ -16,16 +16,13 @@ public final class ModelRotation {
     private static final int                  TRANSLATION_PROPERTIES = Matrix4fc.PROPERTY_AFFINE | Matrix4fc.PROPERTY_TRANSLATION | Matrix4fc.PROPERTY_ORTHONORMAL;
     private static final int                  TRANSLATED_PROPERTIES  = ~(Matrix4fc.PROPERTY_PERSPECTIVE | Matrix4fc.PROPERTY_IDENTITY);
     private static final int                  ROTATION_VALUES        = 9;
-    private static final int                  ANGLE_VALUES           = 3;
-    private static final int                  SLOT_VALUES            = ANGLE_VALUES + ROTATION_VALUES;
     private static final int                  CACHE_SLOTS            = 1024;
-    private static final float[]              SLOTS                  = new float[CACHE_SLOTS * SLOT_VALUES];
+    private static final int[]                CACHED_X               = new int[CACHE_SLOTS];
+    private static final int[]                CACHED_Y               = new int[CACHE_SLOTS];
+    private static final int[]                CACHED_Z               = new int[CACHE_SLOTS];
+    private static final boolean[]            FILLED                 = new boolean[CACHE_SLOTS];
+    private static final float[]              ROTATIONS              = new float[CACHE_SLOTS * ROTATION_VALUES];
     private static final ThreadLocal<float[]> SCRATCH                = ThreadLocal.withInitial(() -> new float[ROTATION_VALUES]);
-
-    static {
-        for (int slot = 0; slot < CACHE_SLOTS; slot ++)
-            fillRotation(SLOTS, slot * SLOT_VALUES + ANGLE_VALUES, 0.0F, 0.0F, 0.0F);
-    }
 
     private ModelRotation() {
     }
@@ -70,8 +67,8 @@ public final class ModelRotation {
         int     base;
 
         if (RenderThreadStack.isOwner()) {
-            rotation = SLOTS;
-            base     = rotationBase(angleZ, angleY, angleX);
+            rotation = ROTATIONS;
+            base     = rotationSlot(angleZ, angleY, angleX) * ROTATION_VALUES;
         } else {
             rotation = SCRATCH.get();
             base     = 0;
@@ -92,22 +89,23 @@ public final class ModelRotation {
         rotate(target.normal(), source.normal(), rm00, rm01, rm02, rm10, rm11, rm12, rm20, rm21, rm22);
     }
 
-    private static int rotationBase(float angleZ, float angleY, float angleX) {
+    private static int rotationSlot(float angleZ, float angleY, float angleX) {
         int bitsX = Float.floatToRawIntBits(angleX);
         int bitsY = Float.floatToRawIntBits(angleY);
         int bitsZ = Float.floatToRawIntBits(angleZ);
         int hash  = (bitsX * 31 + bitsY) * 31 + bitsZ;
-        int slot  = ((hash ^ hash >>> 16) & CACHE_SLOTS - 1) * SLOT_VALUES;
+        int slot  = (hash ^ hash >>> 16) & CACHE_SLOTS - 1;
 
-        if (Float.floatToRawIntBits(SLOTS[slot]) == bitsX && Float.floatToRawIntBits(SLOTS[slot + 1]) == bitsY && Float.floatToRawIntBits(SLOTS[slot + 2]) == bitsZ)
-            return slot + ANGLE_VALUES;
+        if (FILLED[slot] && CACHED_X[slot] == bitsX && CACHED_Y[slot] == bitsY && CACHED_Z[slot] == bitsZ)
+            return slot;
 
-        SLOTS[slot]     = angleX;
-        SLOTS[slot + 1] = angleY;
-        SLOTS[slot + 2] = angleZ;
-        fillRotation(SLOTS, slot + ANGLE_VALUES, angleZ, angleY, angleX);
+        fillRotation(ROTATIONS, slot * ROTATION_VALUES, angleZ, angleY, angleX);
+        CACHED_X[slot] = bitsX;
+        CACHED_Y[slot] = bitsY;
+        CACHED_Z[slot] = bitsZ;
+        FILLED[slot]   = true;
 
-        return slot + ANGLE_VALUES;
+        return slot;
     }
 
     private static void fillRotation(float[] rotation, int base, float angleZ, float angleY, float angleX) {
