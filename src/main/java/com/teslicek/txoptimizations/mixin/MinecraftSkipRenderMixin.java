@@ -1,5 +1,6 @@
 package com.teslicek.txoptimizations.mixin;
 
+import java.util.concurrent.locks.LockSupport;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.screens.TitleScreen;
 import net.minecraft.client.gui.screens.multiplayer.ServerReconfigScreen;
@@ -16,6 +17,9 @@ public abstract class MinecraftSkipRenderMixin {
     private static final long FREEZE_TIMEOUT_MS = 5_000L;
 
     @Unique
+    private static final long FREEZE_POLL_NANOS = 1_000_000L;
+
+    @Unique
     private static long startMs = 0L;
 
     @Unique
@@ -23,8 +27,11 @@ public abstract class MinecraftSkipRenderMixin {
 
     @Inject(method = "renderFrame(Z)V", at = @At("HEAD"), cancellable = true)
     private void txoptimizations$freezeDuringReconfig(boolean advanceGameTime, CallbackInfo ci) {
-        if (txoptimizations$shouldFreeze())
-            ci.cancel();
+        if (!txoptimizations$shouldFreeze())
+            return;
+
+        ci.cancel();
+        LockSupport.parkNanos(FREEZE_POLL_NANOS);
     }
 
     @Unique
