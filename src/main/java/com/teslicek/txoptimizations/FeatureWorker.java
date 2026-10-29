@@ -17,6 +17,7 @@ final class FeatureWorker {
     private static final int INITIAL_CAPACITY = 1 << 20;
     private static final int WINDOW_FRAMES    = 64;
     private static final int PROBE_FRAMES     = 256;
+    private static final int USEFUL_EIGHTHS   = 8;
 
     private final AtomicReference<Runnable> job    = new AtomicReference<>();
     private final List<Object>              groups = new ArrayList<>();
@@ -115,7 +116,7 @@ final class FeatureWorker {
         if (this.windowFrames < WINDOW_FRAMES)
             return;
 
-        this.inline          = this.windowWaitNanos >= this.windowJobNanos;
+        this.inline          = this.windowWaitNanos * USEFUL_EIGHTHS >= this.windowJobNanos * (USEFUL_EIGHTHS - 1);
         this.windowFrames    = 0;
         this.windowWaitNanos = 0L;
         this.windowJobNanos  = 0L;
