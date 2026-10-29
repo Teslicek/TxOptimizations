@@ -1,17 +1,17 @@
 package com.teslicek.txoptimizations.bake;
 
+import com.teslicek.txoptimizations.mixin.LevelExtractorSectionDirtyInvoker;
 import java.util.Queue;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.block.dispatch.BlockStateModel;
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.SectionPos;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.level.block.RenderShape;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
 
 public final class Baking {
-
-    private static final int REBUILD_FLAGS = 8;
 
     private Baking() {
     }
@@ -83,7 +83,7 @@ public final class Baking {
             return;
         }
 
-        minecraft.levelExtractor.blockChanged(pos, REBUILD_FLAGS);
+        ((LevelExtractorSectionDirtyInvoker) minecraft.levelExtractor).txoptimizations$setSectionDirty(SectionPos.blockToSectionCoord(pos.getX()), SectionPos.blockToSectionCoord(pos.getY()), SectionPos.blockToSectionCoord(pos.getZ()), true);
     }
 
     public static RenderShape meshedRenderShape(BlockEntity blockEntity, Queue<Runnable> sectionTasks, RenderShape vanilla) {

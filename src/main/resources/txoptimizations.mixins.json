@@ -155,6 +155,7 @@
     "LevelRendererDeferredSkyMixin",
     "LevelExtractorBlockEntitySectionsMixin",
     "LevelExtractorDirtySectionsMixin",
+    "LevelExtractorSectionDirtyInvoker",
     "LevelExtractorSubsetCarryMixin",
     "LevelExtractorEntityVisibilityMixin",
     "LevelExtractorRegionCacheMixin",
