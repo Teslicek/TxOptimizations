@@ -107,8 +107,8 @@ public final class EntityCulling {
             return true;
 
         BlockPos pos        = blockEntity.getBlockPos();
-        int      vertical   = verticalExtension(blockEntity);
         int      horizontal = horizontalExtension(blockEntity);
+        int      vertical   = verticalExtension(blockEntity, horizontal);
 
         return !((FrustumBoxTest) Minecraft.getInstance().gameRenderer.mainCamera().getCullFrustum()).txoptimizations$isBoxVisible(pos.getX() - horizontal, pos.getY() - vertical, pos.getZ() - horizontal, pos.getX() + 1 + horizontal, pos.getY() + 1 + vertical, pos.getZ() + 1 + horizontal);
     }
@@ -282,8 +282,8 @@ public final class EntityCulling {
             return;
         }
 
-        int vertical   = verticalExtension(blockEntity);
         int horizontal = horizontalExtension(blockEntity);
+        int vertical   = verticalExtension(blockEntity, horizontal);
 
         apply(cullable, TRACER.isVisible(pos.getX() - horizontal, pos.getY() - vertical, pos.getZ() - horizontal, pos.getX() + 1 + horizontal, pos.getY() + 1 + vertical, pos.getZ() + 1 + horizontal), now);
     }
@@ -320,8 +320,8 @@ public final class EntityCulling {
         cullable.txoptimizations$setVisibleUntil(now + VISIBLE_HOLD_MILLIS);
     }
 
-    private static int verticalExtension(BlockEntity blockEntity) {
-        return blockEntity instanceof BannerBlockEntity || hasOpenLid(blockEntity) ? 1 : 0;
+    private static int verticalExtension(BlockEntity blockEntity, int horizontal) {
+        return horizontal > 0 || blockEntity instanceof BannerBlockEntity ? 1 : 0;
     }
 
     private static int horizontalExtension(BlockEntity blockEntity) {
