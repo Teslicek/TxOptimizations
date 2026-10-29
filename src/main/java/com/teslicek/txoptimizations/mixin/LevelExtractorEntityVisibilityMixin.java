@@ -2,7 +2,6 @@ package com.teslicek.txoptimizations.mixin;
 
 import com.teslicek.txoptimizations.ClientClock;
 import com.teslicek.txoptimizations.EntityVisibilityMemo;
-import com.teslicek.txoptimizations.bake.Baking;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.client.renderer.LevelRenderer;
@@ -61,7 +60,7 @@ public abstract class LevelExtractorEntityVisibilityMixin {
         if (this.txoptimizations$passesRendererCulling(entity, frustum, camX, camY, camZ, partialTicks)) {
             BlockPos blockPos = entity.blockPosition();
 
-            visible = (this.level.isOutsideBuildHeight(blockPos.getY()) || this.levelRenderer.isSectionCompiledAndVisible(blockPos, chunkFadeDuration)) && !Baking.isEntityMeshed(entity);
+            visible = (this.level.isOutsideBuildHeight(blockPos.getY()) || this.levelRenderer.isSectionCompiledAndVisible(blockPos, chunkFadeDuration));
         }
 
         if (keyed)

@@ -3,6 +3,7 @@ package com.teslicek.txoptimizations.mixin.cull;
 import com.llamalad7.mixinextras.injector.ModifyExpressionValue;
 import com.llamalad7.mixinextras.sugar.Local;
 import com.teslicek.txoptimizations.EntityStateReuse;
+import com.teslicek.txoptimizations.bake.Baking;
 import com.teslicek.txoptimizations.cull.Cullable;
 import com.teslicek.txoptimizations.cull.EntityCulling;
 import net.minecraft.client.renderer.entity.state.EntityRenderState;
@@ -23,7 +24,7 @@ public abstract class LevelExtractorCullMixin {
 
     @ModifyExpressionValue(method = "extractVisibleEntities", at = @At(value = "INVOKE", target = "Lnet/minecraft/client/renderer/extract/LevelExtractor;isEntityVisible(Lnet/minecraft/world/entity/Entity;Lnet/minecraft/client/renderer/culling/Frustum;DDDFJ)Z"))
     private boolean txoptimizations$skipCulledEntities(boolean visible, @Local Entity entity) {
-        return visible && !EntityCulling.hidesEntity(entity);
+        return visible && !Baking.isEntityMeshed(entity) && !EntityCulling.hidesEntity(entity);
     }
 
     @Redirect(method = "extractVisibleEntities", at = @At(value = "INVOKE", target = "Lnet/minecraft/client/renderer/extract/LevelExtractor;extractEntity(Lnet/minecraft/world/entity/Entity;F)Lnet/minecraft/client/renderer/entity/state/EntityRenderState;"))
