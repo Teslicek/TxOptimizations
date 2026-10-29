@@ -28,6 +28,7 @@ import org.joml.Matrix4f;
 
 public final class ParallelFeatures {
 
+    private static final int                                         LOCK_SPINS = 512;
     private static final ReentrantLock                               LOCK       = new ReentrantLock();
     private static final Matrix4f                                    MODEL_VIEW = new Matrix4f();
     private static final FeatureWorker                               TEXT       = new FeatureWorker("TxOptimizations Text Worker");
@@ -119,7 +120,7 @@ public final class ParallelFeatures {
         if (!active)
             return renderType.prepare();
 
-        LOCK.lock();
+        acquire();
 
         try {
             return renderType.prepare();
@@ -132,13 +133,24 @@ public final class ParallelFeatures {
         if (!active)
             return false;
 
-        LOCK.lock();
+        acquire();
 
         return true;
     }
 
     public static void unlock() {
         LOCK.unlock();
+    }
+
+    private static void acquire() {
+        for (int spin = 0; spin < LOCK_SPINS; spin ++) {
+            if (LOCK.tryLock())
+                return;
+
+            Thread.onSpinWait();
+        }
+
+        LOCK.lock();
     }
 
     private static FeatureWorker workerFor(FeatureRendererType<?> type) {
