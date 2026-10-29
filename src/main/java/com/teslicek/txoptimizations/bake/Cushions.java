@@ -83,8 +83,8 @@ public final class Cushions {
             sectionTasks.add(() -> {
                 Entity entity = Minecraft.getInstance().level.getEntity(snapshot.id());
 
-                if (entity != null)
-                    ((Bakeable) entity).txoptimizations$setRenderMode(RenderMode.TERRAIN);
+                if (entity instanceof Bakeable bakeable)
+                    bakeable.txoptimizations$setRenderMode(RenderMode.TERRAIN);
             });
 
             consumer.accept(snapshot.blockPos(), model(snapshot));
