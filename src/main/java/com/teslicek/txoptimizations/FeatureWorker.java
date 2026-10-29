@@ -24,8 +24,10 @@ final class FeatureWorker {
     private final Thread                    thread;
     private volatile boolean                done   = true;
     private volatile Throwable              failure;
+    private volatile long                   jobNanos;
     private int                             windowFrames;
-    private int                             windowSteals;
+    private long                            windowWaitNanos;
+    private long                            windowJobNanos;
     private int                             inlineFrames;
     private boolean                         inline;
 
@@ -73,15 +75,16 @@ final class FeatureWorker {
         if (this.groups.isEmpty())
             return;
 
-        Runnable pending = this.job.getAndSet(null);
+        long     waitStart = System.nanoTime();
+        Runnable pending   = this.job.getAndSet(null);
 
         if (pending != null)
             this.run(pending);
 
-        this.recordFrame(pending != null);
-
         while (!this.done)
             Thread.onSpinWait();
+
+        this.recordFrame(System.nanoTime() - waitStart, this.jobNanos);
 
         this.groups.clear();
 
@@ -104,18 +107,18 @@ final class FeatureWorker {
         shardDraws.clear();
     }
 
-    private void recordFrame(boolean stolen) {
+    private void recordFrame(long waitNanos, long workNanos) {
         this.windowFrames ++;
-
-        if (stolen)
-            this.windowSteals ++;
+        this.windowWaitNanos += waitNanos;
+        this.windowJobNanos  += workNanos;
 
         if (this.windowFrames < WINDOW_FRAMES)
             return;
 
-        this.inline       = this.windowSteals == WINDOW_FRAMES;
-        this.windowFrames = 0;
-        this.windowSteals = 0;
+        this.inline          = this.windowWaitNanos >= this.windowJobNanos;
+        this.windowFrames    = 0;
+        this.windowWaitNanos = 0L;
+        this.windowJobNanos  = 0L;
     }
 
     private void prepare(FeatureFrameContext context, FeatureRendererMap renderers, List<SubmitNode> submits) {
@@ -139,12 +142,15 @@ final class FeatureWorker {
     }
 
     private void run(Runnable next) {
+        long start = System.nanoTime();
+
         try {
             next.run();
         } catch (Throwable thrown) {
             this.failure = thrown;
         } finally {
-            this.done = true;
+            this.jobNanos = System.nanoTime() - start;
+            this.done     = true;
         }
     }
 }
