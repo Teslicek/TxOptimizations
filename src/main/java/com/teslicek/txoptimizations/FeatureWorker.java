@@ -14,10 +14,11 @@ import net.minecraft.client.renderer.feature.submit.SubmitNode;
 
 final class FeatureWorker {
 
-    private static final int INITIAL_CAPACITY = 1 << 20;
-    private static final int WINDOW_FRAMES    = 64;
-    private static final int PROBE_FRAMES     = 256;
-    private static final int USEFUL_EIGHTHS   = 8;
+    private static final int  INITIAL_CAPACITY = 1 << 20;
+    private static final int  WINDOW_FRAMES    = 64;
+    private static final int  PROBE_FRAMES     = 256;
+    private static final int  IDLE_FRAMES      = WINDOW_FRAMES * 7 / 8;
+    private static final long OVERHEAD_NANOS   = 3_000L;
 
     private final AtomicReference<Runnable> job    = new AtomicReference<>();
     private final List<Object>              groups = new ArrayList<>();
@@ -27,8 +28,7 @@ final class FeatureWorker {
     private volatile Throwable              failure;
     private volatile long                   jobNanos;
     private int                             windowFrames;
-    private long                            windowWaitNanos;
-    private long                            windowJobNanos;
+    private int                             windowUselessFrames;
     private int                             inlineFrames;
     private boolean                         inline;
 
@@ -110,16 +110,16 @@ final class FeatureWorker {
 
     private void recordFrame(long waitNanos, long workNanos) {
         this.windowFrames ++;
-        this.windowWaitNanos += waitNanos;
-        this.windowJobNanos  += workNanos;
+
+        if (workNanos - waitNanos < OVERHEAD_NANOS)
+            this.windowUselessFrames ++;
 
         if (this.windowFrames < WINDOW_FRAMES)
             return;
 
-        this.inline          = this.windowWaitNanos * USEFUL_EIGHTHS >= this.windowJobNanos * (USEFUL_EIGHTHS - 1);
-        this.windowFrames    = 0;
-        this.windowWaitNanos = 0L;
-        this.windowJobNanos  = 0L;
+        this.inline              = this.windowUselessFrames >= IDLE_FRAMES;
+        this.windowFrames        = 0;
+        this.windowUselessFrames = 0;
     }
 
     private void prepare(FeatureFrameContext context, FeatureRendererMap renderers, List<SubmitNode> submits) {
