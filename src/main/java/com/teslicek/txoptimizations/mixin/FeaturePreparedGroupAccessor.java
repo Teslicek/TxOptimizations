@@ -21,6 +21,15 @@ public interface FeaturePreparedGroupAccessor {
     @Accessor("featureGroupIndex")
     int txoptimizations$featureGroupIndex();
 
+    @Accessor("fromInclusive")
+    int txoptimizations$fromInclusive();
+
+    @Accessor("toInclusive")
+    int txoptimizations$toInclusive();
+
+    @Invoker("prepare")
+    void txoptimizations$prepare(FeatureFrameContext context, FeatureRendererMap featureRenderers, List<SubmitNode> submits);
+
     @Invoker("execute")
     void txoptimizations$execute(FeatureFrameContext context, @Nullable OitStage stage, RenderPass renderPass, FeatureRendererMap featureRenderers, List<SubmitNode> submits);
 }

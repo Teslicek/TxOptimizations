@@ -50,6 +50,18 @@ public final class TextLayoutCache {
         return entry.prepared;
     }
 
+    public static boolean ensure(Font font, FormattedCharSequence text, float x, float y, int color, boolean dropShadow, int backgroundColor, boolean outline) {
+        if (find(font, text, x, y, color, dropShadow, backgroundColor, outline) != null)
+            return true;
+
+        if (!isStable(text))
+            return false;
+
+        store(outline ? font.prepare8xTextOutline(text, x, y, color) : font.prepareText(text, x, y, color, dropShadow, false, backgroundColor), font, text, x, y, color, dropShadow, backgroundColor, outline);
+
+        return true;
+    }
+
     public static Font.PreparedText store(Font.PreparedText prepared, Font font, FormattedCharSequence text, float x, float y, int color, boolean dropShadow, int backgroundColor, boolean outline) {
         if (!isStable(text))
             return prepared;

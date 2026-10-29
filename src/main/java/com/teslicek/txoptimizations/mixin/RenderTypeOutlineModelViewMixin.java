@@ -5,6 +5,7 @@ import com.mojang.blaze3d.systems.RenderSystem;
 import com.mojang.renderpearl.api.buffers.GpuBufferSlice;
 import com.teslicek.txoptimizations.LastWrittenData;
 import com.teslicek.txoptimizations.OutlineModelView;
+import com.teslicek.txoptimizations.ParallelFeatures;
 import com.teslicek.txoptimizations.RenderThreadStack;
 import java.util.Objects;
 import net.minecraft.client.renderer.DynamicGpuData;
@@ -33,7 +34,7 @@ public abstract class RenderTypeOutlineModelViewMixin {
     @Redirect(method = "prepare", at = @At(value = "INVOKE", target = "Lcom/mojang/blaze3d/systems/RenderSystem;getModelViewMatrixCopy()Lorg/joml/Matrix4f;"))
     private Matrix4f txoptimizations$scratchModelView() {
         if (!RenderThreadStack.isOwner())
-            return RenderSystem.getModelViewMatrixCopy();
+            return ParallelFeatures.modelViewMatrixCopy();
 
         return MODEL_VIEW.set(RenderSystem.getModelViewStack());
     }

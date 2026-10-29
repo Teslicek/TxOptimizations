@@ -175,6 +175,11 @@ public abstract class StagedVertexBufferDirectCopyMixin implements BackgroundVer
     }
 
     @Override
+    public boolean txoptimizations$isCopyingInBackground() {
+        return this.txoptimizations$vertexCopy.isInBackground();
+    }
+
+    @Override
     public void txoptimizations$copyVerticesInBackground() {
         if (!this.txoptimizations$vulkanVertices || this.txoptimizations$vertexCopy.isInBackground())
             return;
@@ -308,8 +313,8 @@ public abstract class StagedVertexBufferDirectCopyMixin implements BackgroundVer
 
     @Unique
     private long txoptimizations$address(ByteBufferBuilder.Result slice) {
-        ByteBufferBuilderAccessor builder = (ByteBufferBuilderAccessor) this.stagingBuffer;
         ByteBufferResultAccessor  result  = (ByteBufferResultAccessor) slice;
+        ByteBufferBuilderAccessor builder = (ByteBufferBuilderAccessor) result.txoptimizations$builder();
 
         if (!builder.txoptimizations$isValid(result.txoptimizations$generation()))
             throw new IllegalStateException("Buffer is no longer valid");

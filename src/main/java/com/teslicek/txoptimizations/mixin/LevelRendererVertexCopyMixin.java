@@ -1,6 +1,7 @@
 package com.teslicek.txoptimizations.mixin;
 
 import com.teslicek.txoptimizations.BackgroundVertexCopy;
+import com.teslicek.txoptimizations.ParallelFeatures;
 import net.minecraft.client.renderer.LevelRenderer;
 import net.minecraft.client.renderer.RenderBuffers;
 import org.spongepowered.asm.mixin.Final;
@@ -16,6 +17,11 @@ public abstract class LevelRendererVertexCopyMixin {
     @Shadow
     @Final
     private RenderBuffers renderBuffers;
+
+    @Inject(method = "render", at = @At(value = "INVOKE", target = "Lnet/minecraft/client/renderer/feature/FeatureRenderDispatcher;prepareFrame(Lnet/minecraft/client/renderer/SubmitNodeStorage;)Lnet/minecraft/client/renderer/feature/FeatureRenderDispatcher$PreparedFrame;"))
+    private void txoptimizations$allowParallelFeatures(CallbackInfo ci) {
+        ParallelFeatures.allowNextFrame(!((BackgroundVertexCopy) this.renderBuffers.stagedVertexBuffer()).txoptimizations$isCopyingInBackground());
+    }
 
     @Inject(method = "render", at = @At(value = "INVOKE", target = "Lnet/minecraft/client/renderer/feature/FeatureRenderDispatcher;prepareFrame(Lnet/minecraft/client/renderer/SubmitNodeStorage;)Lnet/minecraft/client/renderer/feature/FeatureRenderDispatcher$PreparedFrame;", shift = At.Shift.AFTER))
     private void txoptimizations$copyFeatureVerticesInBackground(CallbackInfo ci) {

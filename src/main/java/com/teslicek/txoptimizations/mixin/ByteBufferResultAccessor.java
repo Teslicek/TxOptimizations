@@ -14,6 +14,9 @@ public interface ByteBufferResultAccessor {
     @Accessor("generation")
     int txoptimizations$generation();
 
+    @Accessor("this$0")
+    ByteBufferBuilder txoptimizations$builder();
+
     @Mutable
     @Accessor("size")
     void txoptimizations$setSize(int size);
