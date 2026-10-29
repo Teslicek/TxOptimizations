@@ -83,10 +83,13 @@ public final class ParallelFeatures {
 
         try {
             TEXT.finish(main);
-            GEOMETRY.finish(main);
         } finally {
-            ASSIGNED.clear();
-            active = false;
+            try {
+                GEOMETRY.finish(main);
+            } finally {
+                ASSIGNED.clear();
+                active = false;
+            }
         }
     }
 
