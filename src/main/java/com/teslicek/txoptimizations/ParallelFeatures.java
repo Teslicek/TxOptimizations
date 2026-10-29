@@ -149,6 +149,8 @@ public final class ParallelFeatures {
     }
 
     private static boolean layoutsCached(Font font, List<?> groups, List<SubmitNode> submits) {
+        int clears = TextLayoutCache.entryClears();
+
         for (Object group : groups) {
             FeaturePreparedGroupAccessor accessor = (FeaturePreparedGroupAccessor) group;
 
@@ -161,7 +163,7 @@ public final class ParallelFeatures {
             }
         }
 
-        return true;
+        return TextLayoutCache.entryClears() == clears;
     }
 
     private static boolean withoutTexts(List<?> groups, List<SubmitNode> submits) {

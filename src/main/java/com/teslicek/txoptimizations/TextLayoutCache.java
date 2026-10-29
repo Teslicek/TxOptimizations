@@ -26,12 +26,17 @@ public final class TextLayoutCache {
 
     private static long lastEviction;
     private static int  generation;
+    private static int  entryClears;
 
     private TextLayoutCache() {
     }
 
     public static int generation() {
         return generation;
+    }
+
+    public static int entryClears() {
+        return entryClears;
     }
 
     public static Font.PreparedText find(Font font, FormattedCharSequence text, float x, float y, int color, boolean dropShadow, int backgroundColor, boolean outline) {
@@ -66,8 +71,10 @@ public final class TextLayoutCache {
         if (!isStable(text))
             return prepared;
 
-        if (ENTRIES.size() >= MAX_ENTRIES)
+        if (ENTRIES.size() >= MAX_ENTRIES) {
             ENTRIES.clear();
+            entryClears ++;
+        }
 
         Key key = new Key();
 
