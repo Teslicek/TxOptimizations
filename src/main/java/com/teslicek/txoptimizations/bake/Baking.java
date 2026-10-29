@@ -3,6 +3,7 @@ package com.teslicek.txoptimizations.bake;
 import com.teslicek.txoptimizations.mixin.LevelExtractorSectionDirtyInvoker;
 import java.util.Queue;
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.components.debug.DebugScreenEntries;
 import net.minecraft.client.renderer.block.dispatch.BlockStateModel;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.SectionPos;
@@ -45,7 +46,8 @@ public final class Baking {
 
     public static boolean isEntityMeshed(Entity entity) {
         return entity instanceof Bakeable bakeable
-            && bakeable.txoptimizations$isBakeSupported() && bakeable.txoptimizations$getRenderMode() == RenderMode.TERRAIN && !entity.shouldShowName();
+            && bakeable.txoptimizations$isBakeSupported() && bakeable.txoptimizations$getRenderMode() == RenderMode.TERRAIN && !entity.shouldShowName() && !entity.displayFireAnimation()
+            && !Minecraft.getInstance().debugEntries.isCurrentlyEnabled(DebugScreenEntries.ENTITY_HITBOXES);
     }
 
     public static void requestMode(BlockEntity blockEntity, RenderMode mode) {
