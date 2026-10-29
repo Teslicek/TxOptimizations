@@ -9,6 +9,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import com.mojang.blaze3d.platform.Window;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.navigation.ScreenRectangle;
@@ -32,12 +33,13 @@ public final class HudCache {
 
     private static final Map<Identifier, HudLayerTimer> LAYERS    = new HashMap<>();
     private static final List<HudLayerTimer>            ORDER     = new ArrayList<>();
-    private static final HudLayerTimer                  UNKNOWN   = new HudLayerTimer(false);
     private static final List<ScreenArea>               DEFERRED  = new ArrayList<>();
     private static final Matrix3x2f                     LAST_POSE = new Matrix3x2f();
 
     private static HudFramebuffers framebuffers;
     private static HudLayerTimer   current;
+    private static int             position;
+    private static boolean         orderChanged;
     private static int             pass = 1;
     private static boolean         rendering;
     private static boolean         flushing;
@@ -59,7 +61,11 @@ public final class HudCache {
     }
 
     public static HudLayerTimer layer(Identifier id) {
-        return LAYERS.getOrDefault(id, UNKNOWN);
+        HudLayerTimer layer = LAYERS.computeIfAbsent(id, _ -> new HudLayerTimer(false));
+
+        layer.place(position ++);
+
+        return layer;
     }
 
     public static void registerLayers(List<Identifier> ids) {
@@ -92,6 +98,9 @@ public final class HudCache {
 
     public static void defer(ScreenArea submission) {
         DEFERRED.add(submission);
+
+        if (current != null)
+            record(current, submission.bounds());
     }
 
     public static void checkBlend(RenderPipeline pipeline) {
@@ -123,7 +132,11 @@ public final class HudCache {
         }
 
         rendering = true;
+        position  = 0;
         hud.run();
+
+        if (orderChanged)
+            keepUncachedAbove();
 
         if (pass > 0)
             flush();
@@ -148,6 +161,9 @@ public final class HudCache {
 
     public static void include(ScreenRectangle bounds) {
         framebuffers().include(bounds);
+
+        if (current != null)
+            record(current, bounds);
     }
 
     public static void markForCatchUp() {
@@ -169,6 +185,46 @@ public final class HudCache {
 
         current.uncache();
         framebuffers().dropFrame();
+        orderChanged = true;
+    }
+
+    private static void record(HudLayerTimer layer, ScreenRectangle bounds) {
+        if (bounds != null) {
+            orderChanged |= layer.include(bounds.left(), bounds.top(), bounds.right(), bounds.bottom());
+
+            return;
+        }
+
+        Window window = Minecraft.getInstance().getWindow();
+
+        orderChanged |= layer.include(0, 0, window.getGuiScaledWidth(), window.getGuiScaledHeight());
+    }
+
+    private static void keepUncachedAbove() {
+        orderChanged = false;
+
+        boolean dropped = false;
+
+        for (HudLayerTimer below : LAYERS.values()) {
+            if (!below.isCached())
+                continue;
+
+            for (HudLayerTimer above : LAYERS.values()) {
+                if (above.isCached() || !below.drawsBelow(above))
+                    continue;
+
+                below.uncache();
+                dropped = true;
+
+                break;
+            }
+        }
+
+        if (!dropped)
+            return;
+
+        framebuffers().dropFrame();
+        orderChanged = true;
     }
 
     private static void flush() {
