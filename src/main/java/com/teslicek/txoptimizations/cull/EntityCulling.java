@@ -29,6 +29,9 @@ import net.minecraft.world.entity.decoration.ArmorStand;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.level.block.entity.BannerBlockEntity;
 import net.minecraft.world.level.block.entity.BlockEntity;
+import net.minecraft.world.level.block.entity.ChestBlockEntity;
+import net.minecraft.world.level.block.entity.EnderChestBlockEntity;
+import net.minecraft.world.level.block.entity.ShulkerBoxBlockEntity;
 import net.minecraft.world.level.chunk.LevelChunk;
 import net.minecraft.world.level.chunk.status.ChunkStatus;
 import net.minecraft.world.phys.AABB;
@@ -103,10 +106,11 @@ public final class EntityCulling {
         if (((Cullable) blockEntity).txoptimizations$isCulled())
             return true;
 
-        BlockPos pos       = blockEntity.getBlockPos();
-        int      extension = verticalExtension(blockEntity);
+        BlockPos pos        = blockEntity.getBlockPos();
+        int      vertical   = verticalExtension(blockEntity);
+        int      horizontal = horizontalExtension(blockEntity);
 
-        return !((FrustumBoxTest) Minecraft.getInstance().gameRenderer.mainCamera().getCullFrustum()).txoptimizations$isBoxVisible(pos.getX(), pos.getY() - extension, pos.getZ(), pos.getX() + 1, pos.getY() + 1 + extension, pos.getZ() + 1);
+        return !((FrustumBoxTest) Minecraft.getInstance().gameRenderer.mainCamera().getCullFrustum()).txoptimizations$isBoxVisible(pos.getX() - horizontal, pos.getY() - vertical, pos.getZ() - horizontal, pos.getX() + 1 + horizontal, pos.getY() + 1 + vertical, pos.getZ() + 1 + horizontal);
     }
 
     public static boolean skipsTick(Entity entity) {
@@ -278,9 +282,10 @@ public final class EntityCulling {
             return;
         }
 
-        int extension = verticalExtension(blockEntity);
+        int vertical   = verticalExtension(blockEntity);
+        int horizontal = horizontalExtension(blockEntity);
 
-        apply(cullable, TRACER.isVisible(pos.getX(), pos.getY() - extension, pos.getZ(), pos.getX() + 1, pos.getY() + 1 + extension, pos.getZ() + 1), now);
+        apply(cullable, TRACER.isVisible(pos.getX() - horizontal, pos.getY() - vertical, pos.getZ() - horizontal, pos.getX() + 1 + horizontal, pos.getY() + 1 + vertical, pos.getZ() + 1 + horizontal), now);
     }
 
     private static void cullEntity(EntityTarget target, Vec3 position, long now) {
@@ -316,7 +321,20 @@ public final class EntityCulling {
     }
 
     private static int verticalExtension(BlockEntity blockEntity) {
-        return blockEntity instanceof BannerBlockEntity ? 1 : 0;
+        return blockEntity instanceof BannerBlockEntity || hasOpenLid(blockEntity) ? 1 : 0;
+    }
+
+    private static int horizontalExtension(BlockEntity blockEntity) {
+        return hasOpenLid(blockEntity) ? 1 : 0;
+    }
+
+    private static boolean hasOpenLid(BlockEntity blockEntity) {
+        return switch (blockEntity) {
+            case ChestBlockEntity chest -> chest.getOpenNess(0.0F) > 0.0F || chest.getOpenNess(1.0F) > 0.0F;
+            case EnderChestBlockEntity chest -> chest.getOpenNess(0.0F) > 0.0F || chest.getOpenNess(1.0F) > 0.0F;
+            case ShulkerBoxBlockEntity box -> box.getProgress(0.0F) > 0.0F || box.getProgress(1.0F) > 0.0F;
+            default -> false;
+        };
     }
 
     private record Snapshot(ClientLevel level, List<Cullable> pinned, List<EntityTarget> entities, List<BlockEntity> blockEntities) {
