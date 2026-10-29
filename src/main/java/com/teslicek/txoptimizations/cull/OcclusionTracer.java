@@ -339,11 +339,12 @@ final class OcclusionTracer {
     private void setState(int x, int y, int z, int state) {
         int index = this.index(x, y, z);
         int entry = index >> 2;
+        int shift = (index & 3) << 1;
 
         if (this.cache[entry] == 0)
             this.touched.add(entry);
 
-        this.cache[entry] |= (byte) (state << ((index & 3) << 1));
+        this.cache[entry] = (byte) (this.cache[entry] & ~(3 << shift) | state << shift);
     }
 
     private int index(int x, int y, int z) {
