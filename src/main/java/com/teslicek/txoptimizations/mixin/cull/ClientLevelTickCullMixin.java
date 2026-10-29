@@ -27,6 +27,7 @@ public abstract class ClientLevelTickCullMixin {
         entity.commonTick();
 
         if (entity instanceof LivingEntity living) {
+            ((LivingEntityTickEffectsInvoker) living).txoptimizations$tickEffects();
             living.aiStep();
 
             if (living.hurtTime > 0)

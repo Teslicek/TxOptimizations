@@ -368,6 +368,7 @@
     "cull.CullableMixin",
     "cull.EntityRendererCullAccessor",
     "cull.LevelExtractorCullMixin",
+    "cull.LivingEntityTickEffectsInvoker",
     "cull.WardenHeartbeatAccessor",
     "gpu.FrontendRenderPassGpuProfilerMixin",
     "gpu.VulkanQueryPoolAccessor",
