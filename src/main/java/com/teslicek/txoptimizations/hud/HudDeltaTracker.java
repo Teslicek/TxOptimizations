@@ -25,11 +25,15 @@ public final class HudDeltaTracker {
     }
 
     public static float realtimeDelta(float vanilla) {
-        return HudCache.isRendering() && ready ? realtimeDelta : vanilla;
+        return usesCycleDelta() ? realtimeDelta : vanilla;
     }
 
     public static float gameTimeDelta(float vanilla) {
-        return HudCache.isRendering() && ready ? gameTimeDelta : vanilla;
+        return usesCycleDelta() ? gameTimeDelta : vanilla;
+    }
+
+    private static boolean usesCycleDelta() {
+        return ready && HudCache.isRendering() && !HudCache.isCurrentUncached();
     }
 
     static void completeCycle() {
