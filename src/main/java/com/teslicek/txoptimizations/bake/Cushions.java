@@ -59,7 +59,9 @@ public final class Cushions {
         if (cushions.isEmpty())
             SECTIONS.remove(section, cushions);
 
-        ChunkTasks.add(section, () -> ((Bakeable) entity).txoptimizations$setRenderMode(RenderMode.ENTITY));
+        if (!entity.isRemoved())
+            ChunkTasks.add(section, () -> ((Bakeable) entity).txoptimizations$setRenderMode(RenderMode.ENTITY));
+
         Baking.rebuild(pos, true);
     }
 
