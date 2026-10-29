@@ -14,7 +14,7 @@ public abstract class RenderSectionBakeMixin {
     @ModifyVariable(method = "setSectionMesh", at = @At("HEAD"), argsOnly = true)
     private SectionMesh txoptimizations$runSectionTasks(SectionMesh sectionMesh) {
         if (sectionMesh instanceof SectionTasks tasks)
-            ChunkTasks.run(tasks.txoptimizations$getSectionTasks());
+            ChunkTasks.run(tasks);
 
         return sectionMesh;
     }

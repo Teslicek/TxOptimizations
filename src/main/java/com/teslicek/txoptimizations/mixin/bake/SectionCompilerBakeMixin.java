@@ -12,7 +12,6 @@ import com.teslicek.txoptimizations.bake.ChunkTasks;
 import com.teslicek.txoptimizations.bake.Cushions;
 import com.teslicek.txoptimizations.bake.SectionTasks;
 import java.util.Map;
-import java.util.Queue;
 import net.fabricmc.fabric.api.client.renderer.v1.Renderer;
 import net.fabricmc.fabric.api.client.renderer.v1.mesh.QuadEmitter;
 import net.fabricmc.fabric.api.client.renderer.v1.render.AltModelBlockRenderer;
@@ -79,18 +78,13 @@ public abstract class SectionCompilerBakeMixin {
     }
 
     @Inject(method = "compile", at = @At("HEAD"))
-    private void txoptimizations$claimPendingTasks(SectionPos section, RenderSectionRegion region, VertexSorting vertexSorting, SectionBufferBuilderPack builders, CallbackInfoReturnable<SectionCompiler.Results> cir, @Share("pendingTasks") LocalRef<Queue<Runnable>> pendingTasks) {
-        pendingTasks.set(ChunkTasks.claim(section));
+    private void txoptimizations$claimPendingTasks(SectionPos section, RenderSectionRegion region, VertexSorting vertexSorting, SectionBufferBuilderPack builders, CallbackInfoReturnable<SectionCompiler.Results> cir, @Share("claim") LocalRef<ChunkTasks.Claim> claim) {
+        claim.set(ChunkTasks.claim(section));
     }
 
     @Inject(method = "compile", at = @At("RETURN"))
-    private void txoptimizations$keepPendingTasks(SectionPos section, RenderSectionRegion region, VertexSorting vertexSorting, SectionBufferBuilderPack builders, CallbackInfoReturnable<SectionCompiler.Results> cir, @Share("pendingTasks") LocalRef<Queue<Runnable>> pendingTasks) {
-        Queue<Runnable> pending = pendingTasks.get();
-
-        if (pending == null)
-            return;
-
-        ((SectionTasks) (Object) cir.getReturnValue()).txoptimizations$getSectionTasks().addAll(pending);
+    private void txoptimizations$keepClaim(SectionPos section, RenderSectionRegion region, VertexSorting vertexSorting, SectionBufferBuilderPack builders, CallbackInfoReturnable<SectionCompiler.Results> cir, @Share("claim") LocalRef<ChunkTasks.Claim> claim) {
+        ((SectionTasks) (Object) cir.getReturnValue()).txoptimizations$setClaim(claim.get());
     }
 
     @Inject(method = "compile", at = @At(value = "INVOKE", target = "Ljava/util/Map;entrySet()Ljava/util/Set;"))

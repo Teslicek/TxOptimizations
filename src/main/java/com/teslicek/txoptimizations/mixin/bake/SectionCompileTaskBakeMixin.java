@@ -15,6 +15,6 @@ public abstract class SectionCompileTaskBakeMixin {
 
     @Inject(method = "doTask", at = @At(value = "INVOKE", target = "Lnet/minecraft/client/renderer/chunk/SectionRenderDispatcher$RenderSection;setSectionMesh(Lnet/minecraft/client/renderer/chunk/SectionMesh;)Lnet/minecraft/client/renderer/chunk/SectionMesh;"), require = 1)
     private void txoptimizations$runTasksOfEmptyMesh(SectionBufferBuilderPack buffers, CallbackInfoReturnable<?> cir, @Local CompiledSectionMesh compiledSectionMesh) {
-        ChunkTasks.run(((SectionTasks) compiledSectionMesh).txoptimizations$getSectionTasks());
+        ChunkTasks.run((SectionTasks) compiledSectionMesh);
     }
 }
