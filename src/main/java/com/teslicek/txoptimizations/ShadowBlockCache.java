@@ -1,6 +1,7 @@
 package com.teslicek.txoptimizations;
 
 import it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap;
+import java.util.concurrent.atomic.AtomicInteger;
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.RenderShape;
@@ -13,21 +14,25 @@ public final class ShadowBlockCache {
     private static final int   MIN_BRIGHTNESS = 3;
     private static final Block NONE           = new Block(null, 0);
 
-    private static final Long2ObjectOpenHashMap<Block> BLOCKS = new Long2ObjectOpenHashMap<>();
+    private static final Long2ObjectOpenHashMap<Block> BLOCKS  = new Long2ObjectOpenHashMap<>();
+    private static final AtomicInteger                 CHANGES = new AtomicInteger();
 
     private static long  tick = -1L;
+    private static int   changes;
     private static Level level;
 
     private ShadowBlockCache() {
     }
 
     public static Block get(Level currentLevel, BlockPos pos, ChunkAccess chunk) {
-        long currentTick = ClientClock.tick();
+        long currentTick    = ClientClock.tick();
+        int  currentChanges = CHANGES.get();
 
-        if (currentTick != tick || currentLevel != level) {
+        if (currentTick != tick || currentChanges != changes || currentLevel != level) {
             BLOCKS.clear();
-            tick  = currentTick;
-            level = currentLevel;
+            tick    = currentTick;
+            changes = currentChanges;
+            level   = currentLevel;
         }
 
         long  key   = pos.asLong();
@@ -39,6 +44,10 @@ public final class ShadowBlockCache {
         }
 
         return block == NONE ? null : block;
+    }
+
+    public static void worldChanged() {
+        CHANGES.incrementAndGet();
     }
 
     private static Block compute(Level currentLevel, BlockPos pos, ChunkAccess chunk) {
