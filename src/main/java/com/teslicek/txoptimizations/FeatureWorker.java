@@ -52,6 +52,11 @@ final class FeatureWorker {
         if (this.groups.isEmpty())
             return;
 
+        Runnable pending = this.job.getAndSet(null);
+
+        if (pending != null)
+            this.run(pending);
+
         while (!this.done)
             Thread.onSpinWait();
 
@@ -92,13 +97,17 @@ final class FeatureWorker {
                 continue;
             }
 
-            try {
-                next.run();
-            } catch (Throwable thrown) {
-                this.failure = thrown;
-            } finally {
-                this.done = true;
-            }
+            this.run(next);
+        }
+    }
+
+    private void run(Runnable next) {
+        try {
+            next.run();
+        } catch (Throwable thrown) {
+            this.failure = thrown;
+        } finally {
+            this.done = true;
         }
     }
 }
