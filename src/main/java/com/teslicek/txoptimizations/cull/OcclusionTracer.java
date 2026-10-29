@@ -23,10 +23,11 @@ final class OcclusionTracer {
     private static final int MIN_Z = 16;
     private static final int MAX_Z = 32;
 
-    private static final int OUTSIDE = -1;
-    private static final int UNKNOWN = 0;
-    private static final int VISIBLE = 1;
-    private static final int HIDDEN  = 2;
+    private static final int OUTSIDE  = -1;
+    private static final int UNKNOWN  = 0;
+    private static final int VISIBLE  = 1;
+    private static final int HIDDEN   = 2;
+    private static final int OCCLUDED = 3;
 
     private static final int INSIDE   = 0;
     private static final int POSITIVE = 1;
@@ -200,7 +201,10 @@ final class OcclusionTracer {
             this.hasLastHit = true;
         }
 
-        this.setState(x, y, z, HIDDEN);
+        if (this.getState(x, y, z) == VISIBLE)
+            return true;
+
+        this.setState(x, y, z, OCCLUDED);
 
         return false;
     }
@@ -261,7 +265,7 @@ final class OcclusionTracer {
             if (state == HIDDEN && !clipping)
                 return this.hit(x, y, z);
 
-            if (state == UNKNOWN) {
+            if (state == UNKNOWN || state == OCCLUDED) {
                 if (!this.isOpaque(x, y, z)) {
                     clipping = false;
                     this.setState(x, y, z, VISIBLE);
