@@ -8,5 +8,7 @@ public interface FrustumBoxTest {
 
     boolean txoptimizations$isBoxVisible(double minX, double minY, double minZ, double maxX, double maxY, double maxZ);
 
+    boolean txoptimizations$isBoxInside(double minX, double minY, double minZ, double maxX, double maxY, double maxZ);
+
     void txoptimizations$capturePlanes(double[] planes);
 }

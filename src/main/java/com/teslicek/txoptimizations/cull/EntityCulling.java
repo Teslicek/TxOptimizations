@@ -15,6 +15,7 @@ import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.client.player.LocalPlayer;
 import net.minecraft.client.renderer.blockentity.BlockEntityRenderDispatcher;
 import net.minecraft.client.renderer.blockentity.BlockEntityRenderer;
+import net.minecraft.client.renderer.chunk.SectionRenderDispatcher;
 import net.minecraft.client.renderer.entity.EntityRenderDispatcher;
 import net.minecraft.client.renderer.entity.state.EntityRenderState;
 import net.minecraft.core.BlockPos;
@@ -60,6 +61,7 @@ public final class EntityCulling {
     private static int     captureTick;
     private static long    tickFrame = -1L;
     private static boolean renderedSinceTick;
+    private static boolean sectionInsideView;
 
     private EntityCulling() {
     }
@@ -102,9 +104,22 @@ public final class EntityCulling {
         return ((Cullable) entity).txoptimizations$isCulled() && !entity.shouldShowName();
     }
 
+    public static void enterBlockEntitySection(SectionRenderDispatcher.RenderSection section) {
+        AABB box = section.getBoundingBox();
+
+        sectionInsideView = ((FrustumBoxTest) Minecraft.getInstance().gameRenderer.mainCamera().getCullFrustum()).txoptimizations$isBoxInside(box.minX, box.minY, box.minZ, box.maxX, box.maxY, box.maxZ);
+    }
+
+    public static void leaveBlockEntitySections() {
+        sectionInsideView = false;
+    }
+
     public static boolean hidesBlockEntity(BlockEntity blockEntity) {
         if (((Cullable) blockEntity).txoptimizations$isCulled())
             return true;
+
+        if (sectionInsideView)
+            return false;
 
         BlockPos pos        = blockEntity.getBlockPos();
         int      horizontal = horizontalExtension(blockEntity);

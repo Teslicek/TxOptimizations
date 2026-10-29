@@ -37,6 +37,11 @@ public abstract class FrustumBoxTestMixin implements FrustumBoxTest {
     }
 
     @Override
+    public boolean txoptimizations$isBoxInside(double minX, double minY, double minZ, double maxX, double maxY, double maxZ) {
+        return this.intersection.intersectAab((float) (minX - this.camX), (float) (minY - this.camY), (float) (minZ - this.camZ), (float) (maxX - this.camX), (float) (maxY - this.camY), (float) (maxZ - this.camZ)) == FrustumIntersection.INSIDE;
+    }
+
+    @Override
     public void txoptimizations$capturePlanes(double[] planes) {
         FrustumPlanes.capture(this.intersection, this.camX, this.camY, this.camZ, planes);
     }

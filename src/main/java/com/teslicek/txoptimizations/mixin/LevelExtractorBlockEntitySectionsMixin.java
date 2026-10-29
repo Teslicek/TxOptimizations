@@ -3,6 +3,7 @@ package com.teslicek.txoptimizations.mixin;
 import com.llamalad7.mixinextras.injector.ModifyExpressionValue;
 import com.llamalad7.mixinextras.sugar.Local;
 import com.teslicek.txoptimizations.SectionSubset;
+import com.teslicek.txoptimizations.cull.EntityCulling;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import it.unimi.dsi.fastutil.objects.ObjectListIterator;
 import java.util.List;
@@ -11,7 +12,9 @@ import net.minecraft.client.renderer.extract.LevelExtractor;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
+import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.Redirect;
+import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 @Mixin(LevelExtractor.class)
 public abstract class LevelExtractorBlockEntitySectionsMixin {
@@ -25,6 +28,14 @@ public abstract class LevelExtractorBlockEntitySectionsMixin {
     private List<BlockEntity> txoptimizations$recordBlockEntitySection(List<BlockEntity> blockEntities, @Local SectionRenderDispatcher.RenderSection section) {
         SectionSubset.BLOCK_ENTITIES.note(section, !blockEntities.isEmpty());
 
+        if (!blockEntities.isEmpty())
+            EntityCulling.enterBlockEntitySection(section);
+
         return blockEntities;
+    }
+
+    @Inject(method = "extractVisibleBlockEntities", at = @At("RETURN"))
+    private void txoptimizations$leaveBlockEntitySections(CallbackInfo ci) {
+        EntityCulling.leaveBlockEntitySections();
     }
 }
