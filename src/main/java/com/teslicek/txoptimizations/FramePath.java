@@ -6,7 +6,7 @@ public final class FramePath {
 
     private static final int    WINDOW_FRAMES     = 128;
     private static final int    PROBE_WINDOWS     = 32;
-    private static final int    MAX_PROBE_WINDOWS = 1024;
+    private static final int    MAX_PROBE_WINDOWS = 128;
     private static final double WAIT_LIMIT        = 0.10;
     private static final double ACQUIRE_LIMIT     = 0.08;
 
