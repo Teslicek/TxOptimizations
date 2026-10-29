@@ -12,7 +12,6 @@ public final class FramePath {
 
     private static boolean worker;
     private static boolean trial;
-    private static boolean trialLost;
     private static boolean frameUsesWorker;
     private static boolean frameEligible;
     private static long    lastSubmit;
@@ -23,6 +22,7 @@ public final class FramePath {
     private static long    settledNanos;
     private static int     windowsSinceTrial;
     private static int     probeWindows = PROBE_WINDOWS;
+    private static int     lostWindows;
     private static long    workerFrames;
     private static long    inlineFrames;
 
@@ -105,13 +105,14 @@ public final class FramePath {
             return;
 
         if (trial) {
+            boolean lost = windowFrameNanos >= settledNanos;
+
             trial             = false;
-            trialLost         = windowFrameNanos >= settledNanos;
             windowsSinceTrial = 0;
+            lostWindows       = lost ? PROBE_WINDOWS : 0;
+            probeWindows      = lost ? Math.min(probeWindows * 2, MAX_PROBE_WINDOWS) : PROBE_WINDOWS;
 
-            probeWindows = trialLost ? Math.min(probeWindows * 2, MAX_PROBE_WINDOWS) : PROBE_WINDOWS;
-
-            if (trialLost)
+            if (lost)
                 worker = !worker;
 
             resetWindow();
@@ -122,9 +123,12 @@ public final class FramePath {
         settledNanos = windowFrameNanos;
         windowsSinceTrial ++;
 
+        if (lostWindows > 0)
+            lostWindows --;
+
         boolean wantsOther = worker ? windowAcquireNanos > windowFrameNanos * ACQUIRE_LIMIT : windowWaitNanos < windowFrameNanos * WAIT_LIMIT;
 
-        if ((wantsOther && !trialLost) || windowsSinceTrial >= probeWindows) {
+        if ((wantsOther && lostWindows == 0) || windowsSinceTrial >= probeWindows) {
             trial  = true;
             worker = !worker;
         }
