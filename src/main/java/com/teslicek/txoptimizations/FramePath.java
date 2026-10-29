@@ -88,8 +88,9 @@ public final class FramePath {
 
         if (!frameEligible) {
             if (trial) {
-                trial  = false;
-                worker = !worker;
+                trial             = false;
+                worker            = !worker;
+                windowsSinceTrial = 0;
             }
 
             resetWindow();
