@@ -126,16 +126,8 @@ public final class DrawRecords {
         changed();
     }
 
-    public static void clearDrawable(int[] record, int layer, boolean translucent) {
-        int block = requireBlock(record, layer);
-
-        record[block + VERTEX_BUFFER] = NO_BUFFER;
-        record[block + FIRST_VERTEX]  = 0;
-
-        if (translucent) {
-            record[block + INDEX_BUFFER] = NO_BUFFER;
-            record[block + FIRST_INDEX]  = 0;
-        }
+    public static void clearDrawable(int[] record, int layer) {
+        requireBlock(record, layer);
 
         record[FLAGS] &= ~(1 << DRAWABLE_SHIFT + layer);
         changed();

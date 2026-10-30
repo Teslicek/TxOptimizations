@@ -39,6 +39,9 @@ import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Overwrite;
 import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.Unique;
+import org.spongepowered.asm.mixin.injection.At;
+import org.spongepowered.asm.mixin.injection.Inject;
+import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 @Mixin(value = LevelRenderer.class, priority = 999)
 public abstract class LevelRendererSectionDrawMixin {
@@ -118,6 +121,11 @@ public abstract class LevelRendererSectionDrawMixin {
 
     @Unique
     private boolean txoptimizations$builtPerGroup;
+
+    @Inject(method = "resetLevelRenderData", at = @At("HEAD"))
+    private void txoptimizations$forgetDrawsOfOldLevel(CallbackInfo ci) {
+        this.txoptimizations$forgetBuiltDraws();
+    }
 
     @Overwrite
     public ChunkSectionsToRender prepareChunkRendersIndirect(Matrix4fc modelViewMatrix, boolean respectTranslucentOrder) {

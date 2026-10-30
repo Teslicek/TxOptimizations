@@ -127,7 +127,7 @@ public abstract class CompiledSectionMeshDrawRecordMixin implements SectionAlloc
         SectionMesh.SectionDraw  draw   = this.draws.get(layer);
 
         if (vertex == null || draw == null || draw.hasCustomIndexBuffer() && index == null) {
-            DrawRecords.clearDrawable(record, layer.ordinal(), layer.translucent());
+            DrawRecords.clearDrawable(record, layer.ordinal());
             return;
         }
 
