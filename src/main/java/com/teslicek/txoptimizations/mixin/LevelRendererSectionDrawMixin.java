@@ -108,6 +108,12 @@ public abstract class LevelRendererSectionDrawMixin {
     private int txoptimizations$builtGeneration;
 
     @Unique
+    private int txoptimizations$builtRecordChanges;
+
+    @Unique
+    private int txoptimizations$builtRefills;
+
+    @Unique
     private double txoptimizations$builtX;
 
     @Unique
@@ -206,8 +212,10 @@ public abstract class LevelRendererSectionDrawMixin {
         long    fadeDuration = Util.toMillis(this.optionsRenderState.chunkSectionFadeInTime);
         boolean perGroup     = FramePath.frameUsesWorker();
         int     generation   = DrawRecords.generation();
+        int     changes      = DrawRecords.recordChanges();
+        int     refills      = SectionDrawList.visibleRefills();
 
-        if (this.txoptimizations$reusesBuiltDraws(draws, camera, fadeDuration, respectTranslucentOrder, perGroup, generation)) {
+        if (this.txoptimizations$reusesBuiltDraws(draws, camera, fadeDuration, respectTranslucentOrder, perGroup, generation, changes, refills)) {
             ProfileCounters.countTerrainDraws(draws);
             PackedTerrain.setSectionsFading(false);
 
@@ -282,6 +290,8 @@ public abstract class LevelRendererSectionDrawMixin {
 
         this.txoptimizations$builtSize             = size;
         this.txoptimizations$builtGeneration       = generation;
+        this.txoptimizations$builtRecordChanges    = changes;
+        this.txoptimizations$builtRefills          = refills;
         this.txoptimizations$builtX                = camera.x;
         this.txoptimizations$builtY                = camera.y;
         this.txoptimizations$builtZ                = camera.z;
@@ -293,7 +303,7 @@ public abstract class LevelRendererSectionDrawMixin {
     }
 
     @Unique
-    private boolean txoptimizations$reusesBuiltDraws(SectionDrawList draws, Vec3 camera, long fadeDuration, boolean respectTranslucentOrder, boolean perGroup, int generation) {
+    private boolean txoptimizations$reusesBuiltDraws(SectionDrawList draws, Vec3 camera, long fadeDuration, boolean respectTranslucentOrder, boolean perGroup, int generation, int changes, int refills) {
         int size = this.visibleSections.size();
 
         if (size != this.txoptimizations$builtSize || draws.fading() || generation != this.txoptimizations$builtGeneration || perGroup != this.txoptimizations$builtPerGroup || respectTranslucentOrder != this.txoptimizations$builtTranslucentOrder || fadeDuration != this.txoptimizations$builtFadeDuration)
@@ -301,6 +311,9 @@ public abstract class LevelRendererSectionDrawMixin {
 
         if (camera.x != this.txoptimizations$builtX || camera.y != this.txoptimizations$builtY || camera.z != this.txoptimizations$builtZ)
             return false;
+
+        if (changes == this.txoptimizations$builtRecordChanges && refills == this.txoptimizations$builtRefills)
+            return true;
 
         Object[]                                visible       = this.visibleSections.elements();
         SectionRenderDispatcher.RenderSection[] builtSections = this.txoptimizations$builtSections;
@@ -314,6 +327,9 @@ public abstract class LevelRendererSectionDrawMixin {
             if (section != builtSections[index] || record != builtRecords[index] || record != null && DrawRecords.version(record) != builtVersions[index])
                 return false;
         }
+
+        this.txoptimizations$builtRecordChanges = changes;
+        this.txoptimizations$builtRefills       = refills;
 
         return true;
     }

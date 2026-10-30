@@ -27,7 +27,8 @@ public final class DrawRecords {
     private static final int CUSTOM_INDEX     = 1;
     private static final int INDEX_TYPE_SHIFT = 1;
 
-    private static final AtomicInteger GENERATION = new AtomicInteger();
+    private static final AtomicInteger GENERATION     = new AtomicInteger();
+    private static final AtomicInteger RECORD_CHANGES = new AtomicInteger();
 
     private DrawRecords() {
     }
@@ -63,6 +64,14 @@ public final class DrawRecords {
 
     public static void changed() {
         GENERATION.incrementAndGet();
+    }
+
+    public static int recordChanges() {
+        return RECORD_CHANGES.get();
+    }
+
+    public static void recordReplaced() {
+        RECORD_CHANGES.incrementAndGet();
     }
 
     public static int version(int[] record) {
@@ -129,6 +138,7 @@ public final class DrawRecords {
 
         record[FLAGS] |= 1 << DRAWABLE_SHIFT + layer;
         record[VERSION] ++;
+        recordReplaced();
     }
 
     public static void clearDrawable(int[] record, int layer) {
@@ -136,6 +146,7 @@ public final class DrawRecords {
 
         record[FLAGS] &= ~(1 << DRAWABLE_SHIFT + layer);
         record[VERSION] ++;
+        recordReplaced();
     }
 
     private static int requireBlock(int[] record, int layer) {

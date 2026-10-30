@@ -1,6 +1,7 @@
 package com.teslicek.txoptimizations.mixin;
 
 import com.teslicek.txoptimizations.DrawRecordHolder;
+import com.teslicek.txoptimizations.DrawRecords;
 import com.teslicek.txoptimizations.SectionDrawRecord;
 import net.minecraft.client.renderer.chunk.SectionMesh;
 import net.minecraft.client.renderer.chunk.SectionRenderDispatcher;
@@ -58,6 +59,7 @@ public abstract class RenderSectionDrawRecordMixin implements SectionDrawRecord 
             mesh                                     = this.getSectionMesh();
             this.txoptimizations$drawRecord          = mesh instanceof DrawRecordHolder holder ? holder.txoptimizations$drawRecord() : null;
             this.txoptimizations$translucentGeometry = mesh.hasTranslucentGeometry();
+            DrawRecords.recordReplaced();
         } while (this.getSectionMesh() != mesh);
     }
 }

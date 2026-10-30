@@ -1,5 +1,6 @@
 package com.teslicek.txoptimizations.mixin;
 
+import com.teslicek.txoptimizations.SectionDrawList;
 import com.teslicek.txoptimizations.SectionSubset;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import net.minecraft.client.renderer.LevelRenderer;
@@ -22,6 +23,7 @@ public abstract class LevelRendererVisibleSectionsMixin {
 
     @Overwrite
     public void clearVisibleSections() {
+        SectionDrawList.visibleSectionsRefilled();
         SectionSubset.beginVisibleChange();
         this.visibleSections.clear();
         this.nearbyVisibleSections.clear();
