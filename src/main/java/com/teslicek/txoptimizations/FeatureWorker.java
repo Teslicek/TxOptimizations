@@ -86,7 +86,7 @@ final class FeatureWorker {
         LockSupport.unpark(this.thread);
     }
 
-    void finish(StagedVertexBuffer main) {
+    void prepareUnstarted() {
         if (this.batches.isEmpty())
             return;
 
@@ -95,23 +95,24 @@ final class FeatureWorker {
             this.done     = true;
         }
 
-        long waitStart;
+        this.prepareClaimed(this.context);
+    }
 
-        try {
-            this.prepareClaimed(this.context);
-        } finally {
-            waitStart = System.nanoTime();
+    void finish(StagedVertexBuffer main) {
+        if (this.batches.isEmpty())
+            return;
 
-            while (!this.done)
-                Thread.onSpinWait();
+        long waitStart = System.nanoTime();
 
-            this.batches.clear();
-            this.context   = null;
-            this.renderers = null;
-            this.submits   = null;
-        }
+        while (!this.done)
+            Thread.onSpinWait();
 
         this.recordFrame(System.nanoTime() - waitStart, this.jobNanos);
+
+        this.batches.clear();
+        this.context   = null;
+        this.renderers = null;
+        this.submits   = null;
 
         Throwable thrown = this.failure;
 

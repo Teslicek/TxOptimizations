@@ -88,13 +88,18 @@ public final class ParallelFeatures {
             return;
 
         try {
-            TEXT.finish(main);
+            TEXT.prepareUnstarted();
+            GEOMETRY.prepareUnstarted();
         } finally {
             try {
-                GEOMETRY.finish(main);
+                TEXT.finish(main);
             } finally {
-                ASSIGNED.clear();
-                active = false;
+                try {
+                    GEOMETRY.finish(main);
+                } finally {
+                    ASSIGNED.clear();
+                    active = false;
+                }
             }
         }
     }
