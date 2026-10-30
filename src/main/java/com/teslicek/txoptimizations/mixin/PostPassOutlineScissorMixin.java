@@ -19,10 +19,6 @@ public abstract class PostPassOutlineScissorMixin {
             return;
         }
 
-        if (OutlineScissor.isEmpty(outputTarget.width, outputTarget.height))
-            return;
-
-        OutlineScissor.enableScissor(renderPass, outputTarget.width, outputTarget.height);
-        renderPass.draw(vertexCount, instanceCount, firstVertex, firstInstance);
+        OutlineScissor.draw(renderPass, outputTarget.width, outputTarget.height, vertexCount, instanceCount, firstVertex, firstInstance);
     }
 }

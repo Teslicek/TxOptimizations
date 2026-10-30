@@ -5,6 +5,7 @@ import com.mojang.renderpearl.api.pipeline.RenderPipeline;
 import com.teslicek.txoptimizations.mixin.FeaturePreparedGroupAccessor;
 import com.teslicek.txoptimizations.mixin.PostChainPassesAccessor;
 import com.teslicek.txoptimizations.mixin.RenderTypeFeatureRendererGroupsAccessor;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -40,6 +41,8 @@ public final class OutlineScissor {
     private static final int    UNMEASURED   = 0;
     private static final int    UNBOUNDED    = 1;
     private static final int    BOUNDED      = 2;
+    private static final int    BOX_VALUES   = 4;
+    private static final int    RECT_VALUES  = 4;
 
     private static final String[] VANILLA_FILES = {
         "post_effect/entity_outline.json",
@@ -73,10 +76,11 @@ public final class OutlineScissor {
     private static boolean         vanilla;
     private static int             state  = UNMEASURED;
     private static boolean         blitting;
-    private static double          minX;
-    private static double          minY;
-    private static double          maxX;
-    private static double          maxY;
+    private static double[]        boxes  = new double[BOX_VALUES * 8];
+    private static int             boxCount;
+    private static int[]           rects  = new int[0];
+    private static int             rectsWidth;
+    private static int             rectsHeight;
 
     private OutlineScissor() {
     }
@@ -99,6 +103,7 @@ public final class OutlineScissor {
 
     public static void beginFrame() {
         state = UNMEASURED;
+        rects = null;
     }
 
     public static void measure(SubmitNodeStorage storage, Map<FeatureRenderPhase<?>, ? extends List<?>> groupsByPhase, FeatureRendererMap renderers, StagedVertexBuffer vertices) {
@@ -109,10 +114,8 @@ public final class OutlineScissor {
 
         ((BackgroundVertexCopy) vertices).txoptimizations$finishOutlineBounds();
 
-        minX = Double.POSITIVE_INFINITY;
-        minY = Double.POSITIVE_INFINITY;
-        maxX = Double.NEGATIVE_INFINITY;
-        maxY = Double.NEGATIVE_INFINITY;
+        boxCount = 0;
+        rects    = null;
 
         for (SubmitNodeCollection collection : storage.getSubmitsPerOrder().values()) {
             List<?> groups = groupsByPhase.get(collection.outline);
@@ -150,25 +153,20 @@ public final class OutlineScissor {
         state    = UNMEASURED;
     }
 
-    public static boolean isEmpty(int width, int height) {
+    public static void draw(RenderPass renderPass, int width, int height, int vertexCount, int instanceCount, int firstVertex, int firstInstance) {
         requireMeasured();
 
-        if (state == UNBOUNDED)
-            return false;
-
-        return startX(width) >= endX(width) || startY(height) >= endY(height);
-    }
-
-    public static void enableScissor(RenderPass renderPass, int width, int height) {
-        requireMeasured();
-
-        if (state == UNBOUNDED)
+        if (state == UNBOUNDED) {
+            renderPass.draw(vertexCount, instanceCount, firstVertex, firstInstance);
             return;
+        }
 
-        int startX = startX(width);
-        int startY = startY(height);
+        int[] areas = rects(width, height);
 
-        renderPass.enableScissor(startX, startY, endX(width) - startX, endY(height) - startY);
+        for (int at = 0; at < areas.length; at += RECT_VALUES) {
+            renderPass.enableScissor(areas[at], areas[at + 1], areas[at + 2] - areas[at], areas[at + 3] - areas[at + 1]);
+            renderPass.draw(vertexCount, instanceCount, firstVertex, firstInstance);
+        }
     }
 
     private static boolean includeGroup(FeaturePreparedGroupAccessor group, FeatureRendererMap renderers) {
@@ -214,16 +212,21 @@ public final class OutlineScissor {
         return true;
     }
 
-    private static boolean includeBox(float[] boxes, int offset) {
+    private static boolean includeBox(float[] bounds, int offset) {
         for (int value = offset; value < offset + PositionBounds.VALUES; value ++) {
-            if (!Float.isFinite(boxes[value]))
+            if (!Float.isFinite(bounds[value]))
                 return false;
         }
 
+        double minX = Double.POSITIVE_INFINITY;
+        double minY = Double.POSITIVE_INFINITY;
+        double maxX = Double.NEGATIVE_INFINITY;
+        double maxY = Double.NEGATIVE_INFINITY;
+
         for (int corner = 0; corner < 8; corner ++) {
-            float x = boxes[offset + ((corner & 1) == 0 ? 0 : 3)];
-            float y = boxes[offset + ((corner & 2) == 0 ? 1 : 4)];
-            float z = boxes[offset + ((corner & 4) == 0 ? 2 : 5)];
+            float x = bounds[offset + ((corner & 1) == 0 ? 0 : 3)];
+            float y = bounds[offset + ((corner & 2) == 0 ? 1 : 4)];
+            float z = bounds[offset + ((corner & 4) == 0 ? 2 : 5)];
 
             CLIP.transform(CORNER.set(x, y, z, 1.0));
 
@@ -242,23 +245,85 @@ public final class OutlineScissor {
             maxY = Math.max(maxY, ndcY);
         }
 
+        if (boxCount * BOX_VALUES == boxes.length)
+            boxes = Arrays.copyOf(boxes, boxes.length * 2);
+
+        int at = boxCount * BOX_VALUES;
+
+        boxes[at]     = minX;
+        boxes[at + 1] = minY;
+        boxes[at + 2] = maxX;
+        boxes[at + 3] = maxY;
+        boxCount ++;
+
         return true;
     }
 
-    private static int startX(int width) {
-        return (int) Math.max(0.0, Math.floor((minX + 1.0) * 0.5 * width) - MARGIN);
+    private static int[] rects(int width, int height) {
+        if (rects != null && rectsWidth == width && rectsHeight == height)
+            return rects;
+
+        int[] areas = new int[boxCount * RECT_VALUES];
+        int   count = 0;
+
+        for (int box = 0; box < boxCount; box ++) {
+            int at     = box * BOX_VALUES;
+            int startX = (int) Math.max(0.0, Math.floor((boxes[at] + 1.0) * 0.5 * width) - MARGIN);
+            int startY = (int) Math.max(0.0, Math.floor((boxes[at + 1] + 1.0) * 0.5 * height) - MARGIN);
+            int endX   = (int) Math.min(width, Math.ceil((boxes[at + 2] + 1.0) * 0.5 * width) + MARGIN);
+            int endY   = (int) Math.min(height, Math.ceil((boxes[at + 3] + 1.0) * 0.5 * height) + MARGIN);
+
+            if (startX >= endX || startY >= endY)
+                continue;
+
+            int rect = count * RECT_VALUES;
+
+            areas[rect]     = startX;
+            areas[rect + 1] = startY;
+            areas[rect + 2] = endX;
+            areas[rect + 3] = endY;
+            count ++;
+        }
+
+        count = mergeOverlaps(areas, count);
+
+        rects       = Arrays.copyOf(areas, count * RECT_VALUES);
+        rectsWidth  = width;
+        rectsHeight = height;
+
+        return rects;
     }
 
-    private static int endX(int width) {
-        return (int) Math.min(width, Math.ceil((maxX + 1.0) * 0.5 * width) + MARGIN);
-    }
+    private static int mergeOverlaps(int[] areas, int count) {
+        boolean merged = true;
 
-    private static int startY(int height) {
-        return (int) Math.max(0.0, Math.floor((minY + 1.0) * 0.5 * height) - MARGIN);
-    }
+        while (merged) {
+            merged = false;
 
-    private static int endY(int height) {
-        return (int) Math.min(height, Math.ceil((maxY + 1.0) * 0.5 * height) + MARGIN);
+            for (int first = 0; first < count && !merged; first ++) {
+                for (int second = first + 1; second < count; second ++) {
+                    int a = first * RECT_VALUES;
+                    int b = second * RECT_VALUES;
+
+                    if (areas[a] >= areas[b + 2] || areas[b] >= areas[a + 2] || areas[a + 1] >= areas[b + 3] || areas[b + 1] >= areas[a + 3])
+                        continue;
+
+                    areas[a]     = Math.min(areas[a], areas[b]);
+                    areas[a + 1] = Math.min(areas[a + 1], areas[b + 1]);
+                    areas[a + 2] = Math.max(areas[a + 2], areas[b + 2]);
+                    areas[a + 3] = Math.max(areas[a + 3], areas[b + 3]);
+
+                    int last = (count - 1) * RECT_VALUES;
+
+                    System.arraycopy(areas, last, areas, b, RECT_VALUES);
+                    count --;
+                    merged = true;
+                    break;
+                }
+            }
+        }
+
+        return count;
     }
 
     private static void requireMeasured() {

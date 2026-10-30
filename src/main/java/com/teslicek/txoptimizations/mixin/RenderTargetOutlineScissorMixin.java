@@ -19,10 +19,6 @@ public abstract class RenderTargetOutlineScissorMixin {
 
         RenderTarget target = (RenderTarget) (Object) this;
 
-        if (OutlineScissor.isEmpty(target.width, target.height))
-            return;
-
-        OutlineScissor.enableScissor(renderPass, target.width, target.height);
-        renderPass.draw(vertexCount, instanceCount, firstVertex, firstInstance);
+        OutlineScissor.draw(renderPass, target.width, target.height, vertexCount, instanceCount, firstVertex, firstInstance);
     }
 }
