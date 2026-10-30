@@ -29,7 +29,7 @@ public final class TxOptimizationsClient implements ClientModInitializer {
 
                 return 1;
             })).executes(command -> {
-                if (GpuPassProfiler.isRunning()) {
+                if (GpuPassProfiler.isBusy()) {
                     command.getSource().sendError(Component.literal("Profile is already running"));
 
                     return 0;

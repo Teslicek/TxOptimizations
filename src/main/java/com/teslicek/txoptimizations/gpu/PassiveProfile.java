@@ -106,7 +106,26 @@ public final class PassiveProfile {
         longestNanos = 0L;
         windowFrames = 0;
 
-        WRITER.execute(() -> save(minecraft, directory, name, summary));
+        WRITER.execute(() -> save(directory, name, summary));
+
+        if (!GpuPassProfiler.isBusy())
+            GpuPassProfiler.startBackground();
+    }
+
+    static void runInBackground(Runnable job) {
+        WRITER.execute(() -> {
+            try {
+                job.run();
+            } catch (RuntimeException exception) {
+                LOGGER.error("The background profile failed", exception);
+            }
+        });
+    }
+
+    static void announce() {
+        Minecraft minecraft = Minecraft.getInstance();
+
+        minecraft.execute(() -> minecraft.gui.hud.getChat().addClientSystemMessage(Component.literal(FINISHED)));
     }
 
     private static String summary(Minecraft minecraft, String name, double seconds) {
@@ -151,13 +170,12 @@ public final class PassiveProfile {
         return longestNanos / 1.0e6;
     }
 
-    private static void save(Minecraft minecraft, Path directory, String name, String summary) {
+    private static void save(Path directory, String name, String summary) {
         try {
             Files.createDirectories(directory);
             recording.dump(directory.resolve(name + RECORDING));
             Files.writeString(directory.resolve(name + SUMMARY), summary);
             prune(directory);
-            minecraft.execute(() -> minecraft.gui.hud.getChat().addClientSystemMessage(Component.literal(FINISHED)));
         } catch (IOException exception) {
             LOGGER.error("Could not save the passive profile {} to {}", name, directory, exception);
         }

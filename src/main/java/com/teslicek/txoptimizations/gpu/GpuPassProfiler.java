@@ -18,6 +18,7 @@ import java.nio.file.Path;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.IdentityHashMap;
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.OptionalLong;
@@ -75,13 +76,25 @@ public final class GpuPassProfiler {
     private static int                   frameTimeCount;
     private static String                context;
     private static String                screenFormats;
+    private static boolean               background;
+    private static volatile boolean      finishing;
 
     private GpuPassProfiler() {
     }
 
     public static void start() {
-        if (isRunning())
+        begin(false);
+    }
+
+    public static void startBackground() {
+        begin(true);
+    }
+
+    private static void begin(boolean inBackground) {
+        if (isBusy())
             throw new IllegalStateException("GPU profile is already running");
+
+        background = inBackground;
 
         if (!COMPILER.isCompilationTimeMonitoringSupported())
             throw new IllegalStateException("The JVM does not report JIT compilation time, which the profile's warm-up waits on");
@@ -150,6 +163,10 @@ public final class GpuPassProfiler {
 
     public static boolean isRunning() {
         return warming || draining || recording || framesPending > 0;
+    }
+
+    public static boolean isBusy() {
+        return isRunning() || finishing;
     }
 
     public static boolean isRecording() {
@@ -394,8 +411,15 @@ public final class GpuPassProfiler {
             POOLS[index] = null;
         }
 
-        double           seconds = (System.nanoTime() - startNanos) / 1.0e9;
-        String           gpu     = report(seconds);
+        double seconds = (System.nanoTime() - startNanos) / 1.0e9;
+        String gpu     = report(seconds);
+
+        if (background) {
+            finishInBackground(gpu, seconds);
+
+            return;
+        }
+
         Path             file    = ReportFiles.write("txprofile", gpu + CpuSampler.finish(frameEnds, frameTimes, frameTimeCount, GcPauses.finish()) + JfrRecorder.finish(seconds));
         String[]         lines   = gpu.split("\n");
         MutableComponent chat    = ReportFiles.savedMessage("Profile", file);
@@ -404,6 +428,23 @@ public final class GpuPassProfiler {
             chat.append("\n" + lines[index]);
 
         Minecraft.getInstance().gui.hud.getChat().addClientSystemMessage(chat);
+    }
+
+    private static void finishInBackground(String gpu, double seconds) {
+        List<GcPauses.Pause> pauses = GcPauses.finish();
+        long[]               ends   = frameEnds;
+        long[]               times  = frameTimes;
+        int                  count  = frameTimeCount;
+
+        finishing = true;
+        PassiveProfile.runInBackground(() -> {
+            try {
+                ReportFiles.write("txprofile-background", gpu + CpuSampler.finish(ends, times, count, pauses) + JfrRecorder.finish(seconds));
+                PassiveProfile.announce();
+            } finally {
+                finishing = false;
+            }
+        });
     }
 
     private static String report(double seconds) {
