@@ -32,7 +32,7 @@ final class ProfileContext {
         context.append("Build: ").append(BuildInfo.describe()).append(System.lineSeparator());
         context.append(String.format(Locale.ROOT, "Captured: %s, game uptime %.1f s%n", OffsetDateTime.now(), ManagementFactory.getRuntimeMXBean().getUptime() / 1000.0));
         context.append(String.format(Locale.ROOT, "System: %s %s (%s), CPU %s, %d MB RAM%n", System.getProperty("os.name"), System.getProperty("os.version"), System.getProperty("os.arch"), cpu(), ((OperatingSystemMXBean) ManagementFactory.getOperatingSystemMXBean()).getTotalMemorySize() >> 20));
-        context.append("Mods: ").append(FabricLoader.getInstance().getAllMods().stream().map(mod -> mod.getMetadata().getId() + " " + mod.getMetadata().getVersion().getFriendlyString()).sorted().collect(Collectors.joining(", "))).append(System.lineSeparator());
+        context.append("Mods: ").append(FabricLoader.getInstance().getAllMods().stream().filter(mod -> mod.getContainingMod().isEmpty()).map(mod -> mod.getMetadata().getId() + " " + mod.getMetadata().getVersion().getFriendlyString()).sorted().collect(Collectors.joining(", "))).append(System.lineSeparator());
         context.append("Scene: ").append(scene(minecraft));
 
         if (level != null && minecraft.player != null) {
