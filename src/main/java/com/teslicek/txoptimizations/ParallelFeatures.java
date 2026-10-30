@@ -63,7 +63,7 @@ public final class ParallelFeatures {
             if (worker == null || !(worker == TEXT ? text : geometry) || !runsOffThread(entry.getKey(), entry.getValue(), context.font(), submits))
                 continue;
 
-            worker.groups().addAll(entry.getValue());
+            worker.batches().add(entry.getValue());
             ASSIGNED.put(entry.getKey(), worker);
         }
 

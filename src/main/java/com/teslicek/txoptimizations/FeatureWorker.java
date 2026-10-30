@@ -4,6 +4,7 @@ import com.teslicek.txoptimizations.mixin.FeaturePreparedGroupAccessor;
 import com.teslicek.txoptimizations.mixin.StagedVertexBufferListAccessor;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.locks.LockSupport;
 import java.util.function.Supplier;
@@ -21,13 +22,17 @@ final class FeatureWorker {
     private static final long MAX_INLINE_NANOS = 1_000_000_000L;
     private static final long OVERHEAD_NANOS   = 3_000L;
 
-    private final AtomicReference<Runnable> job    = new AtomicReference<>();
-    private final List<Object>              groups = new ArrayList<>();
+    private final AtomicReference<Runnable> job     = new AtomicReference<>();
+    private final AtomicInteger             claimed = new AtomicInteger();
+    private final List<List<?>>             batches = new ArrayList<>();
     private final StagedVertexBuffer        shard;
     private final Thread                    thread;
-    private volatile boolean                done   = true;
+    private volatile boolean                done    = true;
     private volatile Throwable              failure;
     private volatile long                   jobNanos;
+    private FeatureFrameContext             context;
+    private FeatureRendererMap              renderers;
+    private List<SubmitNode>                submits;
     private int                             windowFrames;
     private long                            windowSavedNanos;
     private int                             inlineFrames;
@@ -41,8 +46,8 @@ final class FeatureWorker {
         this.thread = Thread.ofPlatform().name(name).daemon().priority(Thread.MAX_PRIORITY).start(this::work);
     }
 
-    List<Object> groups() {
-        return this.groups;
+    List<List<?>> batches() {
+        return this.batches;
     }
 
     boolean isCurrentThread() {
@@ -66,33 +71,47 @@ final class FeatureWorker {
     }
 
     void start(FeatureFrameContext context, FeatureRendererMap renderers, List<SubmitNode> submits) {
-        if (this.groups.isEmpty())
+        if (this.batches.isEmpty())
             return;
 
         FeatureFrameContext worker = new FeatureFrameContext(context.options(), context.font(), context.blockStateModelSet(), context.blockColors(), context.textureManager(), context.atlasManager(), context.lightmap(), this.shard);
 
-        this.done    = false;
-        this.failure = null;
-        this.job.set(() -> this.prepare(worker, renderers, submits));
+        this.context   = context;
+        this.renderers = renderers;
+        this.submits   = submits;
+        this.done      = false;
+        this.failure   = null;
+        this.claimed.set(0);
+        this.job.set(() -> this.prepare(worker));
         LockSupport.unpark(this.thread);
     }
 
     void finish(StagedVertexBuffer main) {
-        if (this.groups.isEmpty())
+        if (this.batches.isEmpty())
             return;
 
-        long     waitStart = System.nanoTime();
-        Runnable pending   = this.job.getAndSet(null);
+        if (this.job.getAndSet(null) != null) {
+            this.jobNanos = 0L;
+            this.done     = true;
+        }
 
-        if (pending != null)
-            this.run(pending);
+        long waitStart;
 
-        while (!this.done)
-            Thread.onSpinWait();
+        try {
+            this.prepareClaimed(this.context);
+        } finally {
+            waitStart = System.nanoTime();
+
+            while (!this.done)
+                Thread.onSpinWait();
+
+            this.batches.clear();
+            this.context   = null;
+            this.renderers = null;
+            this.submits   = null;
+        }
 
         this.recordFrame(System.nanoTime() - waitStart, this.jobNanos);
-
-        this.groups.clear();
 
         Throwable thrown = this.failure;
 
@@ -130,11 +149,16 @@ final class FeatureWorker {
         this.windowSavedNanos = 0L;
     }
 
-    private void prepare(FeatureFrameContext context, FeatureRendererMap renderers, List<SubmitNode> submits) {
-        for (Object group : this.groups)
-            ((FeaturePreparedGroupAccessor) group).txoptimizations$prepare(context, renderers, submits);
-
+    private void prepare(FeatureFrameContext worker) {
+        this.prepareClaimed(worker);
         ((StagedVertexBufferListAccessor) this.shard).txoptimizations$finishLastVertexBuilder();
+    }
+
+    private void prepareClaimed(FeatureFrameContext target) {
+        for (int index = this.claimed.getAndIncrement(); index < this.batches.size(); index = this.claimed.getAndIncrement()) {
+            for (Object group : this.batches.get(index))
+                ((FeaturePreparedGroupAccessor) group).txoptimizations$prepare(target, this.renderers, this.submits);
+        }
     }
 
     private void work() {
