@@ -4,22 +4,17 @@ import com.mojang.renderpearl.api.device.GpuSurface;
 import com.mojang.renderpearl.backend.vulkan.VulkanQueue;
 import com.teslicek.txoptimizations.gpu.GpuCallEvent;
 import java.util.Optional;
-import java.util.concurrent.atomic.AtomicReferenceArray;
 import java.util.concurrent.locks.LockSupport;
 
 public final class PresentThread {
 
     private static final int      SPINS       = 1024;
-    private static final int      WAKE_SLOTS  = 4;
     private static final Runnable PRESENT_JOB = PresentThread::presentHandedOff;
     private static final Thread   WORKER      = Thread.ofPlatform().name("TxOptimizations Present").daemon().priority(Thread.MAX_PRIORITY).start(PresentThread::work);
-
-    private static final AtomicReferenceArray<Thread> WAKES = new AtomicReferenceArray<>(WAKE_SLOTS);
 
     private static volatile Runnable      job;
     private static volatile Thread        waiting;
     private static volatile boolean       workerParked;
-    private static volatile boolean       spinning;
     private static volatile Throwable     failure;
     private static GpuSurface             armed;
     private static Runnable               captured;
@@ -86,23 +81,6 @@ public final class PresentThread {
 
         if (workerParked)
             LockSupport.unpark(WORKER);
-    }
-
-    public static boolean wakeWhileSpinning(Thread thread) {
-        if (!spinning)
-            return false;
-
-        for (int slot = 0; slot < WAKE_SLOTS; slot ++) {
-            if (!WAKES.compareAndSet(slot, null, thread))
-                continue;
-
-            if (spinning)
-                return true;
-
-            return !WAKES.compareAndSet(slot, thread, null);
-        }
-
-        return false;
     }
 
     public static boolean isParked() {
@@ -228,26 +206,9 @@ public final class PresentThread {
     }
 
     private static void awaitJob(long deadline) {
-        spinning = true;
-
-        try {
-            while (job == null && System.nanoTime() < deadline) {
-                runWakes();
-                VertexCopy.runQueuedCopy();
-                Thread.onSpinWait();
-            }
-        } finally {
-            spinning = false;
-            runWakes();
-        }
-    }
-
-    private static void runWakes() {
-        for (int slot = 0; slot < WAKE_SLOTS; slot ++) {
-            Thread thread = WAKES.get(slot);
-
-            if (thread != null && WAKES.compareAndSet(slot, thread, null))
-                LockSupport.unpark(thread);
+        while (job == null && System.nanoTime() < deadline) {
+            VertexCopy.runQueuedCopy();
+            Thread.onSpinWait();
         }
     }
 }
