@@ -30,6 +30,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import net.minecraft.client.renderer.StagedVertexBuffer;
+import net.minecraft.client.renderer.oit.OitPipelineSet;
+import net.minecraft.client.renderer.oit.OitStage;
 import net.minecraft.client.renderer.rendertype.PreparedRenderType;
 import net.minecraft.resources.Identifier;
 import org.joml.Matrix4f;
@@ -79,6 +81,8 @@ public final class GpuCubes {
     private static @Nullable GpuBuffer     staticBuffer;
     private static int                     staticCapacity;
     private static long                    partCall;
+    private static int                     generation;
+    private static boolean                 reloaded;
     private static @Nullable GpuCubeDraw   pending;
     private static @Nullable PipelineCache checkedCache;
     private static boolean                 patchedSource;
@@ -97,7 +101,12 @@ public final class GpuCubes {
     }
 
     public static void beginPart() {
-        partCall ++;
+        if (NormalCache.usable())
+            partCall ++;
+    }
+
+    public static int generation() {
+        return generation;
     }
 
     public static long partCall() {
@@ -135,23 +144,33 @@ public final class GpuCubes {
     }
 
     public static boolean accepts(VertexFormat format, PrimitiveTopology topology, @Nullable VertexSorting sorting, @Nullable PreparedRenderType prepared) {
-        if (prepared == null || format != DefaultVertexFormat.ENTITY || topology != PrimitiveTopology.QUADS || sorting != null || prepared.oitPipelineSet() != null)
+        refreshShaders();
+
+        if (prepared == null || format != DefaultVertexFormat.ENTITY || topology != PrimitiveTopology.QUADS || sorting != null || !isEligible(prepared.pipeline()))
             return false;
 
-        return ELIGIBLE.computeIfAbsent(prepared.pipeline(), GpuCubes::eligible);
+        OitPipelineSet oit = prepared.oitPipelineSet();
+
+        if (oit == null)
+            return true;
+
+        for (OitStage stage : OitStage.values()) {
+            if (!isEligible(oit.getPipeline(stage)))
+                return false;
+        }
+
+        return true;
     }
 
     public static RenderPipeline variant(RenderPipeline vanilla) {
-        RenderPipeline variant = VARIANTS.get(vanilla);
+        if (!isEligible(vanilla))
+            throw new IllegalStateException(vanilla.getLocation() + " draws GPU cubes but cannot compute them in its vertex shader");
 
-        if (variant == null)
-            throw new IllegalStateException(vanilla.getLocation() + " has GPU cubes but no GPU cube pipeline");
-
-        return variant;
+        return VARIANTS.get(vanilla);
     }
 
     public static void uploadStatic(GpuDevice device) {
-        if (uploadedCubes == cubes)
+        if (uploadedCubes == cubes && staticBuffer != null)
             return;
 
         if (staticBuffer == null || cubes > staticCapacity) {
@@ -165,6 +184,9 @@ public final class GpuCubes {
             uploadedCubes  = 0;
         }
 
+        if (uploadedCubes == cubes)
+            return;
+
         long offset = (long) uploadedCubes * STATIC_BYTES;
         long length = (long) (cubes - uploadedCubes) * STATIC_BYTES;
 
@@ -177,6 +199,13 @@ public final class GpuCubes {
 
     public static void endFrame() {
         long now = ClientClock.frame();
+
+        if (reloaded) {
+            reloaded      = false;
+            cubes         = 0;
+            uploadedCubes = 0;
+            generation ++;
+        }
 
         for (int index = RETIRED.size() - 1; index >= 0; index --) {
             if (now - RETIRED_AT.get(index) < RETIRE_FRAMES)
@@ -217,18 +246,9 @@ public final class GpuCubes {
         return draw;
     }
 
-    public static void requirePendingDrawn() {
-        if (pending != null)
-            throw new IllegalStateException("A draw with GPU cubes went through a draw path that cannot draw GPU cubes");
-    }
-
     public static void bindCubes(RenderPass renderPass, GpuCubeBatch batch) {
-        GpuBuffer shapes = staticBuffer;
-
-        if (shapes == null || uploadedCubes != cubes)
-            throw new IllegalStateException("GPU cube shapes were not uploaded before drawing");
-
-        renderPass.setUniform("TxCubeStatic", shapes.slice(0L, (long) cubes * STATIC_BYTES));
+        uploadStatic(RenderSystem.getDevice());
+        renderPass.setUniform("TxCubeStatic", staticBuffer.slice(0L, (long) staticCapacity * STATIC_BYTES));
         batch.bind(renderPass);
     }
 
@@ -273,8 +293,12 @@ public final class GpuCubes {
             VertexBytes.putPaddedNormal(address + 80L + direction * 4L, NormalCache.selected(direction));
     }
 
+    private static boolean isEligible(@Nullable RenderPipeline pipeline) {
+        return pipeline != null && ELIGIBLE.computeIfAbsent(pipeline, GpuCubes::eligible);
+    }
+
     private static boolean eligible(RenderPipeline vanilla) {
-        if (!SHADER.equals(vanilla.getShaders().get(ShaderType.VERTEX)) || vanilla.getPrimitiveTopology() != PrimitiveTopology.QUADS || vanilla.getVertexFormatBinding(0) != DefaultVertexFormat.ENTITY || !isPatchedSource())
+        if (!patchedSource || !SHADER.equals(vanilla.getShaders().get(ShaderType.VERTEX)) || vanilla.getPrimitiveTopology() != PrimitiveTopology.QUADS || vanilla.getVertexFormatBinding(0) != DefaultVertexFormat.ENTITY)
             return false;
 
         List<VertexFormat> bindings = vanilla.getVertexFormatBindings();
@@ -300,20 +324,22 @@ public final class GpuCubes {
         return RenderPipeline.builder(copy).withLocation(Identifier.fromNamespaceAndPath("txoptimizations", vanilla.getLocation().getPath() + "_gpu_cubes")).withShaderDefine(DEFINE).build();
     }
 
-    private static boolean isPatchedSource() {
+    private static void refreshShaders() {
         PipelineCache cache = RenderSystemPipelineCacheAccessor.txoptimizations$currentPipelineCache();
 
         if (cache == null)
             throw new IllegalStateException("Entity models are drawn before any shaders were loaded");
 
-        if (cache != checkedCache) {
-            String source = ((PipelineCacheAccessor) cache).txoptimizations$shaderSource().getShader(SHADER, ShaderType.VERTEX);
+        if (cache == checkedCache)
+            return;
 
-            checkedCache  = cache;
-            patchedSource = source != null && source.contains(MARKER);
-        }
+        String source = ((PipelineCacheAccessor) cache).txoptimizations$shaderSource().getShader(SHADER, ShaderType.VERTEX);
 
-        return patchedSource;
+        reloaded      = reloaded || checkedCache != null;
+        checkedCache  = cache;
+        patchedSource = source != null && source.contains(MARKER);
+        ELIGIBLE.clear();
+        VARIANTS.clear();
     }
 
     private static String loader() {

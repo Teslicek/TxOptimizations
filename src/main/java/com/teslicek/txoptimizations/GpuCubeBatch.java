@@ -33,7 +33,7 @@ public final class GpuCubeBatch implements AutoCloseable {
     private GpuBuffer[]              buffers = new GpuBuffer[4];
     private long[]                   usedAt = new long[4];
     private @Nullable GpuBuffer      current;
-    private long                     refsOffset;
+    private long                     half;
 
     public GpuCubeBatch(String label) {
         if (this.poses == MemoryUtil.NULL || this.refs == MemoryUtil.NULL)
@@ -93,14 +93,14 @@ public final class GpuCubeBatch implements AutoCloseable {
         long poseBytes = (long) this.poseCount * GpuCubes.POSE_BYTES;
         long refBytes  = (long) this.refCount * GpuCubes.REF_BYTES;
 
-        this.refsOffset = (poseBytes + ALIGNMENT - 1) / ALIGNMENT * ALIGNMENT;
-        this.current    = this.acquire(device, this.refsOffset + refBytes);
+        this.current = this.acquire(device, 2L * Math.max(poseBytes, refBytes));
+        this.half    = this.current.size() / 2L;
 
-        try (GpuBufferSlice.MappedView view = this.current.slice(0L, this.refsOffset + refBytes).map(false, true)) {
+        try (GpuBufferSlice.MappedView view = this.current.slice(0L, this.half + poseBytes).map(false, true)) {
             long target = MemoryUtil.memAddress(view.data());
 
-            MemoryUtil.memCopy(this.poses, target, poseBytes);
-            MemoryUtil.memCopy(this.refs, target + this.refsOffset, refBytes);
+            MemoryUtil.memCopy(this.refs, target, refBytes);
+            MemoryUtil.memCopy(this.poses, target + this.half, poseBytes);
         }
 
         GpuCubes.uploadStatic(device);
@@ -113,14 +113,14 @@ public final class GpuCubeBatch implements AutoCloseable {
         if (buffer == null)
             throw new IllegalStateException("GPU cubes of " + this.label + " are drawn before they were uploaded");
 
-        GpuBufferSlice poseSlice = buffer.slice(0L, (long) this.poseCount * GpuCubes.POSE_BYTES);
+        GpuBufferSlice poseSlice = buffer.slice(this.half, this.half);
 
         renderPass.setUniform("TxPoseMatrix", poseSlice);
         renderPass.setUniform("TxPoseInfo", poseSlice);
         renderPass.setUniform("TxPoseCoords", poseSlice);
         renderPass.setUniform("TxPoseColor", poseSlice);
         renderPass.setUniform("TxPoseNormal", poseSlice);
-        renderPass.setUniform("TxCubeRefs", buffer.slice(this.refsOffset, (long) this.refCount * GpuCubes.REF_BYTES));
+        renderPass.setUniform("TxCubeRefs", buffer.slice(0L, this.half));
     }
 
     public void reset() {

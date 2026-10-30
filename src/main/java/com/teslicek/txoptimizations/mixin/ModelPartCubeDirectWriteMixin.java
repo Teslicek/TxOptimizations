@@ -58,6 +58,9 @@ public abstract class ModelPartCubeDirectWriteMixin implements GpuCube {
     @Unique
     private int txoptimizations$gpuIndex;
 
+    @Unique
+    private int txoptimizations$gpuGeneration;
+
     @Overwrite
     public void compile(PoseStack.Pose pose, VertexConsumer builder, int lightCoords, int overlayCoords, int color) {
         if (NormalCache.usable() && this.txoptimizations$tryPut(pose, builder, lightCoords, overlayCoords, color))
@@ -87,9 +90,10 @@ public abstract class ModelPartCubeDirectWriteMixin implements GpuCube {
         if (values == null || !this.txoptimizations$flattenedBox)
             throw new IllegalStateException("A cube without flattened values was sent to the GPU");
 
-        if (values != this.txoptimizations$gpuValues) {
-            this.txoptimizations$gpuIndex  = GpuCubes.register(values);
-            this.txoptimizations$gpuValues = values;
+        if (values != this.txoptimizations$gpuValues || this.txoptimizations$gpuGeneration != GpuCubes.generation()) {
+            this.txoptimizations$gpuIndex      = GpuCubes.register(values);
+            this.txoptimizations$gpuValues     = values;
+            this.txoptimizations$gpuGeneration = GpuCubes.generation();
         }
 
         return this.txoptimizations$gpuIndex;

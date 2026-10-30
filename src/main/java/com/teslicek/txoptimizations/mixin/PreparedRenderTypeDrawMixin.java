@@ -18,9 +18,6 @@ import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Overwrite;
 import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.Unique;
-import org.spongepowered.asm.mixin.injection.At;
-import org.spongepowered.asm.mixin.injection.Inject;
-import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 @Mixin(value = PreparedRenderType.class, priority = 999)
 public abstract class PreparedRenderTypeDrawMixin {
@@ -40,11 +37,6 @@ public abstract class PreparedRenderTypeDrawMixin {
     @Shadow
     @Final
     private List<PreparedRenderType.Texture> textures;
-
-    @Inject(method = "drawFromBufferOit", at = @At("HEAD"))
-    private void txoptimizations$refuseOitCubes(CallbackInfo ci) {
-        GpuCubes.requirePendingDrawn();
-    }
 
     @Overwrite
     private void draw(StagedVertexBuffer.ExecuteInfo info, RenderPass renderPass, RenderPipeline renderPipeline) {
