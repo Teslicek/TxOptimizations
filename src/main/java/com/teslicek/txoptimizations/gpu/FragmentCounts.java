@@ -14,14 +14,9 @@ import org.lwjgl.vulkan.VkQueryPoolCreateInfo;
 
 public final class FragmentCounts {
 
-    private static final int                  SLOTS      = 8192;
-    private static final int                  STATISTICS = 4;
-    private static final int                  PRIMITIVES = 0;
-    private static final int                  VERTICES   = 1;
-    private static final int                  CLIPPED    = 2;
-    private static final int                  FRAGMENTS  = 3;
-    private static final ArrayDeque<Pending>  PENDING    = new ArrayDeque<>();
-    private static final Map<String, long[]>  TOTALS     = new HashMap<>();
+    private static final int                  SLOTS   = 8192;
+    private static final ArrayDeque<Pending>  PENDING = new ArrayDeque<>();
+    private static final Map<String, long[]>  TOTALS  = new HashMap<>();
 
     private static VkDevice        device;
     private static long            pool;
@@ -75,42 +70,38 @@ public final class FragmentCounts {
             return;
 
         try (MemoryStack stack = MemoryStack.stackPush()) {
-            LongBuffer values = stack.mallocLong(STATISTICS + 1);
+            LongBuffer values = stack.mallocLong(2);
 
             while (!PENDING.isEmpty()) {
                 Pending query  = PENDING.peekFirst();
-                int     result = VK10.vkGetQueryPoolResults(device, pool, query.slot(), 1, values, (STATISTICS + 1L) * Long.BYTES, VK10.VK_QUERY_RESULT_64_BIT | VK10.VK_QUERY_RESULT_WITH_AVAILABILITY_BIT);
+                int     result = VK10.vkGetQueryPoolResults(device, pool, query.slot(), 1, values, 2L * Long.BYTES, VK10.VK_QUERY_RESULT_64_BIT | VK10.VK_QUERY_RESULT_WITH_AVAILABILITY_BIT);
 
                 if (result != VK10.VK_SUCCESS && result != VK10.VK_NOT_READY)
                     throw new IllegalStateException("Reading fragment statistics failed: " + result);
 
-                if (values.get(STATISTICS) == 0L)
+                if (values.get(1) == 0L)
                     return;
 
                 PENDING.removeFirst();
-
-                long[] totals = TOTALS.computeIfAbsent(query.label(), label -> new long[STATISTICS]);
-
-                for (int index = 0; index < STATISTICS; index ++)
-                    totals[index] += values.get(index);
+                TOTALS.computeIfAbsent(query.label(), label -> new long[1])[0] += values.get(0);
             }
         }
     }
 
     static String report(int frames) {
-        StringBuilder report = new StringBuilder(String.format(Locale.ROOT, "Pipeline statistics per frame by pipeline:%n  %10s  %10s  %10s  %10s", "fragments", "primitives", "vertices", "clipped"));
+        StringBuilder report = new StringBuilder("Fragments shaded per frame by pipeline:");
 
         TOTALS.entrySet().stream()
-            .filter(entry -> entry.getValue()[PRIMITIVES] > 0L || entry.getValue()[FRAGMENTS] > 0L)
-            .sorted((first, second) -> Long.compare(second.getValue()[FRAGMENTS], first.getValue()[FRAGMENTS]))
-            .forEach(entry -> report.append(String.format(Locale.ROOT, "%n  %10.0f  %10.0f  %10.0f  %10.0f  %s", (double) entry.getValue()[FRAGMENTS] / frames, (double) entry.getValue()[PRIMITIVES] / frames, (double) entry.getValue()[VERTICES] / frames, (double) entry.getValue()[CLIPPED] / frames, entry.getKey())));
+            .filter(entry -> entry.getValue()[0] > 0L)
+            .sorted((first, second) -> Long.compare(second.getValue()[0], first.getValue()[0]))
+            .forEach(entry -> report.append(String.format(Locale.ROOT, "%n  %10.0f  %s", (double) entry.getValue()[0] / frames, entry.getKey())));
 
         return report.append(String.format(Locale.ROOT, "%n%n")).toString();
     }
 
     private static void createPool(VkDevice vkDevice) {
         try (MemoryStack stack = MemoryStack.stackPush()) {
-            VkQueryPoolCreateInfo info   = VkQueryPoolCreateInfo.calloc(stack).sType$Default().queryType(VK10.VK_QUERY_TYPE_PIPELINE_STATISTICS).queryCount(SLOTS).pipelineStatistics(VK10.VK_QUERY_PIPELINE_STATISTIC_INPUT_ASSEMBLY_PRIMITIVES_BIT | VK10.VK_QUERY_PIPELINE_STATISTIC_VERTEX_SHADER_INVOCATIONS_BIT | VK10.VK_QUERY_PIPELINE_STATISTIC_CLIPPING_PRIMITIVES_BIT | VK10.VK_QUERY_PIPELINE_STATISTIC_FRAGMENT_SHADER_INVOCATIONS_BIT);
+            VkQueryPoolCreateInfo info   = VkQueryPoolCreateInfo.calloc(stack).sType$Default().queryType(VK10.VK_QUERY_TYPE_PIPELINE_STATISTICS).queryCount(SLOTS).pipelineStatistics(VK10.VK_QUERY_PIPELINE_STATISTIC_FRAGMENT_SHADER_INVOCATIONS_BIT);
             LongBuffer            handle = stack.mallocLong(1);
             int                   result = VK10.vkCreateQueryPool(vkDevice, info, null, handle);
 
