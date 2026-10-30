@@ -27,7 +27,22 @@ public abstract class ModelPartCubeDirectWriteMixin {
     public ModelPart.Polygon[] polygons;
 
     @Unique
-    private ModelPart.Polygon @Nullable [] txoptimizations$flattened;
+    private ModelPart.@Nullable Polygon txoptimizations$face0;
+
+    @Unique
+    private ModelPart.@Nullable Polygon txoptimizations$face1;
+
+    @Unique
+    private ModelPart.@Nullable Polygon txoptimizations$face2;
+
+    @Unique
+    private ModelPart.@Nullable Polygon txoptimizations$face3;
+
+    @Unique
+    private ModelPart.@Nullable Polygon txoptimizations$face4;
+
+    @Unique
+    private ModelPart.@Nullable Polygon txoptimizations$face5;
 
     @Unique
     private float @Nullable [] txoptimizations$values;
@@ -59,28 +74,23 @@ public abstract class ModelPartCubeDirectWriteMixin {
 
     @Unique
     private float @Nullable [] txoptimizations$values() {
-        ModelPart.Polygon[] flattened = this.txoptimizations$flattened;
+        ModelPart.Polygon[] polygons = this.polygons;
 
-        if (this.txoptimizations$flattenedBox && txoptimizations$same(flattened, this.polygons))
+        if (this.txoptimizations$flattenedBox && polygons[0] == this.txoptimizations$face0 && polygons[1] == this.txoptimizations$face1 && polygons[2] == this.txoptimizations$face2 && polygons[3] == this.txoptimizations$face3 && polygons[4] == this.txoptimizations$face4 && polygons[5] == this.txoptimizations$face5)
             return this.txoptimizations$values;
 
-        float[] values = CubeVertices.flatten(this.polygons);
+        float[] values = CubeVertices.flatten(polygons);
 
-        this.txoptimizations$flattened    = this.polygons.clone();
+        this.txoptimizations$face0        = polygons[0];
+        this.txoptimizations$face1        = polygons[1];
+        this.txoptimizations$face2        = polygons[2];
+        this.txoptimizations$face3        = polygons[3];
+        this.txoptimizations$face4        = polygons[4];
+        this.txoptimizations$face5        = polygons[5];
         this.txoptimizations$values       = values;
         this.txoptimizations$flattenedBox = true;
 
         return values;
-    }
-
-    @Unique
-    private static boolean txoptimizations$same(ModelPart.Polygon[] flattened, ModelPart.Polygon[] polygons) {
-        for (int face = 0; face < CubeVertices.FACES; face ++) {
-            if (flattened[face] != polygons[face])
-                return false;
-        }
-
-        return true;
     }
 
     @Unique
