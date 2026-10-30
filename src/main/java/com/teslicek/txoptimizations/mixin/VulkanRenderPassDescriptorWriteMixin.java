@@ -75,20 +75,30 @@ public abstract class VulkanRenderPassDescriptorWriteMixin {
         if (!this.anyDescriptorDirty)
             return;
 
-        if (!DynamicStateCache.changesDescriptors(this.commandBuffer.address(), ((PipelineLayoutKey) (Object) this.pipeline).txoptimizations$layoutKey(), this.uniforms)) {
+        long changed = DynamicStateCache.changedDescriptors(this.commandBuffer.address(), ((PipelineLayoutKey) (Object) this.pipeline).txoptimizations$layoutKey(), this.pipeline.pipelineLayout(), this.uniforms);
+
+        if (changed == 0L) {
             this.anyDescriptorDirty = false;
             return;
         }
 
         List<BindGroupLayout.UniformDescription> uniforms = this.pipeline.uniforms();
         int                                      count    = uniforms.size();
+        boolean                                  all      = changed == DynamicStateCache.ALL_DESCRIPTORS;
+        int                                      written  = all ? count : Long.bitCount(changed);
 
         try (MemoryStack stack = MemoryStack.stackPush()) {
-            long writes = stack.ncalloc(VkWriteDescriptorSet.ALIGNOF, count, VkWriteDescriptorSet.SIZEOF);
+            long writes = stack.ncalloc(VkWriteDescriptorSet.ALIGNOF, written, VkWriteDescriptorSet.SIZEOF);
+            int  slot   = 0;
 
             for (int index = 0; index < count; index ++) {
+                if (!all && (changed & 1L << index) == 0L)
+                    continue;
+
                 BindGroupLayout.UniformDescription uniform = uniforms.get(index);
-                long                               write   = writes + (long) index * VkWriteDescriptorSet.SIZEOF;
+                long                               write   = writes + (long) slot * VkWriteDescriptorSet.SIZEOF;
+
+                slot ++;
 
                 VkWriteDescriptorSet.nsType(write, VK10.VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET);
                 VkWriteDescriptorSet.ndstBinding(write, index);
@@ -135,7 +145,7 @@ public abstract class VulkanRenderPassDescriptorWriteMixin {
                 }
             }
 
-            KHRPushDescriptor.nvkCmdPushDescriptorSetKHR(this.commandBuffer, VK10.VK_PIPELINE_BIND_POINT_GRAPHICS, this.pipeline.pipelineLayout(), 0, count, writes);
+            KHRPushDescriptor.nvkCmdPushDescriptorSetKHR(this.commandBuffer, VK10.VK_PIPELINE_BIND_POINT_GRAPHICS, this.pipeline.pipelineLayout(), 0, written, writes);
         }
 
         this.anyDescriptorDirty = false;
