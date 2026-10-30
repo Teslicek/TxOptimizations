@@ -17,6 +17,7 @@ import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
+import org.spongepowered.asm.mixin.injection.ModifyArg;
 import org.spongepowered.asm.mixin.injection.Redirect;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
@@ -24,17 +25,17 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 public abstract class GpuBufferPoolRecycleMixin {
 
     @Unique
-    private static final int SPARE_FRAMES = 3;
+    private static final long SPARE_NANOS = 1_000_000_000L;
 
     @Shadow
     @Final
     private List<GpuBuffer> available;
 
     @Unique
-    private Map<GpuBuffer, Integer> txoptimizations$idleFrames = new IdentityHashMap<>();
+    private Map<GpuBuffer, Long> txoptimizations$idleSince = new IdentityHashMap<>();
 
     @Unique
-    private Map<GpuBuffer, Integer> txoptimizations$nextIdleFrames = new IdentityHashMap<>();
+    private Map<GpuBuffer, Long> txoptimizations$nextIdleSince = new IdentityHashMap<>();
 
     @WrapOperation(method = "tryRecycleBuffers", at = @At(value = "INVOKE", target = "Ljava/util/List;removeIf(Ljava/util/function/Predicate;)Z"))
     private boolean txoptimizations$recycleUntilFirstPending(List<Object> pendingRecycle, Predicate<Object> tryRecycle, Operation<Boolean> original) {
@@ -60,23 +61,24 @@ public abstract class GpuBufferPoolRecycleMixin {
 
     @Inject(method = "endFrame", at = @At("HEAD"))
     private void txoptimizations$forgetReusedSpares(CallbackInfo ci) {
-        if (this.available.isEmpty() && !this.txoptimizations$idleFrames.isEmpty())
-            this.txoptimizations$idleFrames.clear();
+        if (this.available.isEmpty() && !this.txoptimizations$idleSince.isEmpty())
+            this.txoptimizations$idleSince.clear();
     }
 
     @WrapOperation(method = "endFrame", at = @At(value = "INVOKE", target = "Ljava/util/List;forEach(Ljava/util/function/Consumer;)V"))
     private void txoptimizations$closeExpiredSpares(List<GpuBuffer> spares, Consumer<? super GpuBuffer> close, Operation<Void> original) {
-        Map<GpuBuffer, Integer> idleFrames = this.txoptimizations$nextIdleFrames;
-        List<GpuBuffer>         expired    = null;
-        Iterator<GpuBuffer>     iterator   = spares.iterator();
+        Map<GpuBuffer, Long> idleSince = this.txoptimizations$nextIdleSince;
+        List<GpuBuffer>      expired   = null;
+        Iterator<GpuBuffer>  iterator  = spares.iterator();
+        long                 now       = System.nanoTime();
 
         while (iterator.hasNext()) {
-            GpuBuffer spare  = iterator.next();
-            Integer   idle   = this.txoptimizations$idleFrames.get(spare);
-            int       frames = idle == null ? 1 : idle + 1;
+            GpuBuffer spare = iterator.next();
+            Long      since = this.txoptimizations$idleSince.get(spare);
+            long      start = since == null ? now : since;
 
-            if (frames <= SPARE_FRAMES) {
-                idleFrames.put(spare, frames);
+            if (now - start <= SPARE_NANOS) {
+                idleSince.put(spare, start);
                 continue;
             }
 
@@ -87,14 +89,19 @@ public abstract class GpuBufferPoolRecycleMixin {
             iterator.remove();
         }
 
-        this.txoptimizations$nextIdleFrames = this.txoptimizations$idleFrames;
-        this.txoptimizations$idleFrames     = idleFrames;
+        this.txoptimizations$nextIdleSince = this.txoptimizations$idleSince;
+        this.txoptimizations$idleSince     = idleSince;
 
-        if (!this.txoptimizations$nextIdleFrames.isEmpty())
-            this.txoptimizations$nextIdleFrames.clear();
+        if (!this.txoptimizations$nextIdleSince.isEmpty())
+            this.txoptimizations$nextIdleSince.clear();
 
         if (expired != null)
             original.call(expired, close);
+    }
+
+    @ModifyArg(method = "acquire", at = @At(value = "INVOKE", target = "Lcom/mojang/renderpearl/api/device/GpuDevice;createBuffer(Ljava/util/function/Supplier;IJ)Lcom/mojang/renderpearl/api/buffers/GpuBuffer;"), index = 2, require = 1)
+    private long txoptimizations$growGeometrically(long size) {
+        return Long.highestOneBit(size - 1) << 1;
     }
 
     @Redirect(method = "endFrame", at = @At(value = "INVOKE", target = "Ljava/util/List;clear()V"))
