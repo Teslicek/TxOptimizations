@@ -54,18 +54,23 @@ public abstract class LevelRendererTranslucentResortMixin {
     @Unique
     private int txoptimizations$sweptFrames;
 
+    @Unique
+    private boolean txoptimizations$sweptImprovedTransparency;
+
     @Inject(method = "scheduleTranslucentSectionResort", at = @At("HEAD"), cancellable = true)
     private void txoptimizations$skipSettledResorts(Vec3 cameraPos, CallbackInfo ci) {
-        int changes = DrawRecords.recordChanges();
-        int refills = SectionDrawList.visibleRefills();
+        int     changes  = DrawRecords.recordChanges();
+        int     refills  = SectionDrawList.visibleRefills();
+        boolean improved = this.gameRenderer.useImprovedTransparency();
 
-        if (cameraPos.x != this.txoptimizations$sweptX || cameraPos.y != this.txoptimizations$sweptY || cameraPos.z != this.txoptimizations$sweptZ || changes != this.txoptimizations$sweptChanges || refills != this.txoptimizations$sweptRefills) {
-            this.txoptimizations$sweptX       = cameraPos.x;
-            this.txoptimizations$sweptY       = cameraPos.y;
-            this.txoptimizations$sweptZ       = cameraPos.z;
-            this.txoptimizations$sweptChanges = changes;
-            this.txoptimizations$sweptRefills = refills;
-            this.txoptimizations$sweptFrames  = 0;
+        if (cameraPos.x != this.txoptimizations$sweptX || cameraPos.y != this.txoptimizations$sweptY || cameraPos.z != this.txoptimizations$sweptZ || changes != this.txoptimizations$sweptChanges || refills != this.txoptimizations$sweptRefills || improved != this.txoptimizations$sweptImprovedTransparency) {
+            this.txoptimizations$sweptX                    = cameraPos.x;
+            this.txoptimizations$sweptY                    = cameraPos.y;
+            this.txoptimizations$sweptZ                    = cameraPos.z;
+            this.txoptimizations$sweptChanges              = changes;
+            this.txoptimizations$sweptRefills              = refills;
+            this.txoptimizations$sweptFrames               = 0;
+            this.txoptimizations$sweptImprovedTransparency = improved;
 
             return;
         }
