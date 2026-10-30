@@ -16,21 +16,21 @@ public abstract class TextFeatureRendererLayoutCacheMixin {
         if (includeEmpty)
             throw new IllegalStateException("World text layout is not expected to include empty glyphs");
 
-        Font.PreparedText cached = TextLayoutCache.find(font, text, x, y, color, dropShadow, backgroundColor, false);
+        Font.PreparedText cached = TextLayoutCache.find(font, text, x, y, color, dropShadow, backgroundColor, false, false);
 
         if (cached != null)
             return cached;
 
-        return TextLayoutCache.store(font.prepareText(text, x, y, color, dropShadow, false, backgroundColor), font, text, x, y, color, dropShadow, backgroundColor, false);
+        return TextLayoutCache.store(font.prepareText(text, x, y, color, dropShadow, false, backgroundColor), font, text, x, y, color, dropShadow, backgroundColor, false, false);
     }
 
     @Redirect(method = "renderText", at = @At(value = "INVOKE", target = "Lnet/minecraft/client/gui/Font;prepare8xTextOutline(Lnet/minecraft/util/FormattedCharSequence;FFI)Lnet/minecraft/client/gui/Font$PreparedText;"))
     private static Font.PreparedText txoptimizations$reuseOutlineLayout(Font font, FormattedCharSequence text, float x, float y, int outlineColor) {
-        Font.PreparedText cached = TextLayoutCache.find(font, text, x, y, outlineColor, false, 0, true);
+        Font.PreparedText cached = TextLayoutCache.find(font, text, x, y, outlineColor, false, 0, false, true);
 
         if (cached != null)
             return cached;
 
-        return TextLayoutCache.store(font.prepare8xTextOutline(text, x, y, outlineColor), font, text, x, y, outlineColor, false, 0, true);
+        return TextLayoutCache.store(font.prepare8xTextOutline(text, x, y, outlineColor), font, text, x, y, outlineColor, false, 0, false, true);
     }
 }

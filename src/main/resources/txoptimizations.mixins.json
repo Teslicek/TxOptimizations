@@ -134,7 +134,7 @@
     "GuiRenderStateLayerSearchMixin",
     "GuiRenderStateNodeBoundsMixin",
     "GuiTextRenderStateLayoutCacheMixin",
-    "ChatComponentFocusedLayoutMixin",
+    "ChatComponentLineLayoutMixin",
     "HideLevelLoadingScreenMixin",
     "HideReloadOverlayMixin",
     "HideTitleScreenFadeMixin",

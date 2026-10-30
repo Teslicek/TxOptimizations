@@ -13,14 +13,14 @@ public abstract class GuiTextRenderStateLayoutCacheMixin {
 
     @Redirect(method = "ensurePrepared", at = @At(value = "INVOKE", target = "Lnet/minecraft/client/gui/Font;prepareText(Lnet/minecraft/util/FormattedCharSequence;FFIZZI)Lnet/minecraft/client/gui/Font$PreparedText;"))
     private Font.PreparedText txoptimizations$reuseSharedLayout(Font font, FormattedCharSequence text, float x, float y, int color, boolean dropShadow, boolean includeEmpty, int backgroundColor) {
-        if (includeEmpty || !TextLayoutCache.isRepeated(text))
+        if (!TextLayoutCache.isRepeated(text))
             return font.prepareText(text, x, y, color, dropShadow, includeEmpty, backgroundColor);
 
-        Font.PreparedText cached = TextLayoutCache.find(font, text, x, y, color, dropShadow, backgroundColor, false);
+        Font.PreparedText cached = TextLayoutCache.find(font, text, x, y, color, dropShadow, backgroundColor, includeEmpty, false);
 
         if (cached != null)
             return cached;
 
-        return TextLayoutCache.store(font.prepareText(text, x, y, color, dropShadow, false, backgroundColor), font, text, x, y, color, dropShadow, backgroundColor, false);
+        return TextLayoutCache.store(font.prepareText(text, x, y, color, dropShadow, includeEmpty, backgroundColor), font, text, x, y, color, dropShadow, backgroundColor, includeEmpty, false);
     }
 }

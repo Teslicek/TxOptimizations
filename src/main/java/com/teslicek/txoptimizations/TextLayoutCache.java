@@ -40,11 +40,11 @@ public final class TextLayoutCache {
         return entryClears;
     }
 
-    public static Font.PreparedText find(Font font, FormattedCharSequence text, float x, float y, int color, boolean dropShadow, int backgroundColor, boolean outline) {
+    public static Font.PreparedText find(Font font, FormattedCharSequence text, float x, float y, int color, boolean dropShadow, int backgroundColor, boolean includeEmpty, boolean outline) {
         long frame = ClientClock.frame();
 
         evictUnused(frame);
-        PROBE.set(font, text, x, y, color, dropShadow, backgroundColor, outline);
+        PROBE.set(font, text, x, y, color, dropShadow, backgroundColor, includeEmpty, outline);
 
         Key entry = ENTRIES.get(PROBE);
 
@@ -57,18 +57,18 @@ public final class TextLayoutCache {
     }
 
     public static boolean ensure(Font font, FormattedCharSequence text, float x, float y, int color, boolean dropShadow, int backgroundColor, boolean outline) {
-        if (find(font, text, x, y, color, dropShadow, backgroundColor, outline) != null)
+        if (find(font, text, x, y, color, dropShadow, backgroundColor, false, outline) != null)
             return true;
 
         if (!isStable(text))
             return false;
 
-        store(outline ? font.prepare8xTextOutline(text, x, y, color) : font.prepareText(text, x, y, color, dropShadow, false, backgroundColor), font, text, x, y, color, dropShadow, backgroundColor, outline);
+        store(outline ? font.prepare8xTextOutline(text, x, y, color) : font.prepareText(text, x, y, color, dropShadow, false, backgroundColor), font, text, x, y, color, dropShadow, backgroundColor, false, outline);
 
         return true;
     }
 
-    public static Font.PreparedText store(Font.PreparedText prepared, Font font, FormattedCharSequence text, float x, float y, int color, boolean dropShadow, int backgroundColor, boolean outline) {
+    public static Font.PreparedText store(Font.PreparedText prepared, Font font, FormattedCharSequence text, float x, float y, int color, boolean dropShadow, int backgroundColor, boolean includeEmpty, boolean outline) {
         if (!isStable(text))
             return prepared;
 
@@ -79,7 +79,7 @@ public final class TextLayoutCache {
 
         Key key = new Key();
 
-        key.set(font, text, x, y, color, dropShadow, backgroundColor, outline);
+        key.set(font, text, x, y, color, dropShadow, backgroundColor, includeEmpty, outline);
         key.prepared = prepared;
         key.frame    = ClientClock.frame();
         ENTRIES.put(key, key);
@@ -243,12 +243,13 @@ public final class TextLayoutCache {
         private int                   color;
         private boolean               dropShadow;
         private int                   backgroundColor;
+        private boolean               includeEmpty;
         private boolean               outline;
         private int                   hash;
         private Font.PreparedText     prepared;
         private long                  frame;
 
-        private void set(Font font, FormattedCharSequence text, float x, float y, int color, boolean dropShadow, int backgroundColor, boolean outline) {
+        private void set(Font font, FormattedCharSequence text, float x, float y, int color, boolean dropShadow, int backgroundColor, boolean includeEmpty, boolean outline) {
             this.font            = font;
             this.text            = text;
             this.x               = x;
@@ -256,6 +257,7 @@ public final class TextLayoutCache {
             this.color           = color;
             this.dropShadow      = dropShadow;
             this.backgroundColor = backgroundColor;
+            this.includeEmpty    = includeEmpty;
             this.outline         = outline;
 
             int value = System.identityHashCode(text);
@@ -265,13 +267,14 @@ public final class TextLayoutCache {
             value = 31 * value + color;
             value = 31 * value + backgroundColor;
             value = 31 * value + Boolean.hashCode(outline);
+            value = 31 * value + Boolean.hashCode(includeEmpty);
 
             this.hash = 31 * value + Boolean.hashCode(dropShadow);
         }
 
         @Override
         public boolean equals(Object other) {
-            return other instanceof Key that && this.font == that.font && this.text == that.text && Float.compare(this.x, that.x) == 0 && Float.compare(this.y, that.y) == 0 && this.color == that.color && this.dropShadow == that.dropShadow && this.backgroundColor == that.backgroundColor && this.outline == that.outline;
+            return other instanceof Key that && this.font == that.font && this.text == that.text && Float.compare(this.x, that.x) == 0 && Float.compare(this.y, that.y) == 0 && this.color == that.color && this.dropShadow == that.dropShadow && this.backgroundColor == that.backgroundColor && this.includeEmpty == that.includeEmpty && this.outline == that.outline;
         }
 
         @Override
