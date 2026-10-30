@@ -1,7 +1,9 @@
 package com.teslicek.txoptimizations.mixin;
 
 import com.teslicek.txoptimizations.ClientClock;
+import com.teslicek.txoptimizations.ParticleBaseLight;
 import com.teslicek.txoptimizations.ParticleLightShare;
+import com.teslicek.txoptimizations.RenderThreadStack;
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.client.particle.Particle;
 import net.minecraft.core.BlockPos;
@@ -13,7 +15,7 @@ import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.Unique;
 
 @Mixin(value = Particle.class, priority = 999)
-public abstract class ParticleLightCacheMixin {
+public abstract class ParticleLightCacheMixin implements ParticleBaseLight {
 
     @Unique
     private static final int UNLOADED_LIGHT = 15728640;
@@ -51,10 +53,23 @@ public abstract class ParticleLightCacheMixin {
 
     @Overwrite
     protected int getLightCoords(float partialTick) {
+        return this.txoptimizations$baseLight();
+    }
+
+    @Override
+    public void txoptimizations$warmBaseLight() {
+        this.txoptimizations$baseLight();
+    }
+
+    @Unique
+    private int txoptimizations$baseLight() {
         long tick = ClientClock.tick();
 
         if (this.txoptimizations$lightTick == tick && this.txoptimizations$lightX == this.x && this.txoptimizations$lightY == this.y && this.txoptimizations$lightZ == this.z)
             return this.txoptimizations$light;
+
+        if (!RenderThreadStack.isOwner())
+            throw new IllegalStateException("Particle light for " + this + " was not warmed on the render thread before it was read on " + Thread.currentThread().getName());
 
         BlockPos pos = LIGHT_POS.set(this.x, this.y, this.z);
 

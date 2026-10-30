@@ -3,6 +3,7 @@ package com.teslicek.txoptimizations.mixin;
 import com.teslicek.txoptimizations.ClientClock;
 import com.teslicek.txoptimizations.FrustumBoxTest;
 import com.teslicek.txoptimizations.FrustumPlanes;
+import com.teslicek.txoptimizations.ParticleBaseLight;
 import com.teslicek.txoptimizations.ParticleExtractAhead;
 import com.teslicek.txoptimizations.ParticleLightShare;
 import com.teslicek.txoptimizations.ParticleGroupChanges;
@@ -221,8 +222,13 @@ public abstract class QuadParticleGroupPositionsMixin extends ParticleGroup<Sing
 
                 ((ParticleSnapshot) particle).txoptimizations$snapshot(this.txoptimizations$floats, index * ParticleSnapshot.FLOATS, this.txoptimizations$ints, index * ParticleSnapshot.INTS, this.txoptimizations$refs, index * ParticleSnapshot.REFS, this.txoptimizations$previous, index * AXES);
 
+                int flags = this.txoptimizations$ints[index * ParticleSnapshot.INTS + ParticleSnapshot.FLAGS];
+
+                if ((flags & ParticleSnapshot.OWN_LIGHT) != 0 && txoptimizations$isVanilla(particle))
+                    ((ParticleBaseLight) particle).txoptimizations$warmBaseLight();
+
                 if (blocker == null)
-                    blocker = txoptimizations$blocker(particle, this.txoptimizations$ints[index * ParticleSnapshot.INTS + ParticleSnapshot.FLAGS], this.txoptimizations$refs[index * ParticleSnapshot.REFS + ParticleSnapshot.FACING]);
+                    blocker = txoptimizations$blocker(particle, flags, this.txoptimizations$refs[index * ParticleSnapshot.REFS + ParticleSnapshot.FACING]);
 
                 index ++;
             }
@@ -241,16 +247,21 @@ public abstract class QuadParticleGroupPositionsMixin extends ParticleGroup<Sing
         if ((flags & ParticleSnapshot.STORED) == 0)
             return particle.getClass().getName() + " extracts itself";
 
-        if ((flags & ParticleSnapshot.OWN_LIGHT) != 0)
+        if ((flags & ParticleSnapshot.OWN_LIGHT) != 0 && !txoptimizations$isVanilla(particle))
             return particle.getClass().getName() + " lights itself per frame";
 
-        if ((flags & ParticleSnapshot.OWN_SIZE) != 0 && !particle.getClass().getName().startsWith("net.minecraft."))
+        if ((flags & ParticleSnapshot.OWN_SIZE) != 0 && !txoptimizations$isVanilla(particle))
             return particle.getClass().getName() + " sizes itself";
 
         if (facing != SingleQuadParticle.FacingCameraMode.LOOKAT_XYZ && facing != SingleQuadParticle.FacingCameraMode.LOOKAT_Y)
             return particle.getClass().getName() + " faces the camera its own way";
 
         return null;
+    }
+
+    @Unique
+    private static boolean txoptimizations$isVanilla(SingleQuadParticle particle) {
+        return particle.getClass().getName().startsWith("net.minecraft.");
     }
 
     @Unique
