@@ -138,6 +138,7 @@ public final class GpuPassProfiler {
         ProfileCounters.reset();
         FragmentCounts.reset();
         HudProfile.reset();
+        ParticleProfile.reset();
     }
 
     private static boolean isWarmedUp(long now) {
@@ -498,7 +499,7 @@ public final class GpuPassProfiler {
             .sorted((first, second) -> Long.compare(second.getValue().nanos, first.getValue().nanos))
             .forEach(entry -> report.append(String.format(Locale.ROOT, "%6.2f%%  %7.3f ms  %6.1fx  %s%n", entry.getValue().nanos * 100.0 / gpuNanos, entry.getValue().nanos / 1.0e6 / framesRead, (double) entry.getValue().calls / framesRead, entry.getKey())));
 
-        report.append(System.lineSeparator()).append(FragmentCounts.report(framesRead)).append(HudProfile.report()).append(slowFrameReport());
+        report.append(System.lineSeparator()).append(FragmentCounts.report(framesRead)).append(HudProfile.report()).append(ParticleProfile.report()).append(slowFrameReport());
 
         return report.toString();
     }

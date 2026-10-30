@@ -8,6 +8,7 @@ import com.teslicek.txoptimizations.ParticleLightShare;
 import com.teslicek.txoptimizations.ParticleGroupChanges;
 import com.teslicek.txoptimizations.ParticleSnapshot;
 import com.teslicek.txoptimizations.ParticleWorker;
+import com.teslicek.txoptimizations.gpu.ParticleProfile;
 import java.util.Arrays;
 import net.minecraft.CrashReport;
 import net.minecraft.CrashReportCategory;
@@ -24,6 +25,7 @@ import net.minecraft.client.renderer.state.level.QuadParticleRenderState;
 import net.minecraft.util.Mth;
 import net.minecraft.world.phys.Vec3;
 import org.joml.Quaternionf;
+import org.jspecify.annotations.Nullable;
 import org.spongepowered.asm.mixin.Final;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Overwrite;
@@ -96,7 +98,7 @@ public abstract class QuadParticleGroupPositionsMixin extends ParticleGroup<Sing
     private long txoptimizations$snapshotTick = -1L;
 
     @Unique
-    private boolean txoptimizations$offThread;
+    private @Nullable String txoptimizations$blocker;
 
     @Unique
     private boolean txoptimizations$ahead;
@@ -136,7 +138,11 @@ public abstract class QuadParticleGroupPositionsMixin extends ParticleGroup<Sing
 
         this.txoptimizations$snapshot();
 
-        if (!this.txoptimizations$offThread || this.txoptimizations$count < MIN_AHEAD_PARTICLES)
+        boolean enough = this.txoptimizations$count >= MIN_AHEAD_PARTICLES;
+
+        ParticleProfile.record(enough && this.txoptimizations$blocker == null, enough, this.txoptimizations$blocker);
+
+        if (!enough || this.txoptimizations$blocker != null)
             return;
 
         this.txoptimizations$ahead            = true;
@@ -199,7 +205,7 @@ public abstract class QuadParticleGroupPositionsMixin extends ParticleGroup<Sing
         double[] bounds    = this.txoptimizations$bounds;
         Object[] order     = this.txoptimizations$order;
         int      index     = 0;
-        boolean  offThread = true;
+        String   blocker   = null;
 
         Arrays.fill(order, count, order.length, null);
         ParticleLightShare.begin();
@@ -215,7 +221,9 @@ public abstract class QuadParticleGroupPositionsMixin extends ParticleGroup<Sing
 
                 ((ParticleSnapshot) particle).txoptimizations$snapshot(this.txoptimizations$floats, index * ParticleSnapshot.FLOATS, this.txoptimizations$ints, index * ParticleSnapshot.INTS, this.txoptimizations$refs, index * ParticleSnapshot.REFS, this.txoptimizations$previous, index * AXES);
 
-                offThread = offThread && txoptimizations$runsOffThread(particle, this.txoptimizations$ints[index * ParticleSnapshot.INTS + ParticleSnapshot.FLAGS], this.txoptimizations$refs[index * ParticleSnapshot.REFS + ParticleSnapshot.FACING]);
+                if (blocker == null)
+                    blocker = txoptimizations$blocker(particle, this.txoptimizations$ints[index * ParticleSnapshot.INTS + ParticleSnapshot.FLAGS], this.txoptimizations$refs[index * ParticleSnapshot.REFS + ParticleSnapshot.FACING]);
+
                 index ++;
             }
         } finally {
@@ -223,20 +231,26 @@ public abstract class QuadParticleGroupPositionsMixin extends ParticleGroup<Sing
         }
 
         this.txoptimizations$count           = index;
-        this.txoptimizations$offThread       = offThread;
+        this.txoptimizations$blocker         = blocker;
         this.txoptimizations$snapshotChanges = changes;
         this.txoptimizations$snapshotTick    = tick;
     }
 
     @Unique
-    private static boolean txoptimizations$runsOffThread(SingleQuadParticle particle, int flags, Object facing) {
-        if ((flags & ParticleSnapshot.STORED) == 0 || (flags & ParticleSnapshot.OWN_LIGHT) != 0)
-            return false;
+    private static @Nullable String txoptimizations$blocker(SingleQuadParticle particle, int flags, Object facing) {
+        if ((flags & ParticleSnapshot.STORED) == 0)
+            return particle.getClass().getName() + " extracts itself";
+
+        if ((flags & ParticleSnapshot.OWN_LIGHT) != 0)
+            return particle.getClass().getName() + " lights itself per frame";
 
         if ((flags & ParticleSnapshot.OWN_SIZE) != 0 && !particle.getClass().getName().startsWith("net.minecraft."))
-            return false;
+            return particle.getClass().getName() + " sizes itself";
 
-        return facing == SingleQuadParticle.FacingCameraMode.LOOKAT_XYZ || facing == SingleQuadParticle.FacingCameraMode.LOOKAT_Y;
+        if (facing != SingleQuadParticle.FacingCameraMode.LOOKAT_XYZ && facing != SingleQuadParticle.FacingCameraMode.LOOKAT_Y)
+            return particle.getClass().getName() + " faces the camera its own way";
+
+        return null;
     }
 
     @Unique
