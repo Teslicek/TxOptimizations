@@ -15,12 +15,14 @@ import java.util.concurrent.Executors;
 import java.util.stream.Stream;
 import jdk.jfr.Recording;
 import net.minecraft.client.Minecraft;
+import net.minecraft.network.chat.Component;
 import org.slf4j.Logger;
 
 public final class PassiveProfile {
 
     private static final Logger            LOGGER            = LogUtils.getLogger();
     private static final String            DIRECTORY         = "txoptimizations/passive";
+    private static final String            FINISHED          = "[TxOptimizations] Background profiler finished";
     private static final String            PREFIX            = "passive-";
     private static final String            RECORDING         = ".jfr";
     private static final String            SUMMARY           = ".txt";
@@ -93,7 +95,7 @@ public final class PassiveProfile {
         longestNanos = 0L;
         windowFrames = 0;
 
-        WRITER.execute(() -> save(directory, name, summary));
+        WRITER.execute(() -> save(minecraft, directory, name, summary));
     }
 
     private static String summary(Minecraft minecraft, String name, double seconds) {
@@ -120,12 +122,13 @@ public final class PassiveProfile {
         return longestNanos / 1.0e6;
     }
 
-    private static void save(Path directory, String name, String summary) {
+    private static void save(Minecraft minecraft, Path directory, String name, String summary) {
         try {
             Files.createDirectories(directory);
             recording.dump(directory.resolve(name + RECORDING));
             Files.writeString(directory.resolve(name + SUMMARY), summary);
             prune(directory);
+            minecraft.execute(() -> minecraft.gui.hud.getChat().addClientSystemMessage(Component.literal(FINISHED)));
         } catch (IOException exception) {
             LOGGER.error("Could not save the passive profile {} to {}", name, directory, exception);
         }
