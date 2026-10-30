@@ -10,6 +10,7 @@ import com.teslicek.txoptimizations.SectionCommandStorage;
 import com.teslicek.txoptimizations.SectionDrawList;
 import com.teslicek.txoptimizations.SectionInfoStorage;
 import java.nio.ByteBuffer;
+import java.util.Arrays;
 import java.util.function.LongConsumer;
 import net.minecraft.client.renderer.DynamicGpuDataStorage;
 import net.minecraft.client.renderer.DynamicGpuDataStorageMapped;
@@ -25,6 +26,9 @@ import org.spongepowered.asm.mixin.Unique;
 
 @Mixin(value = DynamicGpuDataStorageMapped.class, priority = 999)
 public abstract class DynamicGpuDataStoragePersistentWriteMixin<T extends DynamicGpuDataStorage.DynamicGpuData> implements SectionCommandStorage, SectionInfoStorage, LastWrittenData {
+
+    @Unique
+    private static final int HELD_BUFFERS = 8;
 
     @Shadow
     @Final
@@ -56,6 +60,18 @@ public abstract class DynamicGpuDataStoragePersistentWriteMixin<T extends Dynami
     @Unique
     private int txoptimizations$lastSliceBlock;
 
+    @Unique
+    private final GpuBuffer[] txoptimizations$heldBuffers = new GpuBuffer[HELD_BUFFERS];
+
+    @Unique
+    private final long[] txoptimizations$heldBuilds = new long[HELD_BUFFERS];
+
+    @Unique
+    private final int[] txoptimizations$heldOffsets = new int[HELD_BUFFERS];
+
+    @Unique
+    private final int[] txoptimizations$heldBytes = new int[HELD_BUFFERS];
+
     @Shadow
     protected abstract void resizeBuffers(int newCapacity);
 
@@ -66,6 +82,8 @@ public abstract class DynamicGpuDataStoragePersistentWriteMixin<T extends Dynami
 
     @Overwrite
     public GpuBufferSlice writeData(T gpuData) {
+        this.txoptimizations$forgetHeldDraws();
+
         if (this.lastData != null && this.lastData.equals(gpuData)) {
             GpuBuffer current = this.ringBuffer.currentBuffer();
 
@@ -126,7 +144,7 @@ public abstract class DynamicGpuDataStoragePersistentWriteMixin<T extends Dynami
             listOffset   += listBytes;
         }
 
-        this.txoptimizations$write(buffer, offset, bytes, draws::writeCommands);
+        this.txoptimizations$writeUnlessHeld(buffer, offset, bytes, draws.build(), draws::writeCommands);
         this.nextBlock += totalCount;
 
         return result;
@@ -143,7 +161,7 @@ public abstract class DynamicGpuDataStoragePersistentWriteMixin<T extends Dynami
         int       bytes  = count * this.blockSize;
         GpuBuffer buffer = this.ringBuffer.currentBuffer();
 
-        this.txoptimizations$write(buffer, offset, bytes, draws::writeSectionInfos);
+        this.txoptimizations$writeUnlessHeld(buffer, offset, bytes, draws.build(), draws::writeSectionInfos);
         this.nextBlock += count;
 
         return buffer.slice(offset, bytes);
@@ -158,10 +176,47 @@ public abstract class DynamicGpuDataStoragePersistentWriteMixin<T extends Dynami
             int newCapacity = Mth.smallestEncompassingPowerOfTwo(Math.max(this.capacity + 1, count));
 
             LOGGER.info("Resizing {}, capacity limit of {} reached during a single frame. New capacity will be {}.", this.label, this.capacity, newCapacity);
+            this.txoptimizations$forgetHeldDraws();
             this.resizeBuffers(newCapacity);
         }
 
         return this.nextBlock * this.blockSize;
+    }
+
+    @Unique
+    private void txoptimizations$writeUnlessHeld(GpuBuffer buffer, int offset, int bytes, long build, LongConsumer writer) {
+        GpuBuffer[] buffers = this.txoptimizations$heldBuffers;
+        int         free    = -1;
+
+        for (int slot = 0; slot < buffers.length; slot ++) {
+            if (buffers[slot] == buffer) {
+                if (this.txoptimizations$heldBuilds[slot] == build && this.txoptimizations$heldOffsets[slot] == offset && this.txoptimizations$heldBytes[slot] == bytes)
+                    return;
+
+                free = slot;
+                break;
+            }
+
+            if (buffers[slot] == null && free == -1)
+                free = slot;
+        }
+
+        this.txoptimizations$write(buffer, offset, bytes, writer);
+
+        if (free == -1) {
+            this.txoptimizations$forgetHeldDraws();
+            free = 0;
+        }
+
+        buffers[free]                          = buffer;
+        this.txoptimizations$heldBuilds[free]  = build;
+        this.txoptimizations$heldOffsets[free] = offset;
+        this.txoptimizations$heldBytes[free]   = bytes;
+    }
+
+    @Unique
+    private void txoptimizations$forgetHeldDraws() {
+        Arrays.fill(this.txoptimizations$heldBuffers, null);
     }
 
     @Unique

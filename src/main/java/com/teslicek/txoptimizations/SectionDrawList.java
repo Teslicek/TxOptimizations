@@ -61,6 +61,7 @@ public final class SectionDrawList {
     private int[]                 memoIndices   = new int[0];
     private int[]                 memoTypes     = new int[0];
     private int[]                 memoGroups    = new int[0];
+    private long                  build;
     private int                   groups;
     private int                   cacheSize;
     private int                   drawInts;
@@ -84,6 +85,8 @@ public final class SectionDrawList {
             this.memoTypes    = new int[layers];
             this.memoGroups   = new int[layers];
         }
+
+        this.build ++;
 
         Arrays.fill(this.layerCounts, 0);
         Arrays.fill(this.memoGroups, NONE);
@@ -200,6 +203,10 @@ public final class SectionDrawList {
             this.placeCommands();
 
         return this;
+    }
+
+    public long build() {
+        return this.build;
     }
 
     public int largestIndexCount() {
