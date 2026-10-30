@@ -83,6 +83,8 @@ public final class PassiveProfile {
         if (recording != null)
             throw new IllegalStateException("The passive profile is already recording");
 
+        BuildInfo.describe();
+
         Recording started = new Recording();
 
         started.setName("TxOptimizations passive profile");

@@ -419,12 +419,14 @@ public final class GpuPassProfiler {
 
     private static void finish() {
         for (int index = 0; index < SLOTS; index ++) {
-            POOLS[index].close();
+            if (POOLS[index] != null)
+                POOLS[index].close();
+
             POOLS[index] = null;
         }
 
         double seconds = (System.nanoTime() - startNanos) / 1.0e9;
-        String gpu     = report(seconds);
+        String gpu     = gpuReport(seconds);
 
         if (background) {
             finishInBackground(gpu, seconds);
@@ -457,6 +459,17 @@ public final class GpuPassProfiler {
                 finishing = false;
             }
         });
+    }
+
+    private static String gpuReport(double seconds) {
+        if (framesRead == 0)
+            return String.format(Locale.ROOT, "No GPU frames were measured in %.1f s, the window was likely minimized or not presenting%n", seconds);
+
+        try {
+            return report(seconds);
+        } catch (IllegalStateException exception) {
+            return String.format(Locale.ROOT, "GPU report unavailable: %s%n", exception.getMessage());
+        }
     }
 
     private static String report(double seconds) {

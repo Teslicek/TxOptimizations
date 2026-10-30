@@ -7,6 +7,7 @@ import com.mojang.renderpearl.backend.vulkan.VulkanDevice;
 import com.mojang.renderpearl.backend.vulkan.VulkanGpuSurface;
 import com.mojang.renderpearl.backend.vulkan.VulkanGpuTexture;
 import com.mojang.renderpearl.backend.vulkan.VulkanUtils;
+import com.teslicek.txoptimizations.PresentThread;
 import com.teslicek.txoptimizations.gpu.GpuPassProfiler;
 import it.unimi.dsi.fastutil.longs.LongList;
 import java.nio.LongBuffer;
@@ -122,6 +123,9 @@ public abstract class VulkanGpuSurfaceBlitReuseMixin {
     private long[] txoptimizations$blitSources = new long[0];
 
     @Unique
+    private Object[] txoptimizations$blitTextures = new Object[0];
+
+    @Unique
     private int[] txoptimizations$blitMips = new int[0];
 
     @Unique
@@ -140,13 +144,14 @@ public abstract class VulkanGpuSurfaceBlitReuseMixin {
         if (index == -1)
             throw new IllegalStateException("No swapchain image is acquired for the screen copy");
 
-        long source = ((VulkanGpuTexture) textureView.texture()).vkImage();
+        VulkanGpuTexture texture = (VulkanGpuTexture) textureView.texture();
+        long             source  = texture.vkImage();
         int  mip    = textureView.baseMipLevel();
         int  width  = Math.min(this.swapchainWidth, textureView.getWidth(0));
         int  height = Math.min(this.swapchainHeight, textureView.getHeight(0));
 
         VulkanCommandEncoder encoder = (VulkanCommandEncoder) commandEncoder;
-        VkCommandBuffer      blit    = this.txoptimizations$blit(index, source, mip, width, height);
+        VkCommandBuffer      blit    = this.txoptimizations$blit(index, texture, source, mip, width, height);
 
         encoder.waitSemaphore(this.acquireSemaphores[this.currentAcquireSemaphore], 0L, ALL_COMMANDS);
         encoder.execute(blit);
@@ -159,22 +164,25 @@ public abstract class VulkanGpuSurfaceBlitReuseMixin {
         if (this.txoptimizations$blitPool == 0L)
             return;
 
+        PresentThread.drain();
+
         VkDevice vkDevice = this.device.vkDevice();
 
         VulkanUtils.crashIfFailure(this.device, VK12.vkDeviceWaitIdle(vkDevice), "Failed to wait for the device before dropping screen copies");
         VK12.vkDestroyCommandPool(vkDevice, this.txoptimizations$blitPool, null);
-        this.txoptimizations$blitPool = 0L;
-        this.txoptimizations$blits    = new VkCommandBuffer[0];
+        this.txoptimizations$blitPool     = 0L;
+        this.txoptimizations$blits        = new VkCommandBuffer[0];
+        this.txoptimizations$blitTextures = new Object[0];
     }
 
     @Unique
-    private VkCommandBuffer txoptimizations$blit(int index, long source, int mip, int width, int height) {
+    private VkCommandBuffer txoptimizations$blit(int index, VulkanGpuTexture texture, long source, int mip, int width, int height) {
         if (this.txoptimizations$blits.length != this.swapchainImages.size())
             this.txoptimizations$allocateBlits();
 
         VkCommandBuffer blit = this.txoptimizations$blits[index];
 
-        if (this.txoptimizations$blitSwapchains[index] == this.swapchain && this.txoptimizations$blitSources[index] == source && this.txoptimizations$blitMips[index] == mip && this.txoptimizations$blitWidths[index] == width && this.txoptimizations$blitHeights[index] == height)
+        if (this.txoptimizations$blitSwapchains[index] == this.swapchain && this.txoptimizations$blitTextures[index] == texture && this.txoptimizations$blitSources[index] == source && this.txoptimizations$blitMips[index] == mip && this.txoptimizations$blitWidths[index] == width && this.txoptimizations$blitHeights[index] == height)
             return blit;
 
         if (this.txoptimizations$blitSwapchains[index] != 0L)
@@ -182,6 +190,7 @@ public abstract class VulkanGpuSurfaceBlitReuseMixin {
 
         this.txoptimizations$record(blit, this.swapchainImages.getLong(index), source, mip, width, height);
         this.txoptimizations$blitSwapchains[index] = this.swapchain;
+        this.txoptimizations$blitTextures[index]   = texture;
         this.txoptimizations$blitSources[index]    = source;
         this.txoptimizations$blitMips[index]       = mip;
         this.txoptimizations$blitWidths[index]     = width;
@@ -226,6 +235,7 @@ public abstract class VulkanGpuSurfaceBlitReuseMixin {
 
             this.txoptimizations$blits          = blits;
             this.txoptimizations$blitSwapchains = new long[count];
+            this.txoptimizations$blitTextures   = new Object[count];
             this.txoptimizations$blitSources    = new long[count];
             this.txoptimizations$blitMips       = new int[count];
             this.txoptimizations$blitWidths     = new int[count];
