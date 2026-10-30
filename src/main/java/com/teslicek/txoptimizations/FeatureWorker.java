@@ -142,30 +142,12 @@ final class FeatureWorker {
             Runnable next = this.job.getAndSet(null);
 
             if (next == null) {
-                if (!this.spinForJob())
-                    LockSupport.park();
-
+                LockSupport.park();
                 continue;
             }
 
             this.run(next);
         }
-    }
-
-    private boolean spinForJob() {
-        if (!FrameSpin.isFastFrames())
-            return false;
-
-        long deadline = System.nanoTime() + FrameSpin.SPIN_NANOS;
-
-        while (this.job.get() == null) {
-            if (System.nanoTime() - deadline > 0L)
-                return false;
-
-            Thread.onSpinWait();
-        }
-
-        return true;
     }
 
     private void run(Runnable next) {
