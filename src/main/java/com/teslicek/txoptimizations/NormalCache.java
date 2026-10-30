@@ -10,7 +10,6 @@ public final class NormalCache {
 
     private static final Direction[] DIRECTIONS = Direction.values();
     private static final int[]       OPPOSITES  = opposites();
-    private static final Direction[] AXES       = {Direction.DOWN, Direction.NORTH, Direction.WEST};
     private static final int         ALL        = (1 << DIRECTIONS.length) - 1;
     private static final int[]       MATRIX     = new int[9];
     private static final int[]       PACKED     = new int[DIRECTIONS.length];
@@ -52,13 +51,11 @@ public final class NormalCache {
         if (known == ALL)
             return;
 
-        for (Direction direction : AXES) {
-            int index  = direction.ordinal();
-            int normal = pack(pose, direction.getUnitVec3f());
+        Matrix3f matrix = pose.normal();
 
-            PACKED[index]            = normal;
-            PACKED[OPPOSITES[index]] = VertexBytes.flipNormal(normal);
-        }
+        keepAxis(Direction.DOWN, packed(-matrix.m10, -matrix.m11, -matrix.m12, pose.trustedNormals));
+        keepAxis(Direction.NORTH, packed(-matrix.m20, -matrix.m21, -matrix.m22, pose.trustedNormals));
+        keepAxis(Direction.WEST, packed(-matrix.m00, -matrix.m01, -matrix.m02, pose.trustedNormals));
 
         known = ALL;
     }
@@ -104,12 +101,23 @@ public final class NormalCache {
         float    ny     = Math.fma(matrix.m01, x, Math.fma(matrix.m11, y, matrix.m21 * z));
         float    nz     = Math.fma(matrix.m02, x, Math.fma(matrix.m12, y, matrix.m22 * z));
 
-        if (pose.trustedNormals)
+        return packed(nx, ny, nz, pose.trustedNormals);
+    }
+
+    private static int packed(float nx, float ny, float nz, boolean trusted) {
+        if (trusted)
             return VertexBytes.packNormal(nx, ny, nz);
 
         float scalar = Math.invsqrt(Math.fma(nx, nx, Math.fma(ny, ny, nz * nz)));
 
         return VertexBytes.packNormal(nx * scalar, ny * scalar, nz * scalar);
+    }
+
+    private static void keepAxis(Direction direction, int normal) {
+        int index = direction.ordinal();
+
+        PACKED[index]            = normal;
+        PACKED[OPPOSITES[index]] = VertexBytes.flipNormal(normal);
     }
 
     private static boolean matches(Matrix3f matrix) {
