@@ -101,6 +101,12 @@ public abstract class QuadParticleGroupPositionsMixin extends ParticleGroup<Sing
     @Unique
     private boolean txoptimizations$ahead;
 
+    @Unique
+    private Camera txoptimizations$aheadCamera;
+
+    @Unique
+    private float txoptimizations$aheadPartialTick;
+
     protected QuadParticleGroupPositionsMixin(ParticleEngine engine) {
         super(engine);
     }
@@ -110,6 +116,9 @@ public abstract class QuadParticleGroupPositionsMixin extends ParticleGroup<Sing
         if (this.txoptimizations$ahead) {
             this.txoptimizations$ahead = false;
             ParticleWorker.join();
+
+            if (camera != this.txoptimizations$aheadCamera || Float.compare(partialTickTime, this.txoptimizations$aheadPartialTick) != 0)
+                throw new IllegalStateException("Particles were extracted ahead for camera " + this.txoptimizations$aheadCamera + " at " + this.txoptimizations$aheadPartialTick + " but are drawn for " + camera + " at " + partialTickTime);
 
             return this.particleTypeRenderState;
         }
@@ -130,7 +139,9 @@ public abstract class QuadParticleGroupPositionsMixin extends ParticleGroup<Sing
         if (!this.txoptimizations$offThread || this.txoptimizations$count < MIN_AHEAD_PARTICLES)
             return;
 
-        this.txoptimizations$ahead = true;
+        this.txoptimizations$ahead            = true;
+        this.txoptimizations$aheadCamera      = camera;
+        this.txoptimizations$aheadPartialTick = partialTickTime;
         ParticleWorker.start(() -> this.txoptimizations$extractVisible(frustum, camera, partialTickTime));
     }
 
