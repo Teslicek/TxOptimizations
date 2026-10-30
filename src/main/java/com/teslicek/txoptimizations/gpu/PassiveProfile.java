@@ -5,7 +5,9 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
+import java.time.Instant;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.Arrays;
 import java.util.List;
@@ -36,10 +38,14 @@ public final class PassiveProfile {
     private static final long              BUCKET_NANOS      = 50_000L;
     private static final int               BUCKETS           = 2000;
     private static final int               KEEP_FILES        = 24;
+    private static final int               LONGEST_FRAMES    = 5;
     private static final double[]          PERCENTILES       = {0.5, 0.9, 0.99, 0.999};
     private static final String[]          PERCENTILE_LABELS = {"p50", "p90", "p99", "p99.9"};
     private static final DateTimeFormatter FILE_TIME         = DateTimeFormatter.ofPattern("yyyy-MM-dd_HH.mm.ss");
+    private static final DateTimeFormatter FRAME_TIME        = DateTimeFormatter.ofPattern("HH:mm:ss.SSS");
     private static final int[]             HISTOGRAM         = new int[BUCKETS + 1];
+    private static final long[]            LONGEST_NANOS     = new long[LONGEST_FRAMES];
+    private static final long[]            LONGEST_AT        = new long[LONGEST_FRAMES];
     private static final ExecutorService   WRITER            = Executors.newSingleThreadExecutor(Thread.ofPlatform().name("TxOptimizations Passive Profile").daemon().factory());
 
     private static Recording recording;
@@ -79,6 +85,9 @@ public final class PassiveProfile {
         windowFrames ++;
         windowNanos += frameNanos;
         longestNanos = Math.max(longestNanos, frameNanos);
+
+        if (frameNanos > LONGEST_NANOS[LONGEST_FRAMES - 1])
+            keepLongest(frameNanos);
         HISTOGRAM[(int) Math.min(frameNanos / BUCKET_NANOS, BUCKETS)] ++;
 
         if (now - windowStart < WINDOW_NANOS)
@@ -90,6 +99,8 @@ public final class PassiveProfile {
         Path      directory = minecraft.gameDirectory.toPath().resolve(DIRECTORY);
 
         Arrays.fill(HISTOGRAM, 0);
+        Arrays.fill(LONGEST_NANOS, 0L);
+        Arrays.fill(LONGEST_AT, 0L);
         windowStart  = now;
         windowNanos  = 0L;
         longestNanos = 0L;
@@ -105,7 +116,25 @@ public final class PassiveProfile {
         for (int index = 0; index < PERCENTILES.length; index ++)
             summary.append(String.format(Locale.ROOT, ", %s %.2f ms", PERCENTILE_LABELS[index], percentileMillis(PERCENTILES[index])));
 
+        summary.append(System.lineSeparator()).append("Longest frames:");
+
+        for (int index = 0; index < LONGEST_FRAMES && LONGEST_NANOS[index] != 0L; index ++)
+            summary.append(String.format(Locale.ROOT, " %.3f ms ending %s", LONGEST_NANOS[index] / 1.0e6, FRAME_TIME.format(LocalDateTime.ofInstant(Instant.ofEpochMilli(LONGEST_AT[index]), ZoneId.systemDefault()))));
+
         return summary.append(System.lineSeparator()).append(ProfileContext.capture(minecraft)).toString();
+    }
+
+    private static void keepLongest(long frameNanos) {
+        int slot = LONGEST_FRAMES - 1;
+
+        while (slot > 0 && LONGEST_NANOS[slot - 1] < frameNanos) {
+            LONGEST_NANOS[slot] = LONGEST_NANOS[slot - 1];
+            LONGEST_AT[slot]    = LONGEST_AT[slot - 1];
+            slot --;
+        }
+
+        LONGEST_NANOS[slot] = frameNanos;
+        LONGEST_AT[slot]    = System.currentTimeMillis();
     }
 
     private static double percentileMillis(double percentile) {
