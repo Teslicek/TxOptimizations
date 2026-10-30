@@ -6,8 +6,6 @@ import java.util.Objects;
 
 public final class DynamicStateCache {
 
-    public static final long ALL_DESCRIPTORS = -1L;
-
     private static long     commandBuffer;
     private static boolean  viewportSet;
     private static float    viewportWidth;
@@ -21,7 +19,6 @@ public final class DynamicStateCache {
     private static long     descriptorLayout;
     private static int      descriptorCount;
     private static Object[] descriptors = new Object[16];
-    private static long     pushedLayout;
 
     private DynamicStateCache() {
     }
@@ -44,19 +41,13 @@ public final class DynamicStateCache {
         return true;
     }
 
-    public static long changedDescriptors(long buffer, long layout, long pipelineLayout, ReferenceList<Object> values) {
-        int     count   = values.size();
-        boolean known   = buffer == commandBuffer && layout == descriptorLayout && count == descriptorCount;
-        long    changed = known ? differingDescriptors(values, count) : ALL_DESCRIPTORS;
+    public static boolean changesDescriptors(long buffer, long layout, ReferenceList<Object> values) {
+        int count = values.size();
 
-        if (changed == 0L)
-            return 0L;
-
-        if (pipelineLayout != pushedLayout || count > Long.SIZE)
-            changed = ALL_DESCRIPTORS;
+        if (buffer == commandBuffer && layout == descriptorLayout && count == descriptorCount && matchesDescriptors(values, count))
+            return false;
 
         track(buffer);
-        pushedLayout = pipelineLayout;
 
         if (descriptors.length < count)
             descriptors = new Object[count];
@@ -65,7 +56,7 @@ public final class DynamicStateCache {
         descriptorLayout = layout;
         descriptorCount  = count;
 
-        return changed;
+        return true;
     }
 
     public static boolean changesViewport(long buffer, float width, float height) {
@@ -105,26 +96,18 @@ public final class DynamicStateCache {
         forgetDescriptors();
     }
 
-    private static long differingDescriptors(ReferenceList<Object> values, int count) {
-        long differing = 0L;
-
-        for (int index = 0; index < Math.min(count, Long.SIZE); index ++) {
+    private static boolean matchesDescriptors(ReferenceList<Object> values, int count) {
+        for (int index = 0; index < count; index ++) {
             if (!Objects.equals(descriptors[index], values.get(index)))
-                differing |= 1L << index;
+                return false;
         }
 
-        for (int index = Long.SIZE; index < count; index ++) {
-            if (!Objects.equals(descriptors[index], values.get(index)))
-                return ALL_DESCRIPTORS;
-        }
-
-        return differing;
+        return true;
     }
 
     private static void forgetDescriptors() {
         Arrays.fill(descriptors, 0, descriptorCount, null);
         descriptorLayout = 0L;
         descriptorCount  = 0;
-        pushedLayout     = 0L;
     }
 }
