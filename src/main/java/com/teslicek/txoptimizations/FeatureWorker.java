@@ -33,7 +33,6 @@ final class FeatureWorker {
     private int                             inlineFrames;
     private int                             probeFrames = PROBE_FRAMES;
     private long                            inlineSince;
-    private long                            wakeNanos;
     private boolean                         inline;
     private boolean                         probing;
 
@@ -75,11 +74,7 @@ final class FeatureWorker {
         this.done    = false;
         this.failure = null;
         this.job.set(() -> this.prepare(worker, renderers, submits));
-
-        long wakeStart = System.nanoTime();
-
         LockSupport.unpark(this.thread);
-        this.wakeNanos = System.nanoTime() - wakeStart;
     }
 
     void finish(StagedVertexBuffer main) {
@@ -95,7 +90,7 @@ final class FeatureWorker {
         while (!this.done)
             Thread.onSpinWait();
 
-        this.recordFrame(System.nanoTime() - waitStart + this.wakeNanos, this.jobNanos);
+        this.recordFrame(System.nanoTime() - waitStart, this.jobNanos);
 
         this.groups.clear();
 
