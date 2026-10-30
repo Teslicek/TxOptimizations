@@ -6,6 +6,8 @@ public interface DirectVertexBuffer {
 
     VertexFormat txoptimizations$format();
 
+    int txoptimizations$vertexCount();
+
     long txoptimizations$tryReserveVertices(VertexFormat format, int count);
 
     boolean txoptimizations$duplicatesVertices();

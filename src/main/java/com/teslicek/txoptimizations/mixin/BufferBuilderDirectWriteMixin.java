@@ -57,6 +57,11 @@ public abstract class BufferBuilderDirectWriteMixin implements DirectVertexBuffe
     }
 
     @Override
+    public int txoptimizations$vertexCount() {
+        return this.vertices;
+    }
+
+    @Override
     public long txoptimizations$tryReserveVertices(VertexFormat format, int count) {
         if (count <= 0)
             throw new IllegalArgumentException("Cannot reserve " + count + " vertices");

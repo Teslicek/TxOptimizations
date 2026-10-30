@@ -5,6 +5,8 @@ import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.blaze3d.vertex.VertexConsumer;
 import com.teslicek.txoptimizations.CubeVertices;
 import com.teslicek.txoptimizations.DirectVertexBuffer;
+import com.teslicek.txoptimizations.GpuCube;
+import com.teslicek.txoptimizations.GpuCubes;
 import com.teslicek.txoptimizations.NormalCache;
 import com.teslicek.txoptimizations.PositionTransform;
 import com.teslicek.txoptimizations.VertexBytes;
@@ -20,7 +22,7 @@ import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.Unique;
 
 @Mixin(value = ModelPart.Cube.class, priority = 999)
-public abstract class ModelPartCubeDirectWriteMixin {
+public abstract class ModelPartCubeDirectWriteMixin implements GpuCube {
 
     @Shadow
     @Final
@@ -50,6 +52,12 @@ public abstract class ModelPartCubeDirectWriteMixin {
     @Unique
     private boolean txoptimizations$flattenedBox;
 
+    @Unique
+    private float @Nullable [] txoptimizations$gpuValues;
+
+    @Unique
+    private int txoptimizations$gpuIndex;
+
     @Overwrite
     public void compile(PoseStack.Pose pose, VertexConsumer builder, int lightCoords, int overlayCoords, int color) {
         if (NormalCache.usable() && this.txoptimizations$tryPut(pose, builder, lightCoords, overlayCoords, color))
@@ -70,6 +78,21 @@ public abstract class ModelPartCubeDirectWriteMixin {
                 builder.addVertex(position.x(), position.y(), position.z(), color, vertex.u(), vertex.v(), overlayCoords, lightCoords, nx, ny, nz);
             }
         }
+    }
+
+    @Override
+    public int txoptimizations$gpuIndex() {
+        float[] values = this.txoptimizations$values;
+
+        if (values == null || !this.txoptimizations$flattenedBox)
+            throw new IllegalStateException("A cube without flattened values was sent to the GPU");
+
+        if (values != this.txoptimizations$gpuValues) {
+            this.txoptimizations$gpuIndex  = GpuCubes.register(values);
+            this.txoptimizations$gpuValues = values;
+        }
+
+        return this.txoptimizations$gpuIndex;
     }
 
     @Unique
@@ -98,7 +121,7 @@ public abstract class ModelPartCubeDirectWriteMixin {
         float[] values = this.polygons.length == CubeVertices.FACES ? this.txoptimizations$values() : null;
 
         if (values != null)
-            return CubeVertices.tryPut(pose, values, builder, lightCoords, overlayCoords, color);
+            return GpuCubes.tryAdd(pose, this, builder, lightCoords, overlayCoords, color) || CubeVertices.tryPut(pose, values, builder, lightCoords, overlayCoords, color);
 
         int vertices = 0;
 

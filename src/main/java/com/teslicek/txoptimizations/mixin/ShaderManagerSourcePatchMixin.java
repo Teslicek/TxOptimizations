@@ -2,6 +2,7 @@ package com.teslicek.txoptimizations.mixin;
 
 import com.llamalad7.mixinextras.injector.ModifyExpressionValue;
 import com.llamalad7.mixinextras.sugar.Local;
+import com.teslicek.txoptimizations.GpuCubes;
 import com.teslicek.txoptimizations.PackedTerrain;
 import com.teslicek.txoptimizations.RgssShortcut;
 import com.teslicek.txoptimizations.SkyFarPlane;
@@ -15,7 +16,7 @@ public abstract class ShaderManagerSourcePatchMixin {
 
     @ModifyExpressionValue(method = "loadShader", at = @At(value = "INVOKE", target = "Lnet/minecraft/server/packs/resources/Resource;readAllAsString()Ljava/lang/String;"))
     private static String txoptimizations$patchSources(String contents, @Local(argsOnly = true) Identifier location) {
-        return PackedTerrain.patch(location, SkyFarPlane.patch(location, contents));
+        return GpuCubes.patch(location, PackedTerrain.patch(location, SkyFarPlane.patch(location, contents)));
     }
 
     @ModifyExpressionValue(method = "loadInclude", at = @At(value = "INVOKE", target = "Lnet/minecraft/server/packs/resources/Resource;readAllAsString()Ljava/lang/String;"))

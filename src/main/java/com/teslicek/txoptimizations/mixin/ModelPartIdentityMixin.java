@@ -1,5 +1,6 @@
 package com.teslicek.txoptimizations.mixin;
 
+import com.teslicek.txoptimizations.GpuCubes;
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.blaze3d.vertex.VertexConsumer;
 import com.teslicek.txoptimizations.ArrayMapValues;
@@ -70,6 +71,8 @@ public abstract class ModelPartIdentityMixin {
 
     @Overwrite
     private void compile(PoseStack.Pose pose, VertexConsumer builder, int lightCoords, int overlayCoords, int color) {
+        GpuCubes.beginPart();
+
         for (int index = 0; index < this.cubes.size(); index ++)
             this.cubes.get(index).compile(pose, builder, lightCoords, overlayCoords, color);
     }

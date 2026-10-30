@@ -6,6 +6,8 @@ import com.mojang.renderpearl.api.buffers.GpuBuffer;
 import com.mojang.renderpearl.api.buffers.GpuBufferSlice;
 import com.mojang.renderpearl.api.commands.RenderPass;
 import com.mojang.renderpearl.api.pipeline.RenderPipeline;
+import com.teslicek.txoptimizations.GpuCubeDraw;
+import com.teslicek.txoptimizations.GpuCubes;
 import com.teslicek.txoptimizations.TextureList;
 import com.teslicek.txoptimizations.TextureUniformBinding;
 import java.util.List;
@@ -15,6 +17,10 @@ import org.spongepowered.asm.mixin.Final;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Overwrite;
 import org.spongepowered.asm.mixin.Shadow;
+import org.spongepowered.asm.mixin.Unique;
+import org.spongepowered.asm.mixin.injection.At;
+import org.spongepowered.asm.mixin.injection.Inject;
+import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 @Mixin(value = PreparedRenderType.class, priority = 999)
 public abstract class PreparedRenderTypeDrawMixin {
@@ -35,12 +41,57 @@ public abstract class PreparedRenderTypeDrawMixin {
     @Final
     private List<PreparedRenderType.Texture> textures;
 
+    @Inject(method = "drawFromBufferOit", at = @At("HEAD"))
+    private void txoptimizations$refuseOitCubes(CallbackInfo ci) {
+        GpuCubes.requirePendingDrawn();
+    }
+
     @Overwrite
     private void draw(StagedVertexBuffer.ExecuteInfo info, RenderPass renderPass, RenderPipeline renderPipeline) {
         renderPass.pushDebugGroup(() -> "Render Type " + this.name);
 
+        GpuCubeDraw cubes = GpuCubes.takePending();
+
+        if (cubes == null) {
+            this.txoptimizations$bind(renderPass, renderPipeline);
+            this.txoptimizations$drawVertices(info, renderPass, 0, info.indexCount());
+            renderPass.popDebugGroup();
+
+            return;
+        }
+
+        for (int segment = 0; segment < cubes.txoptimizations$segments(); segment ++) {
+            int start  = cubes.txoptimizations$segmentStart(segment);
+            int length = cubes.txoptimizations$segmentLength(segment);
+
+            if (cubes.txoptimizations$isCubeSegment(segment)) {
+                this.txoptimizations$bind(renderPass, GpuCubes.variant(renderPipeline));
+                GpuCubes.bindCubes(renderPass, cubes.txoptimizations$batch());
+                GpuCubes.drawCubes(renderPass, start, length);
+                continue;
+            }
+
+            if (start % 4 != 0 || length % 4 != 0)
+                throw new IllegalStateException("Vertices between GPU cubes do not form whole quads: " + length + " vertices from " + start);
+
+            this.txoptimizations$bind(renderPass, renderPipeline);
+            this.txoptimizations$drawVertices(info, renderPass, start / 4 * 6, length / 4 * 6);
+        }
+
+        renderPass.popDebugGroup();
+    }
+
+    @Unique
+    private void txoptimizations$drawVertices(StagedVertexBuffer.ExecuteInfo info, RenderPass renderPass, int firstIndex, int indexCount) {
         GpuBuffer indexBuffer = info.indexBuffer();
 
+        renderPass.setVertexBuffer(0, info.vertexBuffer().slice());
+        renderPass.setIndexBuffer(indexBuffer, info.indexType());
+        renderPass.drawIndexed(indexCount, 1, info.firstIndex() + firstIndex, info.baseVertex(), 0);
+    }
+
+    @Unique
+    private void txoptimizations$bind(RenderPass renderPass, RenderPipeline renderPipeline) {
         renderPass.setPipeline(RenderSystem.getCompiledPipeline(renderPipeline));
 
         if (this.scissorState.enabled())
@@ -48,7 +99,6 @@ public abstract class PreparedRenderTypeDrawMixin {
 
         RenderSystem.bindDefaultUniforms(renderPass);
         renderPass.setUniform("DynamicTransforms", this.dynamicTransforms);
-        renderPass.setVertexBuffer(0, info.vertexBuffer().slice());
 
         if (this.textures instanceof TextureList list) {
             TextureUniformBinding binding = (TextureUniformBinding) renderPass;
@@ -62,9 +112,5 @@ public abstract class PreparedRenderTypeDrawMixin {
                 renderPass.setUniform(texture.name(), texture.textureView(), texture.sampler());
             }
         }
-
-        renderPass.setIndexBuffer(indexBuffer, info.indexType());
-        renderPass.drawIndexed(info.indexCount(), 1, info.firstIndex(), info.baseVertex(), 0);
-        renderPass.popDebugGroup();
     }
 }
