@@ -99,6 +99,9 @@ public abstract class LevelRendererSectionDrawMixin {
     private int[][] txoptimizations$builtRecords = new int[0][];
 
     @Unique
+    private int[] txoptimizations$builtVersions = new int[0];
+
+    @Unique
     private int txoptimizations$builtSize = -1;
 
     @Unique
@@ -227,6 +230,7 @@ public abstract class LevelRendererSectionDrawMixin {
         int                                     size          = this.visibleSections.size();
         SectionRenderDispatcher.RenderSection[] builtSections = this.txoptimizations$builtSections(size);
         int[][]                                 builtRecords  = this.txoptimizations$builtRecords;
+        int[]                                   builtVersions = this.txoptimizations$builtVersions;
 
         for (int chunkStart = 0; chunkStart < size; chunkStart += CHUNK) {
             int chunkSize = Math.min(CHUNK, size - chunkStart);
@@ -240,6 +244,7 @@ public abstract class LevelRendererSectionDrawMixin {
 
                 builtSections[chunkStart + index] = section;
                 builtRecords[chunkStart + index]  = chunkRecords[index];
+                builtVersions[chunkStart + index] = chunkRecords[index] == null ? 0 : DrawRecords.version(chunkRecords[index]);
             }
 
             for (int index = 0; index < chunkSize; index ++) {
@@ -300,11 +305,13 @@ public abstract class LevelRendererSectionDrawMixin {
         Object[]                                visible       = this.visibleSections.elements();
         SectionRenderDispatcher.RenderSection[] builtSections = this.txoptimizations$builtSections;
         int[][]                                 builtRecords  = this.txoptimizations$builtRecords;
+        int[]                                   builtVersions = this.txoptimizations$builtVersions;
 
         for (int index = 0; index < size; index ++) {
             SectionRenderDispatcher.RenderSection section = (SectionRenderDispatcher.RenderSection) visible[index];
+            int[]                                 record  = ((SectionDrawRecord) section).txoptimizations$sectionDrawRecord();
 
-            if (section != builtSections[index] || ((SectionDrawRecord) section).txoptimizations$sectionDrawRecord() != builtRecords[index])
+            if (section != builtSections[index] || record != builtRecords[index] || record != null && DrawRecords.version(record) != builtVersions[index])
                 return false;
         }
 
@@ -320,6 +327,7 @@ public abstract class LevelRendererSectionDrawMixin {
 
             this.txoptimizations$builtSections = new SectionRenderDispatcher.RenderSection[capacity];
             this.txoptimizations$builtRecords  = new int[capacity][];
+            this.txoptimizations$builtVersions = new int[capacity];
         }
 
         Arrays.fill(this.txoptimizations$builtSections, size, this.txoptimizations$builtSections.length, null);

@@ -14,7 +14,8 @@ public final class DrawRecords {
     public static final int FIRST_INDEX   = 5;
 
     private static final int FLAGS            = 0;
-    private static final int HEADER           = 1;
+    private static final int VERSION          = 1;
+    private static final int HEADER           = 2;
     private static final int MAX_LAYERS       = 3;
     private static final int LAYER_MASK       = (1 << MAX_LAYERS) - 1;
     private static final int DRAWABLE_SHIFT   = MAX_LAYERS;
@@ -62,6 +63,10 @@ public final class DrawRecords {
 
     public static void changed() {
         GENERATION.incrementAndGet();
+    }
+
+    public static int version(int[] record) {
+        return record[VERSION];
     }
 
     public static int flags(int[] record) {
@@ -123,14 +128,14 @@ public final class DrawRecords {
         }
 
         record[FLAGS] |= 1 << DRAWABLE_SHIFT + layer;
-        changed();
+        record[VERSION] ++;
     }
 
     public static void clearDrawable(int[] record, int layer) {
         requireBlock(record, layer);
 
         record[FLAGS] &= ~(1 << DRAWABLE_SHIFT + layer);
-        changed();
+        record[VERSION] ++;
     }
 
     private static int requireBlock(int[] record, int layer) {
