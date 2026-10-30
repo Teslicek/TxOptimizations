@@ -3,9 +3,11 @@ package com.teslicek.txoptimizations.mixin;
 import com.teslicek.txoptimizations.ClientClock;
 import com.teslicek.txoptimizations.FrustumBoxTest;
 import com.teslicek.txoptimizations.FrustumPlanes;
+import com.teslicek.txoptimizations.ParticleExtractAhead;
 import com.teslicek.txoptimizations.ParticleLightShare;
 import com.teslicek.txoptimizations.ParticleGroupChanges;
 import com.teslicek.txoptimizations.ParticleSnapshot;
+import com.teslicek.txoptimizations.ParticleWorker;
 import java.util.Arrays;
 import net.minecraft.CrashReport;
 import net.minecraft.CrashReportCategory;
@@ -29,7 +31,7 @@ import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.Unique;
 
 @Mixin(value = QuadParticleGroup.class, priority = 999)
-public abstract class QuadParticleGroupPositionsMixin extends ParticleGroup<SingleQuadParticle> {
+public abstract class QuadParticleGroupPositionsMixin extends ParticleGroup<SingleQuadParticle> implements ParticleExtractAhead {
 
     @Unique
     private static final int AXES = 3;
@@ -45,6 +47,9 @@ public abstract class QuadParticleGroupPositionsMixin extends ParticleGroup<Sing
 
     @Unique
     private static final int BOUNDS = 6;
+
+    @Unique
+    private static final int MIN_AHEAD_PARTICLES = 512;
 
     @Unique
     private static final double[] PLANES = FrustumPlanes.newPlanes();
@@ -90,14 +95,47 @@ public abstract class QuadParticleGroupPositionsMixin extends ParticleGroup<Sing
     @Unique
     private long txoptimizations$snapshotTick = -1L;
 
+    @Unique
+    private boolean txoptimizations$offThread;
+
+    @Unique
+    private boolean txoptimizations$ahead;
+
     protected QuadParticleGroupPositionsMixin(ParticleEngine engine) {
         super(engine);
     }
 
     @Overwrite
     public ParticleGroupRenderState extractRenderState(Frustum frustum, Camera camera, float partialTickTime) {
+        if (this.txoptimizations$ahead) {
+            this.txoptimizations$ahead = false;
+            ParticleWorker.join();
+
+            return this.particleTypeRenderState;
+        }
+
+        this.txoptimizations$snapshot();
+        this.txoptimizations$extractVisible(frustum, camera, partialTickTime);
+
+        return this.particleTypeRenderState;
+    }
+
+    @Override
+    public void txoptimizations$extractAhead(Frustum frustum, Camera camera, float partialTickTime) {
+        if (this.txoptimizations$ahead)
+            throw new IllegalStateException("Particles were extracted ahead twice in one frame");
+
         this.txoptimizations$snapshot();
 
+        if (!this.txoptimizations$offThread || this.txoptimizations$count < MIN_AHEAD_PARTICLES)
+            return;
+
+        this.txoptimizations$ahead = true;
+        ParticleWorker.start(() -> this.txoptimizations$extractVisible(frustum, camera, partialTickTime));
+    }
+
+    @Unique
+    private void txoptimizations$extractVisible(Frustum frustum, Camera camera, float partialTickTime) {
         double[] positions = this.txoptimizations$positions;
         double[] bounds    = this.txoptimizations$bounds;
         Object[] order     = this.txoptimizations$order;
@@ -122,8 +160,6 @@ public abstract class QuadParticleGroupPositionsMixin extends ParticleGroup<Sing
                     this.txoptimizations$extract((SingleQuadParticle) order[index], index, camera, partialTickTime);
             }
         }
-
-        return this.particleTypeRenderState;
     }
 
     @Unique
@@ -152,6 +188,7 @@ public abstract class QuadParticleGroupPositionsMixin extends ParticleGroup<Sing
         double[] bounds    = this.txoptimizations$bounds;
         Object[] order     = this.txoptimizations$order;
         int      index     = 0;
+        boolean  offThread = true;
 
         Arrays.fill(order, count, order.length, null);
         ParticleLightShare.begin();
@@ -166,6 +203,8 @@ public abstract class QuadParticleGroupPositionsMixin extends ParticleGroup<Sing
                 txoptimizations$include(bounds, (index >> BLOCK_SHIFT) * BOUNDS, (index & BLOCK - 1) == 0, particle.x, particle.y, particle.z);
 
                 ((ParticleSnapshot) particle).txoptimizations$snapshot(this.txoptimizations$floats, index * ParticleSnapshot.FLOATS, this.txoptimizations$ints, index * ParticleSnapshot.INTS, this.txoptimizations$refs, index * ParticleSnapshot.REFS, this.txoptimizations$previous, index * AXES);
+
+                offThread = offThread && txoptimizations$runsOffThread(particle, this.txoptimizations$ints[index * ParticleSnapshot.INTS + ParticleSnapshot.FLAGS], this.txoptimizations$refs[index * ParticleSnapshot.REFS + ParticleSnapshot.FACING]);
                 index ++;
             }
         } finally {
@@ -173,8 +212,20 @@ public abstract class QuadParticleGroupPositionsMixin extends ParticleGroup<Sing
         }
 
         this.txoptimizations$count           = index;
+        this.txoptimizations$offThread       = offThread;
         this.txoptimizations$snapshotChanges = changes;
         this.txoptimizations$snapshotTick    = tick;
+    }
+
+    @Unique
+    private static boolean txoptimizations$runsOffThread(SingleQuadParticle particle, int flags, Object facing) {
+        if ((flags & ParticleSnapshot.STORED) == 0 || (flags & ParticleSnapshot.OWN_LIGHT) != 0)
+            return false;
+
+        if ((flags & ParticleSnapshot.OWN_SIZE) != 0 && !particle.getClass().getName().startsWith("net.minecraft."))
+            return false;
+
+        return facing == SingleQuadParticle.FacingCameraMode.LOOKAT_XYZ || facing == SingleQuadParticle.FacingCameraMode.LOOKAT_Y;
     }
 
     @Unique

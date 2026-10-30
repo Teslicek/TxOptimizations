@@ -195,6 +195,8 @@
     "ItemModelSlotMixin",
     "ParticleGroupTickMixin",
     "QuadParticleGroupPositionsMixin",
+    "LevelExtractorParticleAheadMixin",
+    "ParticleEngineAccessor",
     "PalettedContainerReadsMixin",
     "LevelChunkDeferredSkyLightMixin",
     "LevelChunkSectionCollisionReachMixin",
