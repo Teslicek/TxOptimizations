@@ -149,8 +149,9 @@ public final class DisplayCulling {
         float maxX = Float.NEGATIVE_INFINITY;
         float maxY = Float.NEGATIVE_INFINITY;
         float maxZ = Float.NEGATIVE_INFINITY;
+        int   used = boxMinZ == boxMaxZ ? CubeVertices.CORNERS / 2 : CubeVertices.CORNERS;
 
-        for (int corner = 0; corner < CORNER_X.length; corner ++) {
+        for (int corner = 0; corner < used; corner ++) {
             minX = Math.min(minX, CORNER_X[corner]);
             minY = Math.min(minY, CORNER_Y[corner]);
             minZ = Math.min(minZ, CORNER_Z[corner]);
