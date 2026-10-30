@@ -3,6 +3,7 @@ package com.teslicek.txoptimizations;
 import com.teslicek.txoptimizations.bake.Cushions;
 import com.teslicek.txoptimizations.cull.EntityCulling;
 import com.teslicek.txoptimizations.gpu.GpuPassProfiler;
+import com.teslicek.txoptimizations.gpu.PassiveProfile;
 import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.fabric.api.client.command.v2.ClientCommandRegistrationCallback;
 import net.fabricmc.fabric.api.client.command.v2.ClientCommands;
@@ -15,6 +16,7 @@ public final class TxOptimizationsClient implements ClientModInitializer {
     @Override
     public void onInitializeClient() {
         TxOptimizationsConfig.load();
+        PassiveProfile.start();
         FpsCounter.register();
         EntityCulling.start();
         ClientTickEvents.START_CLIENT_TICK.register(EntityCulling::tick);

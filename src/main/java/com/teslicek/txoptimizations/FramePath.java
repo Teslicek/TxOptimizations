@@ -1,6 +1,7 @@
 package com.teslicek.txoptimizations;
 
 import com.teslicek.txoptimizations.gpu.GpuPassProfiler;
+import com.teslicek.txoptimizations.gpu.PassiveProfile;
 
 public final class FramePath {
 
@@ -84,6 +85,7 @@ public final class FramePath {
 
         lastSubmit = now;
         GpuPassProfiler.recordFrameTime(frameNanos);
+        PassiveProfile.recordFrame(frameNanos);
         FrameSpin.recordFrame(frameNanos);
 
         if (!frameEligible) {
