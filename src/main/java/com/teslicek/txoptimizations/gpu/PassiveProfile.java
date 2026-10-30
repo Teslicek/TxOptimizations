@@ -57,6 +57,28 @@ public final class PassiveProfile {
     private PassiveProfile() {
     }
 
+    public static boolean isEnabled() {
+        return recording != null;
+    }
+
+    public static void setEnabled(boolean enabled) {
+        if (enabled == isEnabled())
+            return;
+
+        if (enabled) {
+            start();
+
+            return;
+        }
+
+        Recording stopped = recording;
+
+        recording   = null;
+        windowStart = 0L;
+        resetWindow();
+        WRITER.execute(stopped::close);
+    }
+
     public static void start() {
         if (recording != null)
             throw new IllegalStateException("The passive profile is already recording");
@@ -74,6 +96,9 @@ public final class PassiveProfile {
     }
 
     public static void recordFrame(long frameNanos) {
+        if (recording == null)
+            return;
+
         long now = System.nanoTime();
 
         if (windowStart == 0L) {
@@ -98,15 +123,11 @@ public final class PassiveProfile {
         String    summary   = summary(minecraft, name, (now - windowStart) / 1.0e9);
         Path      directory = minecraft.gameDirectory.toPath().resolve(DIRECTORY);
 
-        Arrays.fill(HISTOGRAM, 0);
-        Arrays.fill(LONGEST_NANOS, 0L);
-        Arrays.fill(LONGEST_AT, 0L);
-        windowStart  = now;
-        windowNanos  = 0L;
-        longestNanos = 0L;
-        windowFrames = 0;
+        Recording saved = recording;
 
-        WRITER.execute(() -> save(directory, name, summary));
+        windowStart = now;
+        resetWindow();
+        WRITER.execute(() -> save(saved, directory, name, summary));
 
         if (!GpuPassProfiler.isBusy())
             GpuPassProfiler.startBackground();
@@ -170,10 +191,19 @@ public final class PassiveProfile {
         return longestNanos / 1.0e6;
     }
 
-    private static void save(Path directory, String name, String summary) {
+    private static void resetWindow() {
+        Arrays.fill(HISTOGRAM, 0);
+        Arrays.fill(LONGEST_NANOS, 0L);
+        Arrays.fill(LONGEST_AT, 0L);
+        windowNanos  = 0L;
+        longestNanos = 0L;
+        windowFrames = 0;
+    }
+
+    private static void save(Recording saved, Path directory, String name, String summary) {
         try {
             Files.createDirectories(directory);
-            recording.dump(directory.resolve(name + RECORDING));
+            saved.dump(directory.resolve(name + RECORDING));
             Files.writeString(directory.resolve(name + SUMMARY), summary);
             prune(directory);
         } catch (IOException exception) {

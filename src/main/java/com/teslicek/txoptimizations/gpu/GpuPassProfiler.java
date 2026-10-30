@@ -37,6 +37,7 @@ public final class GpuPassProfiler {
     private static final long                                WARMUP_LIMIT    = 10_000_000_000L;
     private static final long                                JIT_WINDOW      = 500_000_000L;
     private static final long                                JIT_QUIET       = 50L;
+    private static final long                                MIN_MEASURED    = 1_000_000_000L;
     private static final CompilationMXBean                   COMPILER        = ManagementFactory.getCompilationMXBean();
     private static final int                                 CHAT_LINES      = 8;
     private static final int                                 SLOW_FRAMES     = 10;
@@ -77,6 +78,7 @@ public final class GpuPassProfiler {
     private static String                context;
     private static String                screenFormats;
     private static boolean               background;
+    private static boolean               stopRequested;
     private static volatile boolean      finishing;
 
     private GpuPassProfiler() {
@@ -94,7 +96,8 @@ public final class GpuPassProfiler {
         if (isBusy())
             throw new IllegalStateException("GPU profile is already running");
 
-        background = inBackground;
+        background    = inBackground;
+        stopRequested = false;
 
         if (!COMPILER.isCompilationTimeMonitoringSupported())
             throw new IllegalStateException("The JVM does not report JIT compilation time, which the profile's warm-up waits on");
@@ -163,6 +166,15 @@ public final class GpuPassProfiler {
 
     public static boolean isRunning() {
         return warming || draining || recording || framesPending > 0;
+    }
+
+    public static boolean requestStop() {
+        if (warming || draining || !recording || System.nanoTime() - measuredFrom < MIN_MEASURED)
+            return false;
+
+        stopRequested = true;
+
+        return true;
     }
 
     public static boolean isBusy() {
@@ -295,7 +307,7 @@ public final class GpuPassProfiler {
         if (recording) {
             mark(frameDevice, frameEncoder, FRAME_END);
             framesPending ++;
-            recording = warming || System.nanoTime() - startNanos < DURATION;
+            recording = !stopRequested && (warming || System.nanoTime() - startNanos < DURATION);
         }
 
         if (warming && isWarmedUp(System.nanoTime())) {

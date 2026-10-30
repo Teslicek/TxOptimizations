@@ -28,6 +28,36 @@ public final class TxOptimizationsClient implements ClientModInitializer {
                 command.getSource().sendFeedback(Component.literal("The next resource reload will log its timings to latest.log"));
 
                 return 1;
+            })).then(ClientCommands.literal("stop").executes(command -> {
+                if (!GpuPassProfiler.isRunning()) {
+                    command.getSource().sendError(Component.literal("No profile is running"));
+
+                    return 0;
+                }
+
+                if (!GpuPassProfiler.requestStop()) {
+                    command.getSource().sendError(Component.literal("The profile is still warming up or has measured less than a second; try again in a moment"));
+
+                    return 0;
+                }
+
+                command.getSource().sendFeedback(Component.literal("Stopping the profile; its report is saved in a moment"));
+
+                return 1;
+            })).then(ClientCommands.literal("background").then(ClientCommands.literal("on").executes(command -> {
+                PassiveProfile.setEnabled(true);
+                command.getSource().sendFeedback(Component.literal("Background profiler is on"));
+
+                return 1;
+            })).then(ClientCommands.literal("off").executes(command -> {
+                PassiveProfile.setEnabled(false);
+                command.getSource().sendFeedback(Component.literal("Background profiler is off"));
+
+                return 1;
+            })).executes(command -> {
+                command.getSource().sendFeedback(Component.literal("Background profiler is " + (PassiveProfile.isEnabled() ? "on" : "off")));
+
+                return 1;
             })).executes(command -> {
                 if (GpuPassProfiler.isBusy()) {
                     command.getSource().sendError(Component.literal("Profile is already running"));
