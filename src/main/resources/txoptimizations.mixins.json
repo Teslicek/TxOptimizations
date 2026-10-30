@@ -330,6 +330,7 @@
     "VulkanCommandEncoderVertexCopyMixin",
     "VulkanGpuBufferDirectMixin",
     "VulkanGpuBufferUnmapMixin",
+    "VulkanGpuSurfaceBlitReuseMixin",
     "VulkanGpuSurfacePresentThreadMixin",
     "VulkanQueueDrainMixin",
     "VulkanRenderPassBindSkipMixin",
