@@ -1,5 +1,7 @@
 package com.teslicek.txoptimizations;
 
+import java.util.concurrent.atomic.AtomicInteger;
+
 public final class DrawRecords {
 
     public static final int NO_BUFFER     = -1;
@@ -23,6 +25,8 @@ public final class DrawRecords {
     private static final int TRANSLUCENT_SIZE = FIRST_INDEX + 1;
     private static final int CUSTOM_INDEX     = 1;
     private static final int INDEX_TYPE_SHIFT = 1;
+
+    private static final AtomicInteger GENERATION = new AtomicInteger();
 
     private DrawRecords() {
     }
@@ -50,6 +54,14 @@ public final class DrawRecords {
         record[FLAGS] = flags;
 
         return record;
+    }
+
+    public static int generation() {
+        return GENERATION.get();
+    }
+
+    public static void changed() {
+        GENERATION.incrementAndGet();
     }
 
     public static int flags(int[] record) {
@@ -111,6 +123,7 @@ public final class DrawRecords {
         }
 
         record[FLAGS] |= 1 << DRAWABLE_SHIFT + layer;
+        changed();
     }
 
     public static void clearDrawable(int[] record, int layer, boolean translucent) {
@@ -125,6 +138,7 @@ public final class DrawRecords {
         }
 
         record[FLAGS] &= ~(1 << DRAWABLE_SHIFT + layer);
+        changed();
     }
 
     private static int requireBlock(int[] record, int layer) {

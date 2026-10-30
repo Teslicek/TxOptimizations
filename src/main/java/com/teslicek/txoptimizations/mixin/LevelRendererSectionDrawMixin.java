@@ -7,6 +7,7 @@ import com.mojang.renderpearl.api.pipeline.PrimitiveTopology;
 import com.mojang.renderpearl.api.textures.GpuTextureView;
 import com.teslicek.txoptimizations.DrawRecords;
 import com.teslicek.txoptimizations.FacingCulling;
+import com.teslicek.txoptimizations.FramePath;
 import com.teslicek.txoptimizations.PackedTerrain;
 import com.teslicek.txoptimizations.SectionDrawList;
 import com.teslicek.txoptimizations.SectionDrawRecord;
@@ -30,6 +31,7 @@ import net.minecraft.client.renderer.texture.TextureAtlas;
 import net.minecraft.client.renderer.texture.TextureManager;
 import net.minecraft.core.SectionPos;
 import net.minecraft.util.Util;
+import net.minecraft.world.phys.Vec3;
 import org.joml.Matrix4fc;
 import org.jspecify.annotations.Nullable;
 import org.spongepowered.asm.mixin.Final;
@@ -86,6 +88,36 @@ public abstract class LevelRendererSectionDrawMixin {
 
     @Unique
     private final float[] txoptimizations$chunkFades = new float[CHUNK];
+
+    @Unique
+    private SectionRenderDispatcher.RenderSection[] txoptimizations$builtSections = new SectionRenderDispatcher.RenderSection[0];
+
+    @Unique
+    private int[][] txoptimizations$builtRecords = new int[0][];
+
+    @Unique
+    private int txoptimizations$builtSize = -1;
+
+    @Unique
+    private int txoptimizations$builtGeneration;
+
+    @Unique
+    private double txoptimizations$builtX;
+
+    @Unique
+    private double txoptimizations$builtY;
+
+    @Unique
+    private double txoptimizations$builtZ;
+
+    @Unique
+    private long txoptimizations$builtFadeDuration;
+
+    @Unique
+    private boolean txoptimizations$builtTranslucentOrder;
+
+    @Unique
+    private boolean txoptimizations$builtPerGroup;
 
     @Overwrite
     public ChunkSectionsToRender prepareChunkRendersIndirect(Matrix4fc modelViewMatrix, boolean respectTranslucentOrder) {
@@ -152,15 +184,29 @@ public abstract class LevelRendererSectionDrawMixin {
         boolean[]       translucent = SectionLayers.TRANSLUCENT;
         SectionDrawList draws       = this.txoptimizations$draws;
 
-        draws.begin(translucent.length, respectTranslucentOrder);
+        if (this.sectionRenderDispatcher == null) {
+            this.txoptimizations$forgetBuiltDraws();
+            draws.begin(translucent.length, respectTranslucentOrder);
 
-        if (this.sectionRenderDispatcher == null)
             return draws.finish();
+        }
 
-        FacingCulling.beginFrame(this.levelRenderState.cameraRenderState.pos);
+        Vec3    camera       = this.levelRenderState.cameraRenderState.pos;
+        long    fadeDuration = Util.toMillis(this.optionsRenderState.chunkSectionFadeInTime);
+        boolean perGroup     = FramePath.frameUsesWorker();
+        int     generation   = DrawRecords.generation();
 
-        long fadeDuration = Util.toMillis(this.optionsRenderState.chunkSectionFadeInTime);
-        long now          = Util.getMillis();
+        if (this.txoptimizations$reusesBuiltDraws(draws, camera, fadeDuration, respectTranslucentOrder, perGroup, generation)) {
+            ProfileCounters.countTerrainDraws(draws);
+            PackedTerrain.setSectionsFading(false);
+
+            return draws;
+        }
+
+        draws.begin(translucent.length, respectTranslucentOrder);
+        FacingCulling.beginFrame(camera);
+
+        long now = Util.getMillis();
 
         SectionRenderDispatcher.RenderSection[] chunkSections = this.txoptimizations$chunkSections;
         int[][]                                 chunkRecords  = this.txoptimizations$chunkRecords;
@@ -171,6 +217,8 @@ public abstract class LevelRendererSectionDrawMixin {
         float[]                                 chunkFades    = this.txoptimizations$chunkFades;
         Object[]                                visible       = this.visibleSections.elements();
         int                                     size          = this.visibleSections.size();
+        SectionRenderDispatcher.RenderSection[] builtSections = this.txoptimizations$builtSections(size);
+        int[][]                                 builtRecords  = this.txoptimizations$builtRecords;
 
         for (int chunkStart = 0; chunkStart < size; chunkStart += CHUNK) {
             int chunkSize = Math.min(CHUNK, size - chunkStart);
@@ -181,6 +229,9 @@ public abstract class LevelRendererSectionDrawMixin {
 
                 chunkSections[index] = section;
                 chunkRecords[index]  = ((SectionDrawRecord) section).txoptimizations$sectionDrawRecord();
+
+                builtSections[chunkStart + index] = section;
+                builtRecords[chunkStart + index]  = chunkRecords[index];
             }
 
             for (int index = 0; index < chunkSize; index ++) {
@@ -216,7 +267,64 @@ public abstract class LevelRendererSectionDrawMixin {
         ProfileCounters.countTerrainDraws(draws);
         PackedTerrain.setSectionsFading(draws.fading());
 
+        this.txoptimizations$builtSize             = size;
+        this.txoptimizations$builtGeneration       = generation;
+        this.txoptimizations$builtX                = camera.x;
+        this.txoptimizations$builtY                = camera.y;
+        this.txoptimizations$builtZ                = camera.z;
+        this.txoptimizations$builtFadeDuration     = fadeDuration;
+        this.txoptimizations$builtTranslucentOrder = respectTranslucentOrder;
+        this.txoptimizations$builtPerGroup         = perGroup;
+
         return draws;
+    }
+
+    @Unique
+    private boolean txoptimizations$reusesBuiltDraws(SectionDrawList draws, Vec3 camera, long fadeDuration, boolean respectTranslucentOrder, boolean perGroup, int generation) {
+        int size = this.visibleSections.size();
+
+        if (size != this.txoptimizations$builtSize || draws.fading() || generation != this.txoptimizations$builtGeneration || perGroup != this.txoptimizations$builtPerGroup || respectTranslucentOrder != this.txoptimizations$builtTranslucentOrder || fadeDuration != this.txoptimizations$builtFadeDuration)
+            return false;
+
+        if (camera.x != this.txoptimizations$builtX || camera.y != this.txoptimizations$builtY || camera.z != this.txoptimizations$builtZ)
+            return false;
+
+        Object[]                                visible       = this.visibleSections.elements();
+        SectionRenderDispatcher.RenderSection[] builtSections = this.txoptimizations$builtSections;
+        int[][]                                 builtRecords  = this.txoptimizations$builtRecords;
+
+        for (int index = 0; index < size; index ++) {
+            SectionRenderDispatcher.RenderSection section = (SectionRenderDispatcher.RenderSection) visible[index];
+
+            if (section != builtSections[index] || ((SectionDrawRecord) section).txoptimizations$sectionDrawRecord() != builtRecords[index])
+                return false;
+        }
+
+        return true;
+    }
+
+    @Unique
+    private SectionRenderDispatcher.RenderSection[] txoptimizations$builtSections(int size) {
+        this.txoptimizations$builtSize = -1;
+
+        if (this.txoptimizations$builtSections.length < size) {
+            int capacity = Math.max(size, this.txoptimizations$builtSections.length * 2);
+
+            this.txoptimizations$builtSections = new SectionRenderDispatcher.RenderSection[capacity];
+            this.txoptimizations$builtRecords  = new int[capacity][];
+        }
+
+        Arrays.fill(this.txoptimizations$builtSections, size, this.txoptimizations$builtSections.length, null);
+        Arrays.fill(this.txoptimizations$builtRecords, size, this.txoptimizations$builtRecords.length, null);
+
+        return this.txoptimizations$builtSections;
+    }
+
+    @Unique
+    private void txoptimizations$forgetBuiltDraws() {
+        this.txoptimizations$builtSize = -1;
+        Arrays.fill(this.txoptimizations$builtSections, null);
+        Arrays.fill(this.txoptimizations$builtRecords, null);
     }
 
     @Unique

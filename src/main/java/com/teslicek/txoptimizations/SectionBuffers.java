@@ -27,6 +27,7 @@ public final class SectionBuffers {
 
         buffers[id] = buffer;
         hashes[id]  = buffer.hashCode();
+        DrawRecords.changed();
 
         return id;
     }
@@ -35,6 +36,7 @@ public final class SectionBuffers {
         for (int id = 0; id < buffers.length; id ++) {
             if (buffers[id] == buffer) {
                 buffers[id] = null;
+                DrawRecords.changed();
                 return;
             }
         }
