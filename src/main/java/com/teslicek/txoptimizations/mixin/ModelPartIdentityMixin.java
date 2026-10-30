@@ -84,7 +84,7 @@ public abstract class ModelPartIdentityMixin {
         if (transformed)
             this.txoptimizations$pushTransform(poseStack);
 
-        if (!this.skipDraw)
+        if (!this.skipDraw && !this.cubes.isEmpty())
             this.compile(poseStack.last(), buffer, lightCoords, overlayCoords, color);
 
         if (this.children instanceof Object2ObjectArrayMap<String, ModelPart> arrayMap) {
