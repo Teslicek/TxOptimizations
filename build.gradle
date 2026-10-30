@@ -30,6 +30,27 @@ dependencies {
     implementation "net.fabricmc.fabric-api:fabric-api:${project.fabric_api_version}"
 }
 
+def buildInfoDirectory = layout.buildDirectory.dir('generated/buildinfo')
+
+tasks.register('buildInfo') {
+    def commit = providers.exec { commandLine 'git', 'rev-parse', 'HEAD' }.standardOutput.asText.map { it.trim() }
+    def dirty  = providers.exec { commandLine 'git', 'status', '--porcelain' }.standardOutput.asText.map { !it.trim().isEmpty() }
+
+    inputs.property 'commit', commit
+    inputs.property 'dirty', dirty
+    outputs.upToDateWhen { false }
+    outputs.dir buildInfoDirectory
+
+    doLast {
+        def file = buildInfoDirectory.get().file('txoptimizations-build.properties').asFile
+
+        file.parentFile.mkdirs()
+        file.text = ["commit=${commit.get()}", "dirty=${dirty.get()}", "built=${java.time.OffsetDateTime.now()}"].join(System.lineSeparator())
+    }
+}
+
+sourceSets.main.resources.srcDir(tasks.named('buildInfo'))
+
 processResources {
     inputs.property "version", project.version
     filteringCharset "UTF-8"

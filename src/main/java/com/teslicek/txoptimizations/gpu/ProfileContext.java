@@ -5,8 +5,11 @@ import com.mojang.renderpearl.api.device.DeviceInfo;
 import java.lang.management.GarbageCollectorMXBean;
 import java.lang.management.ManagementFactory;
 import java.lang.management.MemoryUsage;
+import java.time.OffsetDateTime;
 import java.util.Locale;
 import java.util.stream.Collectors;
+import com.sun.management.OperatingSystemMXBean;
+import net.fabricmc.loader.api.FabricLoader;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.Options;
 import net.minecraft.client.gui.components.debug.DebugScreenEntries;
@@ -26,6 +29,10 @@ final class ProfileContext {
         DeviceInfo    device  = RenderSystem.getDevice().getDeviceInfo();
         MemoryUsage   heap    = ManagementFactory.getMemoryMXBean().getHeapMemoryUsage();
 
+        context.append("Build: ").append(BuildInfo.describe()).append(System.lineSeparator());
+        context.append(String.format(Locale.ROOT, "Captured: %s, game uptime %.1f s%n", OffsetDateTime.now(), ManagementFactory.getRuntimeMXBean().getUptime() / 1000.0));
+        context.append(String.format(Locale.ROOT, "System: %s %s (%s), CPU %s, %d MB RAM%n", System.getProperty("os.name"), System.getProperty("os.version"), System.getProperty("os.arch"), cpu(), ((OperatingSystemMXBean) ManagementFactory.getOperatingSystemMXBean()).getTotalMemorySize() >> 20));
+        context.append("Mods: ").append(FabricLoader.getInstance().getAllMods().stream().map(mod -> mod.getMetadata().getId() + " " + mod.getMetadata().getVersion().getFriendlyString()).sorted().collect(Collectors.joining(", "))).append(System.lineSeparator());
         context.append("Scene: ").append(scene(minecraft));
 
         if (level != null && minecraft.player != null) {
@@ -61,6 +68,18 @@ final class ProfileContext {
             return "server " + server.name + " (" + server.ip + ")";
 
         return "no world";
+    }
+
+    private static String cpu() {
+        if (!System.getProperty("os.name").startsWith("Windows"))
+            return System.getProperty("os.arch");
+
+        String identifier = System.getenv("PROCESSOR_IDENTIFIER");
+
+        if (identifier == null)
+            throw new IllegalStateException("Windows did not set PROCESSOR_IDENTIFIER");
+
+        return identifier;
     }
 
     private static String onOff(boolean value) {
