@@ -74,7 +74,9 @@ final class FeatureWorker {
         this.done    = false;
         this.failure = null;
         this.job.set(() -> this.prepare(worker, renderers, submits));
-        LockSupport.unpark(this.thread);
+
+        if (!PresentThread.wakeWhileSpinning(this.thread))
+            LockSupport.unpark(this.thread);
     }
 
     void finish(StagedVertexBuffer main) {
