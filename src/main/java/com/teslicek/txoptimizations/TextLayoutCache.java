@@ -22,6 +22,7 @@ public final class TextLayoutCache {
     private static final Map<FormattedCharSequence, Width> SEQUENCE_WIDTHS = new IdentityHashMap<>();
     private static final Map<String, Width>                STRING_WIDTHS   = new HashMap<>();
     private static final Map<String, SharedText>           SEQUENCES       = new HashMap<>();
+    private static final Map<FormattedCharSequence, Held>  HELD            = new IdentityHashMap<>();
     private static final Key                               PROBE           = new Key();
 
     private static long lastEviction;
@@ -183,7 +184,26 @@ public final class TextLayoutCache {
     }
 
     public static boolean isRepeated(FormattedCharSequence text) {
-        return text instanceof SharedText shared && shared.repeated;
+        return text instanceof SharedText shared && shared.repeated || HELD.containsKey(text);
+    }
+
+    public static FormattedCharSequence hold(FormattedCharSequence text) {
+        long frame = ClientClock.frame();
+        Held held  = HELD.get(text);
+
+        evictUnused(frame);
+
+        if (held != null) {
+            held.frame = frame;
+            return text;
+        }
+
+        if (HELD.size() >= MAX_ENTRIES)
+            HELD.clear();
+
+        HELD.put(text, new Held(frame));
+
+        return text;
     }
 
     public static void clear() {
@@ -192,6 +212,7 @@ public final class TextLayoutCache {
         SEQUENCE_WIDTHS.clear();
         STRING_WIDTHS.clear();
         SEQUENCES.clear();
+        HELD.clear();
         generation ++;
     }
 
@@ -210,6 +231,7 @@ public final class TextLayoutCache {
         SEQUENCE_WIDTHS.values().removeIf(width -> frame - width.frame > UNUSED_FRAMES);
         STRING_WIDTHS.values().removeIf(width -> frame - width.frame > UNUSED_FRAMES);
         SEQUENCES.values().removeIf(sequence -> frame - sequence.frame > UNUSED_FRAMES);
+        HELD.values().removeIf(held -> frame - held.frame > UNUSED_FRAMES);
     }
 
     private static final class Key {
@@ -255,6 +277,15 @@ public final class TextLayoutCache {
         @Override
         public int hashCode() {
             return this.hash;
+        }
+    }
+
+    private static final class Held {
+
+        private long frame;
+
+        private Held(long frame) {
+            this.frame = frame;
         }
     }
 
