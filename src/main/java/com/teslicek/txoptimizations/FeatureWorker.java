@@ -17,6 +17,8 @@ final class FeatureWorker {
     private static final int  INITIAL_CAPACITY = 1 << 20;
     private static final int  WINDOW_FRAMES    = 64;
     private static final int  PROBE_FRAMES     = 256;
+    private static final int  MAX_PROBE_FRAMES = 16384;
+    private static final long MAX_INLINE_NANOS = 1_000_000_000L;
     private static final long OVERHEAD_NANOS   = 3_000L;
 
     private final AtomicReference<Runnable> job    = new AtomicReference<>();
@@ -29,7 +31,10 @@ final class FeatureWorker {
     private int                             windowFrames;
     private long                            windowSavedNanos;
     private int                             inlineFrames;
+    private int                             probeFrames = PROBE_FRAMES;
+    private long                            inlineSince;
     private boolean                         inline;
+    private boolean                         probing;
 
     FeatureWorker(String name) {
         this.shard  = new StagedVertexBuffer((Supplier<String>) () -> name, INITIAL_CAPACITY);
@@ -50,10 +55,11 @@ final class FeatureWorker {
 
         this.inlineFrames ++;
 
-        if (this.inlineFrames < PROBE_FRAMES)
+        if (this.inlineFrames < PROBE_FRAMES || this.inlineFrames < this.probeFrames && System.nanoTime() - this.inlineSince < MAX_INLINE_NANOS)
             return false;
 
         this.inline       = false;
+        this.probing      = true;
         this.inlineFrames = 0;
 
         return true;
@@ -114,7 +120,12 @@ final class FeatureWorker {
         if (this.windowFrames < WINDOW_FRAMES)
             return;
 
-        this.inline           = this.windowSavedNanos < OVERHEAD_NANOS * WINDOW_FRAMES;
+        boolean idle = this.windowSavedNanos < OVERHEAD_NANOS * WINDOW_FRAMES;
+
+        this.probeFrames      = idle && this.probing ? Math.min(this.probeFrames * 2, MAX_PROBE_FRAMES) : PROBE_FRAMES;
+        this.probing          = false;
+        this.inline           = idle;
+        this.inlineSince      = System.nanoTime();
         this.windowFrames     = 0;
         this.windowSavedNanos = 0L;
     }
