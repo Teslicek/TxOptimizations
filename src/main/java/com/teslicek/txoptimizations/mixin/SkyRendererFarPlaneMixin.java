@@ -35,7 +35,7 @@ public abstract class SkyRendererFarPlaneMixin {
 
     @ModifyExpressionValue(method = "*", at = @At(value = "FIELD", target = "Lnet/minecraft/client/renderer/RenderPipelines;CELESTIAL:Lcom/mojang/renderpearl/api/pipeline/RenderPipeline;"))
     private RenderPipeline txoptimizations$farCelestial(RenderPipeline pipeline) {
-        return SkyFarPlane.isDrawing() ? SkyFarPlane.CELESTIAL : pipeline;
+        return SkyFarPlane.isDrawing() ? SkyFarPlane.celestial() : pipeline;
     }
 
     @ModifyExpressionValue(method = "*", at = @At(value = "FIELD", target = "Lnet/minecraft/client/renderer/RenderPipelines;END_SKY:Lcom/mojang/renderpearl/api/pipeline/RenderPipeline;"))

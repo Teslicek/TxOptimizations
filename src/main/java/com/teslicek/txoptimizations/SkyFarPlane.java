@@ -24,9 +24,10 @@ public final class SkyFarPlane {
 
     private static final String            DEFINE         = "TX_FAR_PLANE";
     private static final String            POSITION       = "gl_Position = ProjMat * ModelViewMat * vec4(Position, 1.0);";
-    private static final Set<String>       SHADERS        = Set.of("shaders/core/sky.vsh", "shaders/core/stars.vsh", "shaders/core/position_color.vsh", "shaders/core/position_tex.vsh", "shaders/core/position_tex_color.vsh");
+    private static final Set<String>       SHADERS        = Set.of("shaders/core/sky.vsh", "shaders/core/stars.vsh", "shaders/core/position_color.vsh", "shaders/core/position_tex.vsh");
     private static final Set<String>       PATCHED        = ConcurrentHashMap.newKeySet();
     private static final DepthStencilState BEHIND_TERRAIN = new DepthStencilState(CompareOp.GREATER_THAN_OR_EQUAL, false);
+    private static final DepthStencilState FAR_BOUNDS     = new DepthStencilState(CompareOp.ALWAYS_PASS, false);
 
     public static final RenderPipeline SKY = RenderPipeline.builder()
         .withBindGroupLayout(BindGroupLayouts.GLOBALS)
@@ -93,12 +94,25 @@ public final class SkyFarPlane {
         .withLocation(Identifier.fromNamespaceAndPath("txoptimizations", "pipeline/end_sky_far"))
         .withVertexShader("core/position_tex_color")
         .withFragmentShader("core/position_tex_color")
-        .withShaderDefine(DEFINE)
         .withBindGroupLayout(BindGroupLayouts.SAMPLER0)
         .withColorTargetState(new ColorTargetState(BlendFunction.TRANSLUCENT))
         .withVertexBinding(0, DefaultVertexFormat.POSITION_TEX_COLOR)
         .withPrimitiveTopology(PrimitiveTopology.QUADS)
-        .withDepthStencilState(BEHIND_TERRAIN)
+        .withDepthStencilState(FAR_BOUNDS)
+        .build();
+
+    public static final RenderPipeline END_FLASH = RenderPipeline.builder()
+        .withBindGroupLayout(BindGroupLayouts.GLOBALS)
+        .withBindGroupLayout(BindGroupLayouts.PROJECTION)
+        .withBindGroupLayout(BindGroupLayouts.DYNAMIC_TRANSFORMS)
+        .withLocation(Identifier.fromNamespaceAndPath("txoptimizations", "pipeline/end_flash_far"))
+        .withVertexShader("core/position_tex")
+        .withFragmentShader("core/position_tex")
+        .withBindGroupLayout(BindGroupLayouts.SAMPLER0)
+        .withColorTargetState(new ColorTargetState(BlendFunction.OVERLAY))
+        .withVertexBinding(0, DefaultVertexFormat.POSITION_TEX)
+        .withPrimitiveTopology(PrimitiveTopology.QUADS)
+        .withDepthStencilState(FAR_BOUNDS)
         .build();
 
     private static SkyRenderer    deferredRenderer;
@@ -106,6 +120,7 @@ public final class SkyFarPlane {
     private static SkyRenderState deferredState;
     private static RenderPass     hostPass;
     private static boolean        drawing;
+    private static boolean        drawingEnd;
 
     private SkyFarPlane() {
     }
@@ -126,7 +141,13 @@ public final class SkyFarPlane {
     }
 
     public static boolean canDefer(SkyRenderState state, boolean improvedTransparency) {
-        return (state.skybox == DimensionType.Skybox.OVERWORLD || state.skybox == DimensionType.Skybox.END) && !improvedTransparency && PATCHED.size() == SHADERS.size();
+        if (improvedTransparency)
+            return false;
+
+        if (state.skybox == DimensionType.Skybox.END)
+            return DepthBounds.enabled();
+
+        return state.skybox == DimensionType.Skybox.OVERWORLD && PATCHED.size() == SHADERS.size();
     }
 
     public static void defer(SkyRenderer renderer, GpuBufferSlice fog, SkyRenderState state) {
@@ -152,11 +173,13 @@ public final class SkyFarPlane {
         deferredState    = null;
         hostPass         = mainPass;
         drawing          = true;
+        drawingEnd       = state.skybox == DimensionType.Skybox.END;
 
         renderer.render(fog, state);
 
-        drawing  = false;
-        hostPass = null;
+        drawing    = false;
+        drawingEnd = false;
+        hostPass   = null;
     }
 
     public static RenderPass hostPass(GpuTextureView color, GpuTextureView depth) {
@@ -173,5 +196,9 @@ public final class SkyFarPlane {
 
     public static boolean isDrawing() {
         return drawing;
+    }
+
+    public static RenderPipeline celestial() {
+        return drawingEnd ? END_FLASH : CELESTIAL;
     }
 }
