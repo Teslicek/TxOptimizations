@@ -4,6 +4,7 @@ import com.mojang.blaze3d.systems.SamplerCache;
 import com.mojang.renderpearl.api.textures.FilterMode;
 import com.mojang.renderpearl.api.textures.GpuSampler;
 import com.mojang.renderpearl.api.textures.GpuTextureView;
+import com.teslicek.txoptimizations.ClampedSampler;
 import com.teslicek.txoptimizations.TextureList;
 import com.teslicek.txoptimizations.TextureManagerVersion;
 import java.util.List;
@@ -50,6 +51,9 @@ public abstract class RenderSetupTextureCacheMixin {
 
     @Unique
     private int txoptimizations$texturesVersion;
+
+    @Unique
+    private static ClampedSampler txoptimizations$clamped;
 
     @Overwrite
     public List<PreparedRenderType.Texture> prepareTextures(TextureManager textureManager, SamplerCache samplerCache, GpuTextureView overlayTexture, GpuTextureView lightmapTexture) {
@@ -127,7 +131,7 @@ public abstract class RenderSetupTextureCacheMixin {
     @Unique
     private boolean txoptimizations$matches(TextureList prepared, TextureManager textureManager, SamplerCache samplerCache, GpuTextureView overlayTexture, GpuTextureView lightmapTexture) {
         int        index   = 0;
-        GpuSampler clamped = this.useOverlay || this.useLightmap ? samplerCache.getClampToEdge(FilterMode.LINEAR) : null;
+        GpuSampler clamped = this.useOverlay || this.useLightmap ? txoptimizations$clampedLinear(samplerCache) : null;
 
         if (this.useOverlay && !txoptimizations$same(prepared.get(index ++), overlayTexture, clamped))
             return false;
@@ -146,6 +150,18 @@ public abstract class RenderSetupTextureCacheMixin {
         }
 
         return true;
+    }
+
+    @Unique
+    private static GpuSampler txoptimizations$clampedLinear(SamplerCache samplerCache) {
+        ClampedSampler clamped = txoptimizations$clamped;
+
+        if (clamped == null || clamped.cache() != samplerCache) {
+            clamped                 = new ClampedSampler(samplerCache, samplerCache.getClampToEdge(FilterMode.LINEAR));
+            txoptimizations$clamped = clamped;
+        }
+
+        return clamped.sampler();
     }
 
     @Unique

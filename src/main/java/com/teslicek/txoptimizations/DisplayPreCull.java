@@ -90,15 +90,20 @@ public final class DisplayPreCull {
     public static void remember(Display.ItemDisplay display, ItemDisplayEntityRenderState state) {
         ItemDisplayCullCache cache       = (ItemDisplayCullCache) display;
         Display.RenderState  renderState = display.renderState();
-        ItemModel            model       = plainModel(display);
+        Object               models      = Minecraft.getInstance().getModelManager().bakedItemStackModels;
 
-        if (state.interpolationProgress != 1.0F || renderState == null || model == null || display.itemRenderState() == null) {
+        if (state.interpolationProgress != 1.0F || renderState == null || display.itemRenderState() == null) {
             cache.txoptimizations$forget();
             return;
         }
 
-        if (cache.txoptimizations$matches(renderState, display.itemRenderState(), model))
+        if (cache.txoptimizations$matches(renderState, display.itemRenderState(), models))
             return;
+
+        if (plainModel(display) == null) {
+            cache.txoptimizations$forget();
+            return;
+        }
 
         AABB box = ((ItemCullingBounds) state.item).txoptimizations$cullingBounds();
 
@@ -115,7 +120,7 @@ public final class DisplayPreCull {
             radius = Math.max(radius, CORNER.length());
         }
 
-        cache.txoptimizations$remember(renderState, display.itemRenderState(), model, radius);
+        cache.txoptimizations$remember(renderState, display.itemRenderState(), models, radius);
     }
 
     public static boolean isHidden(Display.ItemDisplay display, float partialTicks) {
@@ -128,9 +133,7 @@ public final class DisplayPreCull {
         if (renderState == null || display.hasCustomName() || display.getVehicle() != null || renderState.shadowRadius().get(1.0F) != 0.0F)
             return false;
 
-        ItemModel model = plainModel(display);
-
-        if (model == null || !cache.txoptimizations$matches(renderState, display.itemRenderState(), model) || display.calculateInterpolationProgress(partialTicks) != 1.0F)
+        if (!cache.txoptimizations$matches(renderState, display.itemRenderState(), Minecraft.getInstance().getModelManager().bakedItemStackModels) || display.calculateInterpolationProgress(partialTicks) != 1.0F)
             return false;
 
         float  radius = Math.max(cache.txoptimizations$radius(), Math.abs(display.getEyeHeight()) + HITBOX_REACH) + RADIUS_SLACK;

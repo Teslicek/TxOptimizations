@@ -1,7 +1,6 @@
 package com.teslicek.txoptimizations.mixin;
 
 import com.teslicek.txoptimizations.ItemDisplayCullCache;
-import net.minecraft.client.renderer.item.ItemModel;
 import net.minecraft.world.entity.Display;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Unique;
@@ -16,14 +15,14 @@ public abstract class ItemDisplayCullCacheMixin implements ItemDisplayCullCache 
     private Display.ItemDisplay.ItemRenderState txoptimizations$cullItemState;
 
     @Unique
-    private ItemModel txoptimizations$cullModel;
+    private Object txoptimizations$cullModels;
 
     @Unique
     private float txoptimizations$cullRadius;
 
     @Override
-    public boolean txoptimizations$matches(Display.RenderState renderState, Display.ItemDisplay.ItemRenderState itemState, ItemModel model) {
-        return this.txoptimizations$cullModel == model && this.txoptimizations$cullRenderState == renderState && this.txoptimizations$cullItemState == itemState;
+    public boolean txoptimizations$matches(Display.RenderState renderState, Display.ItemDisplay.ItemRenderState itemState, Object models) {
+        return this.txoptimizations$cullModels == models && this.txoptimizations$cullRenderState == renderState && this.txoptimizations$cullItemState == itemState;
     }
 
     @Override
@@ -32,10 +31,10 @@ public abstract class ItemDisplayCullCacheMixin implements ItemDisplayCullCache 
     }
 
     @Override
-    public void txoptimizations$remember(Display.RenderState renderState, Display.ItemDisplay.ItemRenderState itemState, ItemModel model, float radius) {
+    public void txoptimizations$remember(Display.RenderState renderState, Display.ItemDisplay.ItemRenderState itemState, Object models, float radius) {
         this.txoptimizations$cullRenderState = renderState;
         this.txoptimizations$cullItemState   = itemState;
-        this.txoptimizations$cullModel       = model;
+        this.txoptimizations$cullModels      = models;
         this.txoptimizations$cullRadius      = radius;
     }
 
@@ -43,6 +42,6 @@ public abstract class ItemDisplayCullCacheMixin implements ItemDisplayCullCache 
     public void txoptimizations$forget() {
         this.txoptimizations$cullRenderState = null;
         this.txoptimizations$cullItemState   = null;
-        this.txoptimizations$cullModel       = null;
+        this.txoptimizations$cullModels      = null;
     }
 }
