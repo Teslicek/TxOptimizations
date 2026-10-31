@@ -69,6 +69,7 @@ public final class GpuCubes {
         .withUniform("TxCubeRefs", UniformType.TEXEL_BUFFER, GpuFormat.RG32_UINT)
         .build();
 
+    private static final int[]                               FACE_KEYS   = new int[CubeVertices.FACES];
     private static final Map<RenderPipeline, RenderPipeline> VARIANTS    = new IdentityHashMap<>();
     private static final Map<RenderPipeline, Boolean>        ELIGIBLE    = new IdentityHashMap<>();
     private static final List<GpuBuffer>                     RETIRED     = new ArrayList<>();
@@ -155,7 +156,14 @@ public final class GpuCubes {
             partSlot = batch.pose(pose, partLight, partOverlay, partColor);
         }
 
-        draw.txoptimizations$addCube(batch.addRef(shape, partSlot), draw.txoptimizations$rawVertices() + ((DirectVertexBuffer) builder).txoptimizations$vertexCount());
+        int ref = batch.addRef(shape, partSlot);
+
+        draw.txoptimizations$addCube(ref, draw.txoptimizations$rawVertices() + ((DirectVertexBuffer) builder).txoptimizations$vertexCount());
+
+        if (draw.txoptimizations$isSorted()) {
+            CubeVertices.faceKeys(partPose.pose(), statics, shape * STATIC_FLOATS, FACE_KEYS, 0);
+            draw.txoptimizations$addSortedKeys(ref, FACE_KEYS);
+        }
 
         return true;
     }
@@ -167,7 +175,7 @@ public final class GpuCubes {
     public static boolean accepts(VertexFormat format, PrimitiveTopology topology, @Nullable VertexSorting sorting, @Nullable PreparedRenderType prepared) {
         refreshShaders();
 
-        if (prepared == null || format != DefaultVertexFormat.ENTITY || topology != PrimitiveTopology.QUADS || sorting != null || !isEligible(prepared.pipeline()))
+        if (prepared == null || format != DefaultVertexFormat.ENTITY || topology != PrimitiveTopology.QUADS || sorting != null && sorting != VertexSorting.DISTANCE_TO_ORIGIN || !isEligible(prepared.pipeline()))
             return false;
 
         OitPipelineSet oit = prepared.oitPipelineSet();
@@ -284,6 +292,14 @@ public final class GpuCubes {
     public static void requestIndices(int cubeCount) {
         if (cubeCount > 0)
             RenderSystem.getSequentialBuffer(PrimitiveTopology.QUADS).requestIndexCount(cubeCount * CUBE_INDICES);
+    }
+
+    public static float[] shapes() {
+        return statics;
+    }
+
+    public static int shapeFloats() {
+        return STATIC_FLOATS;
     }
 
     public static void writePose(long address, PoseStack.Pose pose, int light, int overlay, int color) {

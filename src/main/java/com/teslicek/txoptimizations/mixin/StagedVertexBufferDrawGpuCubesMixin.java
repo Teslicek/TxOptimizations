@@ -30,6 +30,9 @@ public abstract class StagedVertexBufferDrawGpuCubesMixin implements GpuCubeDraw
     @Unique
     private static final int VALUES = 3;
 
+    @Unique
+    private static final int FACES = 6;
+
     @Shadow
     @Final
     private VertexFormat format;
@@ -71,6 +74,30 @@ public abstract class StagedVertexBufferDrawGpuCubesMixin implements GpuCubeDraw
 
     @Unique
     private boolean txoptimizations$finished;
+
+    @Unique
+    private int[] txoptimizations$sortedRefs = new int[0];
+
+    @Unique
+    private int[] txoptimizations$sortedKeys = new int[0];
+
+    @Unique
+    private int txoptimizations$sortedCubes;
+
+    @Unique
+    private int txoptimizations$sortedMode;
+
+    @Unique
+    private int txoptimizations$firstIndex;
+
+    @Unique
+    private int txoptimizations$indexCount;
+
+    @Unique
+    private long txoptimizations$vertexOffset;
+
+    @Unique
+    private long txoptimizations$vertexBytes;
 
     @Override
     public void txoptimizations$setBatch(GpuCubeBatch batch) {
@@ -167,6 +194,77 @@ public abstract class StagedVertexBufferDrawGpuCubesMixin implements GpuCubeDraw
     @Override
     public int txoptimizations$segmentLength(int segment) {
         return this.txoptimizations$segments[segment * VALUES + 2];
+    }
+
+    @Override
+    public boolean txoptimizations$isSorted() {
+        return this.quadSorting != null;
+    }
+
+    @Override
+    public void txoptimizations$addSortedKeys(int ref, int[] keys) {
+        int cube = this.txoptimizations$sortedCubes;
+
+        if (cube == this.txoptimizations$sortedRefs.length) {
+            this.txoptimizations$sortedRefs = Arrays.copyOf(this.txoptimizations$sortedRefs, Math.max(16, cube * 2));
+            this.txoptimizations$sortedKeys = Arrays.copyOf(this.txoptimizations$sortedKeys, this.txoptimizations$sortedRefs.length * FACES);
+        }
+
+        if (cube == 0)
+            this.txoptimizations$batch().addSortedDraw(this);
+
+        this.txoptimizations$sortedRefs[cube] = ref;
+        System.arraycopy(keys, 0, this.txoptimizations$sortedKeys, cube * FACES, FACES);
+        this.txoptimizations$sortedCubes ++;
+    }
+
+    @Override
+    public int txoptimizations$sortedCubes() {
+        return this.txoptimizations$sortedCubes;
+    }
+
+    @Override
+    public int[] txoptimizations$sortedRefs() {
+        return this.txoptimizations$sortedRefs;
+    }
+
+    @Override
+    public int[] txoptimizations$sortedKeys() {
+        return this.txoptimizations$sortedKeys;
+    }
+
+    @Override
+    public void txoptimizations$setSortedDraw(boolean expanded, int firstIndex, int indexCount, long vertexOffset, long vertexBytes) {
+        this.txoptimizations$sortedMode   = expanded ? 2 : 1;
+        this.txoptimizations$firstIndex   = firstIndex;
+        this.txoptimizations$indexCount   = indexCount;
+        this.txoptimizations$vertexOffset = vertexOffset;
+        this.txoptimizations$vertexBytes  = vertexBytes;
+    }
+
+    @Override
+    public int txoptimizations$sortedMode() {
+        return this.txoptimizations$sortedMode;
+    }
+
+    @Override
+    public int txoptimizations$firstIndex() {
+        return this.txoptimizations$firstIndex;
+    }
+
+    @Override
+    public int txoptimizations$indexCount() {
+        return this.txoptimizations$indexCount;
+    }
+
+    @Override
+    public long txoptimizations$vertexOffset() {
+        return this.txoptimizations$vertexOffset;
+    }
+
+    @Override
+    public long txoptimizations$vertexBytes() {
+        return this.txoptimizations$vertexBytes;
     }
 
     @Unique

@@ -5,6 +5,7 @@ import com.mojang.blaze3d.systems.ScissorState;
 import com.mojang.renderpearl.api.buffers.GpuBuffer;
 import com.mojang.renderpearl.api.buffers.GpuBufferSlice;
 import com.mojang.renderpearl.api.commands.RenderPass;
+import com.mojang.renderpearl.api.pipeline.IndexType;
 import com.mojang.renderpearl.api.pipeline.RenderPipeline;
 import com.teslicek.txoptimizations.GpuCubeDraw;
 import com.teslicek.txoptimizations.GpuCubes;
@@ -52,6 +53,13 @@ public abstract class PreparedRenderTypeDrawMixin {
             return;
         }
 
+        if (cubes.txoptimizations$isSorted()) {
+            this.txoptimizations$drawSorted(cubes, renderPass, renderPipeline);
+            renderPass.popDebugGroup();
+
+            return;
+        }
+
         for (int segment = 0; segment < cubes.txoptimizations$segments(); segment ++) {
             int start  = cubes.txoptimizations$segmentStart(segment);
             int length = cubes.txoptimizations$segmentLength(segment);
@@ -71,6 +79,25 @@ public abstract class PreparedRenderTypeDrawMixin {
         }
 
         renderPass.popDebugGroup();
+    }
+
+    @Unique
+    private void txoptimizations$drawSorted(GpuCubeDraw cubes, RenderPass renderPass, RenderPipeline renderPipeline) {
+        GpuBuffer buffer = cubes.txoptimizations$batch().sortedBuffer();
+        int       mode   = cubes.txoptimizations$sortedMode();
+
+        if (mode == 1) {
+            this.txoptimizations$bind(renderPass, GpuCubes.variant(renderPipeline));
+            GpuCubes.bindCubes(renderPass, cubes.txoptimizations$batch());
+        } else if (mode == 2) {
+            this.txoptimizations$bind(renderPass, renderPipeline);
+            renderPass.setVertexBuffer(0, buffer.slice(cubes.txoptimizations$vertexOffset(), cubes.txoptimizations$vertexBytes()));
+        } else {
+            throw new IllegalStateException("A sorted draw with GPU cubes was not sorted before drawing");
+        }
+
+        renderPass.setIndexBuffer(buffer, IndexType.INT);
+        renderPass.drawIndexed(cubes.txoptimizations$indexCount(), 1, cubes.txoptimizations$firstIndex(), 0, 0);
     }
 
     @Unique

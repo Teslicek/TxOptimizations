@@ -40,7 +40,7 @@ public abstract class StagedVertexBufferGpuCubesMixin {
             ((GpuCubeBuilder) this.lastVertexBuilder).txoptimizations$setCubeDraw(null);
     }
 
-    @Inject(method = "upload", at = @At("HEAD"))
+    @Inject(method = "upload", at = {@At(value = "INVOKE", target = "Lnet/minecraft/client/renderer/StagedVertexBuffer;uploadDrawsToBuffers(Lcom/mojang/renderpearl/api/device/GpuDevice;Ljava/util/List;Lcom/mojang/renderpearl/api/buffers/GpuBuffer;Lcom/mojang/renderpearl/api/buffers/GpuBuffer;II)V"), @At("RETURN")})
     private void txoptimizations$uploadCubes(CallbackInfo ci) {
         this.txoptimizations$cubes.upload(RenderSystem.getDevice());
     }

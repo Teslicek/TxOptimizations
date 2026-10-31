@@ -25,4 +25,26 @@ public interface GpuCubeDraw {
     int txoptimizations$segmentStart(int segment);
 
     int txoptimizations$segmentLength(int segment);
+
+    boolean txoptimizations$isSorted();
+
+    void txoptimizations$addSortedKeys(int ref, int[] keys);
+
+    int txoptimizations$sortedCubes();
+
+    int[] txoptimizations$sortedRefs();
+
+    int[] txoptimizations$sortedKeys();
+
+    void txoptimizations$setSortedDraw(boolean expanded, int firstIndex, int indexCount, long vertexOffset, long vertexBytes);
+
+    int txoptimizations$sortedMode();
+
+    int txoptimizations$firstIndex();
+
+    int txoptimizations$indexCount();
+
+    long txoptimizations$vertexOffset();
+
+    long txoptimizations$vertexBytes();
 }

@@ -156,6 +156,42 @@ public final class CubeVertices {
         }
     }
 
+    public static void faceKeys(Matrix4fc matrix, float[] shapes, int shape, int[] keys, int at) {
+        Faces faces = shapes[shape + MIRROR] == 0.0F ? PLAIN : MIRRORED;
+
+        transformCorners(matrix, shapes[shape + BOUNDS], shapes[shape + BOUNDS + 1], shapes[shape + BOUNDS + 2], shapes[shape + BOUNDS + 3], shapes[shape + BOUNDS + 4], shapes[shape + BOUNDS + 5], X, Y, Z);
+
+        byte[] corners = faces.corners();
+
+        for (int face = 0; face < FACES; face ++) {
+            int first = corners[face * FACE_VERTICES];
+            int third = corners[face * FACE_VERTICES + 2];
+
+            keys[at + face] = DistanceSorting.originKey((X[first] + X[third]) / 2.0F, (Y[first] + Y[third]) / 2.0F, (Z[first] + Z[third]) / 2.0F);
+        }
+    }
+
+    public static void putShape(long pointer, Matrix4fc matrix, float[] shapes, int shape, int colorBits, long coordinates, int[] normals) {
+        Faces faces = shapes[shape + MIRROR] == 0.0F ? PLAIN : MIRRORED;
+
+        transformCorners(matrix, shapes[shape + BOUNDS], shapes[shape + BOUNDS + 1], shapes[shape + BOUNDS + 2], shapes[shape + BOUNDS + 3], shapes[shape + BOUNDS + 4], shapes[shape + BOUNDS + 5], X, Y, Z);
+
+        byte[] corners = faces.corners();
+        int[]  facing  = faces.normals();
+
+        for (int face = 0; face < FACES; face ++) {
+            int normal = normals[facing[face]];
+
+            for (int slot = 0; slot < FACE_VERTICES; slot ++) {
+                int index  = face * FACE_VERTICES + slot;
+                int corner = corners[index];
+
+                VertexBytes.putEntityBits(pointer, X[corner], Y[corner], Z[corner], colorBits, shapes[shape + UVS + index * 2], shapes[shape + UVS + index * 2 + 1], coordinates, normal);
+                pointer += VertexBytes.ENTITY_STRIDE;
+            }
+        }
+    }
+
     public static void putTextured(long pointer, TexturedVertexLayout layout, Matrix4f matrix, float[] values, int color, int light, UvMapping mapping) {
         Faces faces = values[MIRROR] == 0.0F ? PLAIN : MIRRORED;
 
