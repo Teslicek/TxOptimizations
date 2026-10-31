@@ -18,6 +18,9 @@ import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Overwrite;
 import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.Unique;
+import org.spongepowered.asm.mixin.injection.At;
+import org.spongepowered.asm.mixin.injection.Inject;
+import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 @Mixin(value = ItemStackRenderState.class, priority = 999)
 public abstract class ItemStackRenderStateBoundsMixin implements ItemCullingBounds {
@@ -37,6 +40,12 @@ public abstract class ItemStackRenderStateBoundsMixin implements ItemCullingBoun
     @Unique
     private ItemBoundsCache.Entry txoptimizations$lastBounds;
 
+    @Unique
+    private AABB txoptimizations$cullingFor;
+
+    @Unique
+    private AABB txoptimizations$culling;
+
     @Shadow
     public abstract void visitExtents(Consumer<Vector3fc> output);
 
@@ -50,16 +59,37 @@ public abstract class ItemStackRenderStateBoundsMixin implements ItemCullingBoun
         return this.cachedModelBoundingBox;
     }
 
+    @Inject(method = "clear", at = @At("HEAD"))
+    private void txoptimizations$forgetCulling(CallbackInfo ci) {
+        this.txoptimizations$cullingFor = null;
+        this.txoptimizations$culling    = null;
+    }
+
     @Override
     public AABB txoptimizations$cullingBounds() {
+        AABB model = this.cachedModelBoundingBox;
+
+        if (model != null && model == this.txoptimizations$cullingFor)
+            return this.txoptimizations$culling;
+
+        AABB bounds = this.txoptimizations$cullable() ? this.getModelBoundingBox() : null;
+
+        this.txoptimizations$cullingFor = this.getModelBoundingBox();
+        this.txoptimizations$culling    = bounds;
+
+        return bounds;
+    }
+
+    @Unique
+    private boolean txoptimizations$cullable() {
         for (int index = 0; index < this.activeLayerCount; index ++) {
             ItemLayerRenderStateAccessor layer = (ItemLayerRenderStateAccessor) this.layers[index];
 
             if (layer.txoptimizations$extents().get().length == 0 || !txoptimizations$hasNoMeshQuads(this.layers[index]) || layer.txoptimizations$specialRenderer() != null && !DisplayCulling.isVanilla(layer.txoptimizations$specialRenderer()))
-                return null;
+                return false;
         }
 
-        return this.getModelBoundingBox();
+        return true;
     }
 
     @Unique

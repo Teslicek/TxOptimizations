@@ -203,6 +203,7 @@
     "ModelPartCubeDirectWriteMixin",
     "BakedQuadGpuShapeMixin",
     "BlitRenderStateDirectWriteMixin",
+    "EntityRenderDistanceMixin",
     "ColoredRectangleRenderStateDirectWriteMixin",
     "VulkanFeatureSetsDepthBoundsMixin",
     "VulkanDeviceDepthBoundsMixin",
