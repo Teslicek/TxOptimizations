@@ -2,6 +2,7 @@ package com.teslicek.txoptimizations.mixin;
 
 import com.llamalad7.mixinextras.sugar.Local;
 import com.teslicek.txoptimizations.ItemModelLookup;
+import com.teslicek.txoptimizations.ItemModelPurity;
 import net.minecraft.client.renderer.item.ClientItem;
 import net.minecraft.client.renderer.item.ItemModel;
 import net.minecraft.client.renderer.item.ItemModelResolver;
@@ -28,6 +29,10 @@ public abstract class ItemModelResolverLookupMixin {
 
     @Redirect(method = "appendItemLayers", at = @At(value = "INVOKE", target = "Lnet/minecraft/client/renderer/item/ItemModelResolver;getItemModel(Lnet/minecraft/resources/Identifier;)Lnet/minecraft/client/renderer/item/ItemModel;"))
     private ItemModel txoptimizations$cachedModel(ItemModelResolver resolver, Identifier modelId, @Local(argsOnly = true) ItemStack item) {
-        return ItemModelLookup.model(this.modelManager, item.getItem(), modelId);
+        ItemModel model = ItemModelLookup.model(this.modelManager, item.getItem(), modelId);
+
+        ItemModelPurity.checkModel(model);
+
+        return model;
     }
 }
