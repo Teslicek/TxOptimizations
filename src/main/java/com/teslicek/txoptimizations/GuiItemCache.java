@@ -6,6 +6,7 @@ import java.util.Map;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.item.ItemModelResolver;
 import net.minecraft.client.renderer.item.TrackingItemStackRenderState;
+import net.minecraft.world.entity.ItemOwner;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.item.ItemDisplayContext;
 import net.minecraft.world.item.ItemStack;
@@ -51,7 +52,7 @@ public final class GuiItemCache {
         return entry.state;
     }
 
-    public static void resolve(ItemModelResolver resolver, TrackingItemStackRenderState state, ItemStack stack, ItemDisplayContext context, @Nullable Level level, @Nullable LivingEntity owner, int seed) {
+    public static void resolve(ItemModelResolver resolver, TrackingItemStackRenderState state, ItemStack stack, ItemDisplayContext context, @Nullable Level level, @Nullable ItemOwner owner, int seed) {
         Entry entry = pending;
 
         if (entry == null || entry.state != state)
