@@ -80,8 +80,12 @@ public final class GpuCubes {
     private static int                     uploadedCubes;
     private static @Nullable GpuBuffer     staticBuffer;
     private static int                     staticCapacity;
-    private static long                    partCall;
     private static int                     generation;
+    private static PoseStack.@Nullable Pose partPose;
+    private static int                     partLight;
+    private static int                     partOverlay;
+    private static int                     partColor;
+    private static int                     partSlot;
     private static boolean                 reloaded;
     private static @Nullable GpuCubeDraw   pending;
     private static @Nullable PipelineCache checkedCache;
@@ -100,17 +104,8 @@ public final class GpuCubes {
         return source.replace(EXTENSION, EXTENSIONS).replace(INPUTS, "#ifdef " + DEFINE + "\n" + loader() + "#else\n" + INPUTS + "#endif\n").replace(MAIN, LOAD);
     }
 
-    public static void beginPart() {
-        if (NormalCache.usable())
-            partCall ++;
-    }
-
     public static int generation() {
         return generation;
-    }
-
-    public static long partCall() {
-        return partCall;
     }
 
     public static int register(float[] values) {
@@ -125,22 +120,48 @@ public final class GpuCubes {
         return cubes ++;
     }
 
-    public static boolean tryAdd(PoseStack.Pose pose, GpuCube cube, VertexConsumer builder, int light, int overlay, int color) {
-        if (!(builder instanceof GpuCubeBuilder target) || builder.getClass() != BufferBuilder.class)
-            return false;
+    public static @Nullable GpuCubeDraw beginPart(PoseStack.Pose pose, VertexConsumer builder, int light, int overlay, int color) {
+        if (!NormalCache.usable() || builder.getClass() != BufferBuilder.class)
+            return null;
 
-        GpuCubeDraw draw = target.txoptimizations$cubeDraw();
+        GpuCubeDraw draw = ((GpuCubeBuilder) builder).txoptimizations$cubeDraw();
 
         if (draw == null || !draw.txoptimizations$acceptsCubes())
+            return null;
+
+        partPose    = pose;
+        partLight   = light;
+        partOverlay = overlay;
+        partColor   = color;
+        partSlot    = -1;
+
+        return draw;
+    }
+
+    public static boolean add(GpuCubeDraw draw, GpuCube cube, VertexConsumer builder) {
+        int shape = cube.txoptimizations$gpuIndex();
+
+        if (shape < 0)
             return false;
 
-        GpuCubeBatch batch    = draw.txoptimizations$batch();
-        int          poseSlot = batch.pose(pose, light, overlay, color);
-        int          ref      = batch.addRef(cube.txoptimizations$gpuIndex(), poseSlot);
+        GpuCubeBatch batch = draw.txoptimizations$batch();
 
-        draw.txoptimizations$addCube(ref, draw.txoptimizations$rawVertices() + ((DirectVertexBuffer) builder).txoptimizations$vertexCount());
+        if (partSlot < 0) {
+            PoseStack.Pose pose = partPose;
+
+            if (pose == null)
+                throw new IllegalStateException("A GPU cube was added outside a model part");
+
+            partSlot = batch.pose(pose, partLight, partOverlay, partColor);
+        }
+
+        draw.txoptimizations$addCube(batch.addRef(shape, partSlot), draw.txoptimizations$rawVertices() + ((DirectVertexBuffer) builder).txoptimizations$vertexCount());
 
         return true;
+    }
+
+    public static void endPart() {
+        partPose = null;
     }
 
     public static boolean accepts(VertexFormat format, PrimitiveTopology topology, @Nullable VertexSorting sorting, @Nullable PreparedRenderType prepared) {

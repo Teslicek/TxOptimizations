@@ -1,9 +1,11 @@
 package com.teslicek.txoptimizations.mixin;
 
-import com.teslicek.txoptimizations.GpuCubes;
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.blaze3d.vertex.VertexConsumer;
 import com.teslicek.txoptimizations.ArrayMapValues;
+import com.teslicek.txoptimizations.GpuCube;
+import com.teslicek.txoptimizations.GpuCubeDraw;
+import com.teslicek.txoptimizations.GpuCubes;
 import com.teslicek.txoptimizations.ModelRotation;
 import it.unimi.dsi.fastutil.objects.Object2ObjectArrayMap;
 import java.util.List;
@@ -71,10 +73,17 @@ public abstract class ModelPartIdentityMixin {
 
     @Overwrite
     private void compile(PoseStack.Pose pose, VertexConsumer builder, int lightCoords, int overlayCoords, int color) {
-        GpuCubes.beginPart();
+        GpuCubeDraw draw = GpuCubes.beginPart(pose, builder, lightCoords, overlayCoords, color);
 
-        for (int index = 0; index < this.cubes.size(); index ++)
-            this.cubes.get(index).compile(pose, builder, lightCoords, overlayCoords, color);
+        for (int index = 0; index < this.cubes.size(); index ++) {
+            ModelPart.Cube cube = this.cubes.get(index);
+
+            if (draw == null || !GpuCubes.add(draw, (GpuCube) cube, builder))
+                cube.compile(pose, builder, lightCoords, overlayCoords, color);
+        }
+
+        if (draw != null)
+            GpuCubes.endPart();
     }
 
     @Overwrite

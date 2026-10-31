@@ -85,10 +85,10 @@ public abstract class ModelPartCubeDirectWriteMixin implements GpuCube {
 
     @Override
     public int txoptimizations$gpuIndex() {
-        float[] values = this.txoptimizations$values;
+        float[] values = this.polygons.length == CubeVertices.FACES ? this.txoptimizations$values() : null;
 
-        if (values == null || !this.txoptimizations$flattenedBox)
-            throw new IllegalStateException("A cube without flattened values was sent to the GPU");
+        if (values == null)
+            return -1;
 
         if (values != this.txoptimizations$gpuValues || this.txoptimizations$gpuGeneration != GpuCubes.generation()) {
             this.txoptimizations$gpuIndex      = GpuCubes.register(values);
@@ -125,7 +125,7 @@ public abstract class ModelPartCubeDirectWriteMixin implements GpuCube {
         float[] values = this.polygons.length == CubeVertices.FACES ? this.txoptimizations$values() : null;
 
         if (values != null)
-            return GpuCubes.tryAdd(pose, this, builder, lightCoords, overlayCoords, color) || CubeVertices.tryPut(pose, values, builder, lightCoords, overlayCoords, color);
+            return CubeVertices.tryPut(pose, values, builder, lightCoords, overlayCoords, color);
 
         int vertices = 0;
 

@@ -25,11 +25,6 @@ public final class GpuCubeBatch implements AutoCloseable {
     private int                      refCapacity = INITIAL_REFS;
     private int                      refCount;
     private int                      longestRun;
-    private long                     lastPartCall = -1L;
-    private PoseStack.@Nullable Pose lastPose;
-    private int                      lastLight;
-    private int                      lastOverlay;
-    private int                      lastColor;
     private GpuBuffer[]              buffers = new GpuBuffer[4];
     private long[]                   usedAt = new long[4];
     private @Nullable GpuBuffer      current;
@@ -44,23 +39,12 @@ public final class GpuCubeBatch implements AutoCloseable {
     }
 
     public int pose(PoseStack.Pose pose, int light, int overlay, int color) {
-        long part = GpuCubes.partCall();
-
-        if (part == this.lastPartCall && pose == this.lastPose && light == this.lastLight && overlay == this.lastOverlay && color == this.lastColor)
-            return this.poseCount - 1;
-
         if (this.poseCount == this.poseCapacity) {
             this.poseCapacity *= 2;
             this.poses         = reallocate(this.poses, (long) this.poseCapacity * GpuCubes.POSE_BYTES);
         }
 
         GpuCubes.writePose(this.poses + (long) this.poseCount * GpuCubes.POSE_BYTES, pose, light, overlay, color);
-
-        this.lastPartCall = part;
-        this.lastPose     = pose;
-        this.lastLight    = light;
-        this.lastOverlay  = overlay;
-        this.lastColor    = color;
 
         return this.poseCount ++;
     }
@@ -126,10 +110,8 @@ public final class GpuCubeBatch implements AutoCloseable {
     public void reset() {
         this.poseCount    = 0;
         this.refCount     = 0;
-        this.longestRun   = 0;
-        this.lastPartCall = -1L;
-        this.lastPose     = null;
-        this.current      = null;
+        this.longestRun = 0;
+        this.current    = null;
     }
 
     @Override
