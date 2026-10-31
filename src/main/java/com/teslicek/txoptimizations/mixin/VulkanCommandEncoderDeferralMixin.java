@@ -23,6 +23,9 @@ import java.util.function.Supplier;
 import org.joml.Vector4fc;
 import org.lwjgl.system.MemoryStack;
 import org.lwjgl.vulkan.KHRDynamicRendering;
+import org.lwjgl.vulkan.VK10;
+import org.lwjgl.vulkan.VkClearAttachment;
+import org.lwjgl.vulkan.VkClearRect;
 import org.lwjgl.vulkan.VkCommandBuffer;
 import org.spongepowered.asm.mixin.Final;
 import org.spongepowered.asm.mixin.Mixin;
@@ -184,6 +187,9 @@ public abstract class VulkanCommandEncoderDeferralMixin {
         this.txoptimizations$openDescriptor      = descriptor;
         this.currentRenderPass                   = new VulkanRenderPass(this.device, (VulkanCommandEncoder) (Object) this, commandBuffer, this.checkpointStorage, descriptor.renderArea(), txoptimizations$outputWidth(descriptor), txoptimizations$outputHeight(descriptor), descriptor.depthAttachment() != null, descriptor.label());
 
+        if (this.txoptimizations$clearDepthTexture != null)
+            this.txoptimizations$clearDepthInPass(commandBuffer, descriptor.renderArea());
+
         cir.setReturnValue(this.currentRenderPass);
     }
 
@@ -303,7 +309,7 @@ public abstract class VulkanCommandEncoderDeferralMixin {
         if (this.txoptimizations$suspendedPass == null || GpuPassProfiler.isRunning() || this.txoptimizations$barrierPending)
             return false;
 
-        if (this.txoptimizations$clearColorTexture != null || this.txoptimizations$clearDepthTexture != null)
+        if (this.txoptimizations$clearColorTexture != null)
             return false;
 
         if (!descriptor.renderArea().equals(previous.renderArea()) || descriptor.colorAttachments().size() != previous.colorAttachments().size())
@@ -328,9 +334,30 @@ public abstract class VulkanCommandEncoderDeferralMixin {
         RenderPassDescriptor.Attachment<OptionalDouble> previousDepth = previous.depthAttachment();
 
         if (depth == null || previousDepth == null)
-            return depth == previousDepth;
+            return depth == previousDepth && this.txoptimizations$clearDepthTexture == null;
 
-        return depth.textureView() == previousDepth.textureView() && depth.clearValue().isEmpty();
+        if (depth.textureView() != previousDepth.textureView() || depth.clearValue().isPresent())
+            return false;
+
+        return this.txoptimizations$clearDepthTexture == null || txoptimizations$coversTexture(depth.textureView(), this.txoptimizations$clearDepthTexture, descriptor.renderArea());
+    }
+
+    @Unique
+    private void txoptimizations$clearDepthInPass(VkCommandBuffer commandBuffer, RenderPass.RenderArea area) {
+        try (MemoryStack stack = MemoryStack.stackPush()) {
+            VkClearAttachment.Buffer attachment = VkClearAttachment.calloc(1, stack);
+            VkClearRect.Buffer       rect       = VkClearRect.calloc(1, stack);
+
+            attachment.get(0).aspectMask(VK10.VK_IMAGE_ASPECT_DEPTH_BIT);
+            attachment.get(0).clearValue().depthStencil().depth((float) this.txoptimizations$clearDepth);
+            rect.get(0).rect().offset().set(area.x(), area.y());
+            rect.get(0).rect().extent().set(area.width(), area.height());
+            rect.get(0).baseArrayLayer(0);
+            rect.get(0).layerCount(1);
+            VK10.vkCmdClearAttachments(commandBuffer, attachment, rect);
+        }
+
+        this.txoptimizations$clearDepthTexture = null;
     }
 
     @Unique
