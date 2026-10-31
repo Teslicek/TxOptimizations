@@ -38,6 +38,11 @@ public abstract class SkyRendererFarPlaneMixin {
         return SkyFarPlane.isDrawing() ? SkyFarPlane.CELESTIAL : pipeline;
     }
 
+    @ModifyExpressionValue(method = "*", at = @At(value = "FIELD", target = "Lnet/minecraft/client/renderer/RenderPipelines;END_SKY:Lcom/mojang/renderpearl/api/pipeline/RenderPipeline;"))
+    private RenderPipeline txoptimizations$farEndSky(RenderPipeline pipeline) {
+        return SkyFarPlane.isDrawing() ? SkyFarPlane.END_SKY : pipeline;
+    }
+
     @Redirect(method = "render", at = @At(value = "INVOKE", target = "Lcom/mojang/renderpearl/api/commands/CommandEncoder;createRenderPass(Ljava/util/function/Supplier;Lcom/mojang/renderpearl/api/textures/GpuTextureView;Ljava/util/Optional;Lcom/mojang/renderpearl/api/textures/GpuTextureView;Ljava/util/OptionalDouble;)Lcom/mojang/renderpearl/api/commands/RenderPass;"))
     private RenderPass txoptimizations$drawInMainPass(CommandEncoder encoder, Supplier<String> label, GpuTextureView color, Optional<Vector4fc> clearColor, GpuTextureView depth, OptionalDouble clearDepth) {
         if (!SkyFarPlane.isDrawing())

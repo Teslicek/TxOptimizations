@@ -24,7 +24,7 @@ public final class SkyFarPlane {
 
     private static final String            DEFINE         = "TX_FAR_PLANE";
     private static final String            POSITION       = "gl_Position = ProjMat * ModelViewMat * vec4(Position, 1.0);";
-    private static final Set<String>       SHADERS        = Set.of("shaders/core/sky.vsh", "shaders/core/stars.vsh", "shaders/core/position_color.vsh", "shaders/core/position_tex.vsh");
+    private static final Set<String>       SHADERS        = Set.of("shaders/core/sky.vsh", "shaders/core/stars.vsh", "shaders/core/position_color.vsh", "shaders/core/position_tex.vsh", "shaders/core/position_tex_color.vsh");
     private static final Set<String>       PATCHED        = ConcurrentHashMap.newKeySet();
     private static final DepthStencilState BEHIND_TERRAIN = new DepthStencilState(CompareOp.GREATER_THAN_OR_EQUAL, false);
 
@@ -86,6 +86,21 @@ public final class SkyFarPlane {
         .withDepthStencilState(BEHIND_TERRAIN)
         .build();
 
+    public static final RenderPipeline END_SKY = RenderPipeline.builder()
+        .withBindGroupLayout(BindGroupLayouts.GLOBALS)
+        .withBindGroupLayout(BindGroupLayouts.PROJECTION)
+        .withBindGroupLayout(BindGroupLayouts.DYNAMIC_TRANSFORMS)
+        .withLocation(Identifier.fromNamespaceAndPath("txoptimizations", "pipeline/end_sky_far"))
+        .withVertexShader("core/position_tex_color")
+        .withFragmentShader("core/position_tex_color")
+        .withShaderDefine(DEFINE)
+        .withBindGroupLayout(BindGroupLayouts.SAMPLER0)
+        .withColorTargetState(new ColorTargetState(BlendFunction.TRANSLUCENT))
+        .withVertexBinding(0, DefaultVertexFormat.POSITION_TEX_COLOR)
+        .withPrimitiveTopology(PrimitiveTopology.QUADS)
+        .withDepthStencilState(BEHIND_TERRAIN)
+        .build();
+
     private static SkyRenderer    deferredRenderer;
     private static GpuBufferSlice deferredFog;
     private static SkyRenderState deferredState;
@@ -111,7 +126,7 @@ public final class SkyFarPlane {
     }
 
     public static boolean canDefer(SkyRenderState state, boolean improvedTransparency) {
-        return state.skybox == DimensionType.Skybox.OVERWORLD && !improvedTransparency && PATCHED.size() == SHADERS.size();
+        return (state.skybox == DimensionType.Skybox.OVERWORLD || state.skybox == DimensionType.Skybox.END) && !improvedTransparency && PATCHED.size() == SHADERS.size();
     }
 
     public static void defer(SkyRenderer renderer, GpuBufferSlice fog, SkyRenderState state) {
