@@ -320,6 +320,7 @@
     "SkyRendererFarPlaneMixin",
     "SoundEngineChannelSpinMixin",
     "SubmitNodeCollectionTextPoseMixin",
+    "SystemReportMissingProcessMixin",
     "SoundEngineListenerMixin",
     "SoundEngineDeviceReuseMixin",
     "LanguageManagerPreparedMixin",
