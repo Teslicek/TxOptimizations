@@ -6,12 +6,16 @@ import com.mojang.blaze3d.vertex.QuadInstance;
 import com.mojang.blaze3d.vertex.VertexConsumer;
 import com.teslicek.txoptimizations.BakedQuadVertices;
 import com.teslicek.txoptimizations.DirectVertexBuffer;
+import com.teslicek.txoptimizations.GpuCube;
+import com.teslicek.txoptimizations.GpuCubeDraw;
+import com.teslicek.txoptimizations.GpuCubes;
 import com.teslicek.txoptimizations.NormalCache;
 import java.util.List;
 import net.minecraft.client.renderer.feature.ItemFeatureRenderer;
 import net.minecraft.client.renderer.item.ItemStackRenderState;
 import net.minecraft.client.renderer.rendertype.RenderType;
 import net.minecraft.client.resources.model.geometry.BakedQuad;
+import net.minecraft.util.LightCoordsUtil;
 import net.minecraft.world.item.ItemDisplayContext;
 import org.lwjgl.system.MemoryUtil;
 import org.spongepowered.asm.mixin.Final;
@@ -68,7 +72,7 @@ public abstract class ItemFeatureQuadLoopMixin {
                 consolidates = renderType.canConsolidateConsecutiveGeometry();
             }
 
-            int written = normalChosen && consolidates ? this.txoptimizations$putEntityRun(builder, submit, index, renderType) : 0;
+            int written = normalChosen && consolidates ? this.txoptimizations$putRun(builder, submit, index, renderType) : 0;
 
             if (written > 0) {
                 index += written;
@@ -87,7 +91,7 @@ public abstract class ItemFeatureQuadLoopMixin {
     }
 
     @Unique
-    private int txoptimizations$putEntityRun(VertexConsumer builder, ItemFeatureRenderer.Submit submit, int from, RenderType renderType) {
+    private int txoptimizations$putRun(VertexConsumer builder, ItemFeatureRenderer.Submit submit, int from, RenderType renderType) {
         if (!(builder instanceof DirectVertexBuffer direct) || direct.txoptimizations$format() != DefaultVertexFormat.ENTITY)
             return 0;
 
@@ -98,7 +102,25 @@ public abstract class ItemFeatureQuadLoopMixin {
         while (end < quads.size() && txoptimizations$renderType(quads.get(end).materialInfo(), foilType) == renderType)
             end ++;
 
-        long pointer = direct.txoptimizations$tryReserveVertices(DefaultVertexFormat.ENTITY, (end - from) * BakedQuadVertices.VERTICES);
+        GpuCubeDraw draw = GpuCubes.beginItem(builder, submit.overlayCoords());
+
+        if (draw == null)
+            return this.txoptimizations$putEntityRun(direct, submit, from, end);
+
+        for (int index = from; index < end; index ++) {
+            BakedQuad              quad     = quads.get(index);
+            BakedQuad.MaterialInfo material = quad.materialInfo();
+
+            GpuCubes.addQuad(draw, builder, submit.pose(), (GpuCube) (Object) quad, getLayerColorSafe(submit.tintLayers(), material), LightCoordsUtil.lightCoordsWithEmission(submit.lightCoords(), material.lightEmission()));
+        }
+
+        return end - from;
+    }
+
+    @Unique
+    private int txoptimizations$putEntityRun(DirectVertexBuffer direct, ItemFeatureRenderer.Submit submit, int from, int end) {
+        List<BakedQuad> quads   = submit.quads();
+        long            pointer = direct.txoptimizations$tryReserveVertices(DefaultVertexFormat.ENTITY, (end - from) * BakedQuadVertices.VERTICES);
 
         if (pointer == MemoryUtil.NULL)
             return 0;

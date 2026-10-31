@@ -70,6 +70,9 @@ public abstract class StagedVertexBufferDrawGpuCubesMixin implements GpuCubeDraw
     private int txoptimizations$nextRef = -1;
 
     @Unique
+    private int txoptimizations$nextKind;
+
+    @Unique
     private boolean txoptimizations$hasCubes;
 
     @Unique
@@ -136,27 +139,33 @@ public abstract class StagedVertexBufferDrawGpuCubesMixin implements GpuCubeDraw
     }
 
     @Override
-    public void txoptimizations$addCube(int ref, int rawVertices) {
+    public void txoptimizations$addRef(int kind, int ref, int rawVertices) {
         if (this.txoptimizations$finished)
-            throw new IllegalStateException("A cube was added to a staged draw after it was drawn");
+            throw new IllegalStateException("A GPU shape was added to a staged draw after it was drawn");
+
+        if (kind != CUBES && kind != QUADS)
+            throw new IllegalArgumentException("Unknown GPU shape kind " + kind);
 
         if (rawVertices != this.txoptimizations$rawMark) {
-            this.txoptimizations$push(false, this.txoptimizations$rawMark, rawVertices - this.txoptimizations$rawMark);
+            this.txoptimizations$push(RAW, this.txoptimizations$rawMark, rawVertices - this.txoptimizations$rawMark);
             this.txoptimizations$rawMark = rawVertices;
             this.txoptimizations$nextRef = -1;
         }
 
-        if (ref == this.txoptimizations$nextRef) {
+        int run;
+
+        if (ref == this.txoptimizations$nextRef && kind == this.txoptimizations$nextKind) {
             int at = (this.txoptimizations$segmentCount - 1) * VALUES + 2;
 
-            this.txoptimizations$segments[at] ++;
-            this.txoptimizations$batch().noteRun(this.txoptimizations$segments[at]);
+            run = ++ this.txoptimizations$segments[at];
         } else {
-            this.txoptimizations$push(true, ref, 1);
-            this.txoptimizations$batch().noteRun(1);
+            this.txoptimizations$push(kind, ref, 1);
+            run = 1;
         }
 
+        this.txoptimizations$batch().noteRun(run * (kind == CUBES ? GpuCubes.CUBE_INDICES : GpuCubes.QUAD_INDICES));
         this.txoptimizations$nextRef  = ref + 1;
+        this.txoptimizations$nextKind = kind;
         this.txoptimizations$hasCubes = true;
     }
 
@@ -169,7 +178,7 @@ public abstract class StagedVertexBufferDrawGpuCubesMixin implements GpuCubeDraw
             throw new IllegalStateException("A staged draw has " + this.vertexCount + " vertices, fewer than the " + this.txoptimizations$rawMark + " counted before its last cube");
 
         if (this.vertexCount > this.txoptimizations$rawMark)
-            this.txoptimizations$push(false, this.txoptimizations$rawMark, this.vertexCount - this.txoptimizations$rawMark);
+            this.txoptimizations$push(RAW, this.txoptimizations$rawMark, this.vertexCount - this.txoptimizations$rawMark);
 
         this.txoptimizations$finished = true;
 
@@ -182,8 +191,8 @@ public abstract class StagedVertexBufferDrawGpuCubesMixin implements GpuCubeDraw
     }
 
     @Override
-    public boolean txoptimizations$isCubeSegment(int segment) {
-        return this.txoptimizations$segments[segment * VALUES] != 0;
+    public int txoptimizations$segmentKind(int segment) {
+        return this.txoptimizations$segments[segment * VALUES];
     }
 
     @Override
@@ -268,13 +277,13 @@ public abstract class StagedVertexBufferDrawGpuCubesMixin implements GpuCubeDraw
     }
 
     @Unique
-    private void txoptimizations$push(boolean cubes, int start, int length) {
+    private void txoptimizations$push(int kind, int start, int length) {
         int at = this.txoptimizations$segmentCount * VALUES;
 
         if (at + VALUES > this.txoptimizations$segments.length)
             this.txoptimizations$segments = Arrays.copyOf(this.txoptimizations$segments, Math.max(VALUES * 4, this.txoptimizations$segments.length * 2));
 
-        this.txoptimizations$segments[at]     = cubes ? 1 : 0;
+        this.txoptimizations$segments[at]     = kind;
         this.txoptimizations$segments[at + 1] = start;
         this.txoptimizations$segments[at + 2] = length;
         this.txoptimizations$segmentCount ++;

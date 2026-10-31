@@ -4,6 +4,10 @@ import net.minecraft.client.renderer.rendertype.PreparedRenderType;
 
 public interface GpuCubeDraw {
 
+    int RAW   = 0;
+    int CUBES = 1;
+    int QUADS = 2;
+
     void txoptimizations$setBatch(GpuCubeBatch batch);
 
     void txoptimizations$setPrepared(PreparedRenderType prepared);
@@ -14,13 +18,13 @@ public interface GpuCubeDraw {
 
     int txoptimizations$rawVertices();
 
-    void txoptimizations$addCube(int ref, int rawVertices);
+    void txoptimizations$addRef(int kind, int ref, int rawVertices);
 
     boolean txoptimizations$finishSegments();
 
     int txoptimizations$segments();
 
-    boolean txoptimizations$isCubeSegment(int segment);
+    int txoptimizations$segmentKind(int segment);
 
     int txoptimizations$segmentStart(int segment);
 

@@ -77,8 +77,8 @@ public final class GpuCubeBatch implements AutoCloseable {
         return this.refCount ++;
     }
 
-    public void noteRun(int cubes) {
-        this.longestRun = Math.max(this.longestRun, cubes);
+    public void noteRun(int indices) {
+        this.longestRun = Math.max(this.longestRun, indices);
     }
 
     public void addSortedDraw(GpuCubeDraw draw) {
@@ -215,7 +215,12 @@ public final class GpuCubeBatch implements AutoCloseable {
                 int start  = draw.txoptimizations$segmentStart(segment);
                 int length = draw.txoptimizations$segmentLength(segment);
 
-                if (!draw.txoptimizations$isCubeSegment(segment)) {
+                int kind = draw.txoptimizations$segmentKind(segment);
+
+                if (kind == GpuCubeDraw.QUADS)
+                    throw new IllegalStateException("A sorted draw holds GPU quads, which are only drawn unsorted");
+
+                if (kind == GpuCubeDraw.RAW) {
                     copyRaw((StagedVertexBuffer.Draw) draw, start, length, at);
                     at += (long) length * STRIDE;
                     continue;

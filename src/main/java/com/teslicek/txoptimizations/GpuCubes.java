@@ -25,17 +25,22 @@ import com.teslicek.txoptimizations.mixin.RenderSystemPipelineCacheAccessor;
 import java.nio.ByteOrder;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashSet;
 import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
+import net.minecraft.client.model.geom.builders.UVPair;
 import net.minecraft.client.renderer.StagedVertexBuffer;
 import net.minecraft.client.renderer.oit.OitPipelineSet;
 import net.minecraft.client.renderer.oit.OitStage;
 import net.minecraft.client.renderer.rendertype.PreparedRenderType;
+import net.minecraft.client.resources.model.geometry.BakedQuad;
 import net.minecraft.resources.Identifier;
 import org.joml.Matrix4f;
 import org.joml.Matrix4fc;
+import org.joml.Vector3fc;
 import org.jspecify.annotations.Nullable;
 import org.lwjgl.system.MemoryUtil;
 
@@ -43,19 +48,27 @@ public final class GpuCubes {
 
     public static final int CUBE_VERTICES = CubeVertices.VERTICES;
     public static final int CUBE_INDICES  = CubeVertices.FACES * 6;
+    public static final int QUAD_INDICES  = 6;
     public static final int POSE_BYTES    = 128;
     public static final int REF_BYTES     = 8;
 
     private static final String          DEFINE          = "TX_GPU_CUBES";
-    private static final Identifier      SHADER          = Identifier.withDefaultNamespace("core/entity");
-    private static final String          FILE            = "shaders/core/entity.vsh";
+    private static final String          GLINT_SPECIAL   = "GLINT_SPECIAL";
+    private static final Identifier      ENTITY_SHADER   = Identifier.withDefaultNamespace("core/entity");
+    private static final Identifier      ITEM_SHADER     = Identifier.withDefaultNamespace("core/item");
+    private static final String          ENTITY_FILE     = "shaders/core/entity.vsh";
+    private static final String          ITEM_FILE       = "shaders/core/item.vsh";
     private static final String          EXTENSION       = "#extension GL_ARB_separate_shader_objects : require\n";
     private static final String          EXTENSIONS      = EXTENSION + "#ifdef " + DEFINE + "\n#extension GL_ARB_gpu_shader5 : require\n#endif\n";
-    private static final String          INPUTS          = "layout(location = 0) in vec3 Position;\nlayout(location = 1) in vec4 Color;\nlayout(location = 2) in vec2 UV0;\nlayout(location = 3) in ivec2 UV1;\nlayout(location = 4) in ivec2 UV2;\nlayout(location = 5) in vec3 Normal;\n";
+    private static final String          ENTITY_INPUTS   = "layout(location = 0) in vec3 Position;\nlayout(location = 1) in vec4 Color;\nlayout(location = 2) in vec2 UV0;\nlayout(location = 3) in ivec2 UV1;\nlayout(location = 4) in ivec2 UV2;\nlayout(location = 5) in vec3 Normal;\n";
+    private static final String          ITEM_INPUTS     = "layout(location = 0) in vec3 Position;\nlayout(location = 1) in vec4 Color;\nlayout(location = 2) in vec2 UV0;\nlayout(location = 3) in ivec2 UV1;\nlayout(location = 4) in ivec2 UV2;\n#ifdef GLINT_SPECIAL\nlayout(location = 5) in vec2 UV3;\n#endif\nlayout(location = 6) in vec3 Normal;\n";
     private static final String          MAIN            = "void main() {\n";
     private static final String          LOAD            = MAIN + "#ifdef " + DEFINE + "\n    txLoadCube();\n#endif\n";
     private static final String          MARKER          = "txLoadCube";
     private static final int             STATIC_FLOATS   = 56;
+    private static final int             QUAD_FLOATS     = 21;
+    private static final int             QUAD_VERTICES   = 4;
+    private static final int             QUAD_INSTANCE   = 1;
     private static final int             STATIC_BYTES    = STATIC_FLOATS * Float.BYTES;
     private static final int             INITIAL_CUBES   = 4096;
     private static final int             RETIRE_FRAMES   = 4;
@@ -75,6 +88,8 @@ public final class GpuCubes {
     private static final List<GpuBuffer>                     RETIRED     = new ArrayList<>();
     private static final List<Long>                          RETIRED_AT  = new ArrayList<>();
     private static final StagedVertexBuffer.ExecuteInfo      EMPTY_INFO  = new StagedVertexBuffer.ExecuteInfo(null, null, IndexType.SHORT, 0, 0, 0, PrimitiveTopology.QUADS);
+    private static final Set<Identifier>                     PATCHED     = new HashSet<>();
+    private static final float[]                             QUAD        = new float[QUAD_FLOATS];
 
     private static float[]                 statics = new float[STATIC_FLOATS * INITIAL_CUBES];
     private static int                     cubes;
@@ -87,22 +102,29 @@ public final class GpuCubes {
     private static int                     partOverlay;
     private static int                     partColor;
     private static int                     partSlot;
+    private static int                     itemOverlay;
+    private static int                     itemColor;
+    private static int                     itemLight;
+    private static int                     itemSlot;
+    private static @Nullable GpuCubeBatch  itemBatch;
     private static boolean                 reloaded;
     private static @Nullable GpuCubeDraw   pending;
     private static @Nullable PipelineCache checkedCache;
-    private static boolean                 patchedSource;
+    private static boolean                 firstInstances;
 
     private GpuCubes() {
     }
 
     public static String patch(Identifier location, String source) {
-        if (!location.getNamespace().equals(Identifier.DEFAULT_NAMESPACE) || !location.getPath().equals(FILE))
+        if (!location.getNamespace().equals(Identifier.DEFAULT_NAMESPACE))
             return source;
 
-        if (!source.contains(EXTENSION) || !source.contains(INPUTS) || !source.contains(MAIN))
+        String inputs = location.getPath().equals(ENTITY_FILE) ? ENTITY_INPUTS : location.getPath().equals(ITEM_FILE) ? ITEM_INPUTS : null;
+
+        if (inputs == null || !source.contains(EXTENSION) || !source.contains(inputs) || !source.contains(MAIN))
             return source;
 
-        return source.replace(EXTENSION, EXTENSIONS).replace(INPUTS, "#ifdef " + DEFINE + "\n" + loader() + "#else\n" + INPUTS + "#endif\n").replace(MAIN, LOAD);
+        return source.replace(EXTENSION, EXTENSIONS).replace(inputs, "#ifdef " + DEFINE + "\n" + loader() + "#else\n" + inputs + "#endif\n").replace(MAIN, LOAD);
     }
 
     public static int generation() {
@@ -121,13 +143,20 @@ public final class GpuCubes {
         return cubes ++;
     }
 
+    public static int registerQuad(BakedQuad quad) {
+        putCorner(0, quad.position0(), quad.packedUV0());
+        putCorner(1, quad.position1(), quad.packedUV1());
+        putCorner(2, quad.position2(), quad.packedUV2());
+        putCorner(3, quad.position3(), quad.packedUV3());
+        QUAD[QUAD_FLOATS - 1] = quad.direction().ordinal();
+
+        return register(QUAD);
+    }
+
     public static @Nullable GpuCubeDraw beginPart(PoseStack.Pose pose, VertexConsumer builder, int light, int overlay, int color) {
-        if (!NormalCache.usable() || builder.getClass() != BufferBuilder.class)
-            return null;
+        GpuCubeDraw draw = acceptingDraw(builder);
 
-        GpuCubeDraw draw = ((GpuCubeBuilder) builder).txoptimizations$cubeDraw();
-
-        if (draw == null || !draw.txoptimizations$acceptsCubes())
+        if (draw == null)
             return null;
 
         partPose    = pose;
@@ -158,7 +187,7 @@ public final class GpuCubes {
 
         int ref = batch.addRef(shape, partSlot);
 
-        draw.txoptimizations$addCube(ref, draw.txoptimizations$rawVertices() + ((DirectVertexBuffer) builder).txoptimizations$vertexCount());
+        draw.txoptimizations$addRef(GpuCubeDraw.CUBES, ref, draw.txoptimizations$rawVertices() + ((DirectVertexBuffer) builder).txoptimizations$vertexCount());
 
         if (draw.txoptimizations$isSorted()) {
             CubeVertices.faceKeys(partPose.pose(), statics, shape * STATIC_FLOATS, FACE_KEYS, 0);
@@ -170,6 +199,31 @@ public final class GpuCubes {
 
     public static void endPart() {
         partPose = null;
+    }
+
+    public static @Nullable GpuCubeDraw beginItem(VertexConsumer builder, int overlay) {
+        GpuCubeDraw draw = acceptingDraw(builder);
+
+        if (draw == null || !firstInstances || draw.txoptimizations$isSorted())
+            return null;
+
+        itemOverlay = overlay;
+        itemBatch   = null;
+
+        return draw;
+    }
+
+    public static void addQuad(GpuCubeDraw draw, VertexConsumer builder, PoseStack.Pose pose, GpuCube quad, int color, int light) {
+        GpuCubeBatch batch = draw.txoptimizations$batch();
+
+        if (batch != itemBatch || color != itemColor || light != itemLight) {
+            itemSlot  = batch.pose(pose, light, itemOverlay, color);
+            itemBatch = batch;
+            itemColor = color;
+            itemLight = light;
+        }
+
+        draw.txoptimizations$addRef(GpuCubeDraw.QUADS, batch.addRef(quad.txoptimizations$gpuIndex(), itemSlot), draw.txoptimizations$rawVertices() + ((DirectVertexBuffer) builder).txoptimizations$vertexCount());
     }
 
     public static boolean accepts(VertexFormat format, PrimitiveTopology topology, @Nullable VertexSorting sorting, @Nullable PreparedRenderType prepared) {
@@ -281,17 +335,22 @@ public final class GpuCubes {
         batch.bind(renderPass);
     }
 
-    public static void drawCubes(RenderPass renderPass, int firstCube, int cubeCount) {
+    public static void drawShapes(RenderPass renderPass, int kind, int firstShape, int shapeCount) {
         RenderSystem.AutoStorageIndexBuffer indices = RenderSystem.getSequentialBuffer(PrimitiveTopology.QUADS);
-        int                                 count   = cubeCount * CUBE_INDICES;
+        boolean                             cubes   = kind == GpuCubeDraw.CUBES;
+
+        if (!cubes && kind != GpuCubeDraw.QUADS)
+            throw new IllegalArgumentException("Unknown GPU shape kind " + kind);
+
+        int count = shapeCount * (cubes ? CUBE_INDICES : QUAD_INDICES);
 
         renderPass.setIndexBuffer(indices.getBuffer(count), indices.type());
-        renderPass.drawIndexed(count, 1, 0, firstCube * CUBE_VERTICES, 0);
+        renderPass.drawIndexed(count, 1, 0, firstShape * (cubes ? CUBE_VERTICES : QUAD_VERTICES), cubes ? 0 : QUAD_INSTANCE);
     }
 
-    public static void requestIndices(int cubeCount) {
-        if (cubeCount > 0)
-            RenderSystem.getSequentialBuffer(PrimitiveTopology.QUADS).requestIndexCount(cubeCount * CUBE_INDICES);
+    public static void requestIndices(int indexCount) {
+        if (indexCount > 0)
+            RenderSystem.getSequentialBuffer(PrimitiveTopology.QUADS).requestIndexCount(indexCount);
     }
 
     public static float[] shapes() {
@@ -330,12 +389,29 @@ public final class GpuCubes {
             VertexBytes.putPaddedNormal(address + 80L + direction * 4L, NormalCache.selected(direction));
     }
 
+    private static @Nullable GpuCubeDraw acceptingDraw(VertexConsumer builder) {
+        if (!NormalCache.usable() || builder.getClass() != BufferBuilder.class)
+            return null;
+
+        GpuCubeDraw draw = ((GpuCubeBuilder) builder).txoptimizations$cubeDraw();
+
+        return draw != null && draw.txoptimizations$acceptsCubes() ? draw : null;
+    }
+
+    private static void putCorner(int corner, Vector3fc position, long packedUv) {
+        QUAD[corner * 3]          = position.x();
+        QUAD[corner * 3 + 1]      = position.y();
+        QUAD[corner * 3 + 2]      = position.z();
+        QUAD[12 + corner * 2]     = UVPair.unpackU(packedUv);
+        QUAD[12 + corner * 2 + 1] = UVPair.unpackV(packedUv);
+    }
+
     private static boolean isEligible(@Nullable RenderPipeline pipeline) {
         return pipeline != null && ELIGIBLE.computeIfAbsent(pipeline, GpuCubes::eligible);
     }
 
     private static boolean eligible(RenderPipeline vanilla) {
-        if (!patchedSource || !SHADER.equals(vanilla.getShaders().get(ShaderType.VERTEX)) || vanilla.getPrimitiveTopology() != PrimitiveTopology.QUADS || vanilla.getVertexFormatBinding(0) != DefaultVertexFormat.ENTITY)
+        if (!PATCHED.contains(vanilla.getShaders().get(ShaderType.VERTEX)) || vanilla.getShaderDefines().flags().contains(GLINT_SPECIAL) || vanilla.getPrimitiveTopology() != PrimitiveTopology.QUADS || vanilla.getVertexFormatBinding(0) != DefaultVertexFormat.ENTITY)
             return false;
 
         List<VertexFormat> bindings = vanilla.getVertexFormatBindings();
@@ -370,13 +446,21 @@ public final class GpuCubes {
         if (cache == checkedCache)
             return;
 
-        String source = ((PipelineCacheAccessor) cache).txoptimizations$shaderSource().getShader(SHADER, ShaderType.VERTEX);
-
-        reloaded      = reloaded || checkedCache != null;
-        checkedCache  = cache;
-        patchedSource = source != null && source.contains(MARKER);
+        reloaded       = reloaded || checkedCache != null;
+        checkedCache   = cache;
+        firstInstances = RenderSystem.getDevice().getDeviceInfo().features().nonZeroFirstInstance();
+        PATCHED.clear();
+        markPatched(cache, ENTITY_SHADER);
+        markPatched(cache, ITEM_SHADER);
         ELIGIBLE.clear();
         VARIANTS.clear();
+    }
+
+    private static void markPatched(PipelineCache cache, Identifier shader) {
+        String source = ((PipelineCacheAccessor) cache).txoptimizations$shaderSource().getShader(shader, ShaderType.VERTEX);
+
+        if (source != null && source.contains(MARKER))
+            PATCHED.add(shader);
     }
 
     private static String loader() {
@@ -401,16 +485,35 @@ public final class GpuCubes {
             + "    return texelFetch(TxCubeStatic, cube * 14 + (value >> 2))[value & 3];\n"
             + "}\n"
             + "void txLoadCube() {\n"
-            + "    int cubeVertex = gl_VertexIndex / 24;\n"
-            + "    int slot = gl_VertexIndex - cubeVertex * 24;\n"
-            + "    uvec2 ref = texelFetch(TxCubeRefs, cubeVertex).xy;\n"
-            + "    int cube = int(ref.x);\n"
-            + "    int pose = int(ref.y);\n"
-            + "    bool mirrored = txShape(cube, 0) != 0.0;\n"
-            + "    int corner = mirrored ? TX_MIRRORED[slot] : TX_PLAIN[slot];\n"
-            + "    float x = txShape(cube, (corner & 1) == 0 ? 1 : 4);\n"
-            + "    float y = txShape(cube, (corner & 2) == 0 ? 2 : 5);\n"
-            + "    float z = txShape(cube, (corner & 4) == 0 ? 3 : 6);\n"
+            + "    int pose;\n"
+            + "    int facing;\n"
+            + "    float x;\n"
+            + "    float y;\n"
+            + "    float z;\n"
+            + "    if (gl_InstanceIndex == " + QUAD_INSTANCE + ") {\n"
+            + "        int corner = gl_VertexIndex & 3;\n"
+            + "        uvec2 ref = texelFetch(TxCubeRefs, gl_VertexIndex >> 2).xy;\n"
+            + "        int quad = int(ref.x);\n"
+            + "        pose = int(ref.y);\n"
+            + "        x = txShape(quad, corner * 3);\n"
+            + "        y = txShape(quad, corner * 3 + 1);\n"
+            + "        z = txShape(quad, corner * 3 + 2);\n"
+            + "        UV0 = vec2(txShape(quad, 12 + corner * 2), txShape(quad, 13 + corner * 2));\n"
+            + "        facing = int(txShape(quad, " + (QUAD_FLOATS - 1) + "));\n"
+            + "    } else {\n"
+            + "        int cubeVertex = gl_VertexIndex / 24;\n"
+            + "        int slot = gl_VertexIndex - cubeVertex * 24;\n"
+            + "        uvec2 ref = texelFetch(TxCubeRefs, cubeVertex).xy;\n"
+            + "        int cube = int(ref.x);\n"
+            + "        pose = int(ref.y);\n"
+            + "        bool mirrored = txShape(cube, 0) != 0.0;\n"
+            + "        int corner = mirrored ? TX_MIRRORED[slot] : TX_PLAIN[slot];\n"
+            + "        x = txShape(cube, (corner & 1) == 0 ? 1 : 4);\n"
+            + "        y = txShape(cube, (corner & 2) == 0 ? 2 : 5);\n"
+            + "        z = txShape(cube, (corner & 4) == 0 ? 3 : 6);\n"
+            + "        UV0 = vec2(txShape(cube, 7 + slot * 2), txShape(cube, 8 + slot * 2));\n"
+            + "        facing = mirrored ? TX_MIRRORED_FACING[slot >> 2] : TX_PLAIN_FACING[slot >> 2];\n"
+            + "    }\n"
             + "    uint properties = texelFetch(TxPoseInfo, pose * 8 + 4).x;\n"
             + "    vec4 c0 = texelFetch(TxPoseMatrix, pose * 8);\n"
             + "    vec4 c1 = texelFetch(TxPoseMatrix, pose * 8 + 1);\n"
@@ -425,11 +528,10 @@ public final class GpuCubes {
             + "        position = vec3(fma(c0.x, x, fma(c1.x, y, fma(c2.x, z, c3.x))), fma(c0.y, x, fma(c1.y, y, fma(c2.y, z, c3.y))), fma(c0.z, x, fma(c1.z, y, fma(c2.z, z, c3.z))));\n"
             + "    }\n"
             + "    Position = position;\n"
-            + "    UV0 = vec2(txShape(cube, 7 + slot * 2), txShape(cube, 8 + slot * 2));\n"
             + "    UV1 = texelFetch(TxPoseCoords, pose * 32 + 17).xy;\n"
             + "    UV2 = texelFetch(TxPoseCoords, pose * 32 + 18).xy;\n"
             + "    Color = texelFetch(TxPoseColor, pose * 32 + 19);\n"
-            + "    Normal = texelFetch(TxPoseNormal, pose * 32 + 20 + (mirrored ? TX_MIRRORED_FACING[slot >> 2] : TX_PLAIN_FACING[slot >> 2])).xyz;\n"
+            + "    Normal = texelFetch(TxPoseNormal, pose * 32 + 20 + facing).xyz;\n"
             + "}\n";
     }
 }

@@ -64,10 +64,12 @@ public abstract class PreparedRenderTypeDrawMixin {
             int start  = cubes.txoptimizations$segmentStart(segment);
             int length = cubes.txoptimizations$segmentLength(segment);
 
-            if (cubes.txoptimizations$isCubeSegment(segment)) {
+            int kind = cubes.txoptimizations$segmentKind(segment);
+
+            if (kind != GpuCubeDraw.RAW) {
                 this.txoptimizations$bind(renderPass, GpuCubes.variant(renderPipeline));
                 GpuCubes.bindCubes(renderPass, cubes.txoptimizations$batch());
-                GpuCubes.drawCubes(renderPass, start, length);
+                GpuCubes.drawShapes(renderPass, kind, start, length);
                 continue;
             }
 

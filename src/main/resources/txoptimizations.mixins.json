@@ -201,6 +201,7 @@
     "StagedVertexBufferDrawGpuCubesMixin",
     "StagedVertexBufferGpuCubesMixin",
     "ModelPartCubeDirectWriteMixin",
+    "BakedQuadGpuShapeMixin",
     "ModelRenderTypeCacheMixin",
     "ModelResetPoseMixin",
     "ParticleCollisionScanMixin",
