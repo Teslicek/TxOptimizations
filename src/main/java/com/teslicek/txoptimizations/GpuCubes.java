@@ -60,7 +60,7 @@ public final class GpuCubes {
     private static final String          ENTITY_FILE     = "shaders/core/entity.vsh";
     private static final String          ITEM_FILE       = "shaders/core/item.vsh";
     private static final String          EXTENSION       = "#extension GL_ARB_separate_shader_objects : require\n";
-    private static final String          EXTENSIONS      = EXTENSION + "#ifdef " + DEFINE + "\n#extension GL_ARB_gpu_shader5 : require\n#endif\n";
+    private static final String          EXTENSIONS      = EXTENSION + "#ifdef " + DEFINE + "\n#extension GL_ARB_gpu_shader5 : require\n#extension GL_ARB_shading_language_packing : require\n#endif\n";
     private static final String          ENTITY_INPUTS   = "layout(location = 0) in vec3 Position;\nlayout(location = 1) in vec4 Color;\nlayout(location = 2) in vec2 UV0;\nlayout(location = 3) in ivec2 UV1;\nlayout(location = 4) in ivec2 UV2;\nlayout(location = 5) in vec3 Normal;\n";
     private static final String          ITEM_INPUTS     = "layout(location = 0) in vec3 Position;\nlayout(location = 1) in vec4 Color;\nlayout(location = 2) in vec2 UV0;\nlayout(location = 3) in ivec2 UV1;\nlayout(location = 4) in ivec2 UV2;\n#ifdef GLINT_SPECIAL\nlayout(location = 5) in vec2 UV3;\n#endif\nlayout(location = 6) in vec3 Normal;\n";
     private static final String          MAIN            = "void main() {\n";
