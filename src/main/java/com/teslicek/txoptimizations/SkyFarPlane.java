@@ -1,6 +1,7 @@
 package com.teslicek.txoptimizations;
 
 import com.mojang.blaze3d.pipeline.RenderTarget;
+import com.mojang.blaze3d.systems.RenderSystem;
 import com.mojang.blaze3d.vertex.DefaultVertexFormat;
 import com.mojang.renderpearl.api.buffers.GpuBufferSlice;
 import com.mojang.renderpearl.api.commands.RenderPass;
@@ -171,11 +172,18 @@ public final class SkyFarPlane {
         deferredRenderer = null;
         deferredFog      = null;
         deferredState    = null;
+
+        GpuBufferSlice passFog = RenderSystem.getShaderFog();
+
+        if (passFog == null)
+            throw new IllegalStateException("The main pass has no fog to restore after the deferred sky");
+
         hostPass         = mainPass;
         drawing          = true;
         drawingEnd       = state.skybox == DimensionType.Skybox.END;
 
         renderer.render(fog, state);
+        RenderSystem.setShaderFog(passFog);
 
         drawing    = false;
         drawingEnd = false;
