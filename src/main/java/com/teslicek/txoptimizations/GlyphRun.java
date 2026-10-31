@@ -16,7 +16,6 @@ import org.jspecify.annotations.Nullable;
 
 public final class GlyphRun implements GuiElementRenderState {
 
-    private static final int      FULL_BRIGHT    = 15728880;
     private static final int      INITIAL_GLYPHS = 16;
     private static final Matrix4f POSE           = new Matrix4f();
 
@@ -47,10 +46,7 @@ public final class GlyphRun implements GuiElementRenderState {
 
     @Override
     public void buildVertices(VertexConsumer vertexConsumer) {
-        Matrix4f pose = POSE.identity().mul(this.pose);
-
-        for (int index = 0; index < this.count; index ++)
-            this.glyphs[index].render(pose, vertexConsumer, FULL_BRIGHT, true);
+        GlyphVertexCache.build(this.glyphs, this.count, this.pose, POSE.identity().mul(this.pose), vertexConsumer);
     }
 
     @Override
