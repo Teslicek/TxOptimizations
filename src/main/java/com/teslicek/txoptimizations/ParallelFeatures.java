@@ -15,7 +15,6 @@ import net.minecraft.client.renderer.feature.FeatureRendererMap;
 import net.minecraft.client.renderer.feature.FeatureRendererType;
 import net.minecraft.client.renderer.feature.FlameFeatureRenderer;
 import net.minecraft.client.renderer.feature.GizmoFeatureRenderer;
-import net.minecraft.client.renderer.feature.ItemFeatureRenderer;
 import net.minecraft.client.renderer.feature.LeashFeatureRenderer;
 import net.minecraft.client.renderer.feature.QuadParticleFeatureRenderer;
 import net.minecraft.client.renderer.feature.ShadowFeatureRenderer;
@@ -150,7 +149,7 @@ public final class ParallelFeatures {
         if (type == TextFeatureRenderer.TYPE || type == GizmoFeatureRenderer.TYPE || type == QuadParticleFeatureRenderer.TYPE)
             return TEXT;
 
-        if (type == ItemFeatureRenderer.TYPE || type == BlockModelFeatureRenderer.TYPE || type == ShadowFeatureRenderer.TYPE || type == FlameFeatureRenderer.TYPE || type == LeashFeatureRenderer.TYPE || type == ShapeOutlineFeatureRenderer.TYPE)
+        if (type == BlockModelFeatureRenderer.TYPE || type == ShadowFeatureRenderer.TYPE || type == FlameFeatureRenderer.TYPE || type == LeashFeatureRenderer.TYPE || type == ShapeOutlineFeatureRenderer.TYPE)
             return GEOMETRY;
 
         return null;
