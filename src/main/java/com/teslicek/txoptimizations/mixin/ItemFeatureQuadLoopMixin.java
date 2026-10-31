@@ -7,6 +7,7 @@ import com.mojang.blaze3d.vertex.VertexConsumer;
 import com.teslicek.txoptimizations.BakedQuadVertices;
 import com.teslicek.txoptimizations.DirectVertexBuffer;
 import com.teslicek.txoptimizations.GpuCube;
+import com.teslicek.txoptimizations.GpuCubeBatch;
 import com.teslicek.txoptimizations.GpuCubeDraw;
 import com.teslicek.txoptimizations.GpuCubes;
 import com.teslicek.txoptimizations.NormalCache;
@@ -108,23 +109,28 @@ public abstract class ItemFeatureQuadLoopMixin {
             return this.txoptimizations$putEntityRun(direct, submit, from, end);
 
         PoseStack.Pose         pose         = submit.pose();
+        GpuCubeBatch           batch        = draw.txoptimizations$batch();
         int                    rawVertices  = draw.txoptimizations$rawVertices() + direct.txoptimizations$vertexCount();
         BakedQuad.MaterialInfo lastMaterial = null;
-        int                    color        = 0;
-        int                    light        = 0;
+        int                    slot         = 0;
+        int                    firstRef     = -1;
 
         for (int index = from; index < end; index ++) {
             BakedQuad              quad     = quads.get(index);
             BakedQuad.MaterialInfo material = quad.materialInfo();
 
             if (material != lastMaterial) {
-                color        = getLayerColorSafe(submit.tintLayers(), material);
-                light        = LightCoordsUtil.lightCoordsWithEmission(submit.lightCoords(), material.lightEmission());
+                slot         = GpuCubes.itemPose(batch, pose, getLayerColorSafe(submit.tintLayers(), material), LightCoordsUtil.lightCoordsWithEmission(submit.lightCoords(), material.lightEmission()));
                 lastMaterial = material;
             }
 
-            GpuCubes.addQuad(draw, pose, (GpuCube) (Object) quad, color, light, rawVertices);
+            int ref = batch.addRef(((GpuCube) (Object) quad).txoptimizations$gpuIndex(), slot);
+
+            if (firstRef < 0)
+                firstRef = ref;
         }
+
+        draw.txoptimizations$addRefs(GpuCubeDraw.QUADS, firstRef, end - from, rawVertices);
 
         return end - from;
     }

@@ -139,7 +139,7 @@ public abstract class StagedVertexBufferDrawGpuCubesMixin implements GpuCubeDraw
     }
 
     @Override
-    public void txoptimizations$addRef(int kind, int ref, int rawVertices) {
+    public void txoptimizations$addRefs(int kind, int firstRef, int count, int rawVertices) {
         if (this.txoptimizations$finished)
             throw new IllegalStateException("A GPU shape was added to a staged draw after it was drawn");
 
@@ -154,17 +154,17 @@ public abstract class StagedVertexBufferDrawGpuCubesMixin implements GpuCubeDraw
 
         int run;
 
-        if (ref == this.txoptimizations$nextRef && kind == this.txoptimizations$nextKind) {
+        if (firstRef == this.txoptimizations$nextRef && kind == this.txoptimizations$nextKind) {
             int at = (this.txoptimizations$segmentCount - 1) * VALUES + 2;
 
-            run = ++ this.txoptimizations$segments[at];
+            run = this.txoptimizations$segments[at] += count;
         } else {
-            this.txoptimizations$push(kind, ref, 1);
-            run = 1;
+            this.txoptimizations$push(kind, firstRef, count);
+            run = count;
         }
 
         this.txoptimizations$batch().noteRun(run * (kind == CUBES ? GpuCubes.CUBE_INDICES : GpuCubes.QUAD_INDICES));
-        this.txoptimizations$nextRef  = ref + 1;
+        this.txoptimizations$nextRef  = firstRef + count;
         this.txoptimizations$nextKind = kind;
         this.txoptimizations$hasCubes = true;
     }

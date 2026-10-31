@@ -18,7 +18,7 @@ public interface GpuCubeDraw {
 
     int txoptimizations$rawVertices();
 
-    void txoptimizations$addRef(int kind, int ref, int rawVertices);
+    void txoptimizations$addRefs(int kind, int firstRef, int count, int rawVertices);
 
     boolean txoptimizations$finishSegments();
 

@@ -191,7 +191,7 @@ public final class GpuCubes {
 
         int ref = batch.addRef(shape, partSlot);
 
-        draw.txoptimizations$addRef(GpuCubeDraw.CUBES, ref, draw.txoptimizations$rawVertices() + ((DirectVertexBuffer) builder).txoptimizations$vertexCount());
+        draw.txoptimizations$addRefs(GpuCubeDraw.CUBES, ref, 1, draw.txoptimizations$rawVertices() + ((DirectVertexBuffer) builder).txoptimizations$vertexCount());
 
         if (draw.txoptimizations$isSorted()) {
             CubeVertices.faceKeys(partPose.pose(), statics, shape * STATIC_FLOATS, FACE_KEYS, 0);
@@ -217,9 +217,7 @@ public final class GpuCubes {
         return draw;
     }
 
-    public static void addQuad(GpuCubeDraw draw, PoseStack.Pose pose, GpuCube quad, int color, int light, int rawVertices) {
-        GpuCubeBatch batch = draw.txoptimizations$batch();
-
+    public static int itemPose(GpuCubeBatch batch, PoseStack.Pose pose, int color, int light) {
         if (batch != itemBatch || color != itemColor || light != itemLight) {
             itemSlot  = batch.pose(pose, light, itemOverlay, color);
             itemBatch = batch;
@@ -227,7 +225,7 @@ public final class GpuCubes {
             itemLight = light;
         }
 
-        draw.txoptimizations$addRef(GpuCubeDraw.QUADS, batch.addRef(quad.txoptimizations$gpuIndex(), itemSlot), rawVertices);
+        return itemSlot;
     }
 
     public static boolean accepts(VertexFormat format, PrimitiveTopology topology, @Nullable VertexSorting sorting, @Nullable PreparedRenderType prepared) {

@@ -204,6 +204,8 @@
     "BakedQuadGpuShapeMixin",
     "BlitRenderStateDirectWriteMixin",
     "EntityRenderDistanceMixin",
+    "AttributeMapVersionMixin",
+    "LivingEntityScaleMixin",
     "ColoredRectangleRenderStateDirectWriteMixin",
     "VulkanFeatureSetsDepthBoundsMixin",
     "VulkanDeviceDepthBoundsMixin",
