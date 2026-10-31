@@ -102,7 +102,7 @@ public abstract class ItemFeatureQuadLoopMixin {
         while (end < quads.size() && txoptimizations$renderType(quads.get(end).materialInfo(), foilType) == renderType)
             end ++;
 
-        GpuCubeDraw draw = GpuCubes.beginItem(builder, submit.overlayCoords());
+        GpuCubeDraw draw = submit.displayContext() == ItemDisplayContext.GUI ? null : GpuCubes.beginItem(builder, submit.overlayCoords());
 
         if (draw == null)
             return this.txoptimizations$putEntityRun(direct, submit, from, end);
