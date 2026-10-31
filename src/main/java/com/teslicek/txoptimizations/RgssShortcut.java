@@ -8,6 +8,7 @@ public final class RgssShortcut {
     private static final String BLEND    = "    float blendFactor = smoothstep(transitionStart, transitionEnd, maxTexelSize);\n";
     private static final String NEAREST  = "    vec4 nearestColor = sampleNearest(source, uv, pixelSize, du, dv, texelScreenSize);\n\n    return mix(nearestColor, rgssColor, blendFactor);\n}";
     private static final String SHORTCUT = BLEND + "    if (blendFactor == 0.0) {\n        return sampleNearest(source, uv, pixelSize, du, dv, texelScreenSize);\n    }\n";
+    private static final String FAR      = "    if (blendFactor == 1.0) {\n        return rgssColor;\n    }\n\n" + NEAREST;
     private static final String LEVELS   = """
             float mipLevelLow = floor(mipLevelExact);
             float mipLevelHigh = mipLevelLow + 1.0;
@@ -46,7 +47,7 @@ public final class RgssShortcut {
         if (!once(source, BLEND) || !once(source, NEAREST) || !once(source, LEVELS) || !once(source, TWO_TAPS))
             return source;
 
-        return source.replace(BLEND, SHORTCUT).replace(LEVELS, "").replace(TWO_TAPS, ONE_TAP);
+        return source.replace(BLEND, SHORTCUT).replace(NEAREST, FAR).replace(LEVELS, "").replace(TWO_TAPS, ONE_TAP);
     }
 
     private static boolean once(String source, String part) {
