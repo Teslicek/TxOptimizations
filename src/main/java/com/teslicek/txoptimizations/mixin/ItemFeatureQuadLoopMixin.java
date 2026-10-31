@@ -107,11 +107,23 @@ public abstract class ItemFeatureQuadLoopMixin {
         if (draw == null)
             return this.txoptimizations$putEntityRun(direct, submit, from, end);
 
+        PoseStack.Pose         pose         = submit.pose();
+        int                    rawVertices  = draw.txoptimizations$rawVertices() + direct.txoptimizations$vertexCount();
+        BakedQuad.MaterialInfo lastMaterial = null;
+        int                    color        = 0;
+        int                    light        = 0;
+
         for (int index = from; index < end; index ++) {
             BakedQuad              quad     = quads.get(index);
             BakedQuad.MaterialInfo material = quad.materialInfo();
 
-            GpuCubes.addQuad(draw, builder, submit.pose(), (GpuCube) (Object) quad, getLayerColorSafe(submit.tintLayers(), material), LightCoordsUtil.lightCoordsWithEmission(submit.lightCoords(), material.lightEmission()));
+            if (material != lastMaterial) {
+                color        = getLayerColorSafe(submit.tintLayers(), material);
+                light        = LightCoordsUtil.lightCoordsWithEmission(submit.lightCoords(), material.lightEmission());
+                lastMaterial = material;
+            }
+
+            GpuCubes.addQuad(draw, pose, (GpuCube) (Object) quad, color, light, rawVertices);
         }
 
         return end - from;

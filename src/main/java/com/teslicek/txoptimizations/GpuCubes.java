@@ -217,7 +217,7 @@ public final class GpuCubes {
         return draw;
     }
 
-    public static void addQuad(GpuCubeDraw draw, VertexConsumer builder, PoseStack.Pose pose, GpuCube quad, int color, int light) {
+    public static void addQuad(GpuCubeDraw draw, PoseStack.Pose pose, GpuCube quad, int color, int light, int rawVertices) {
         GpuCubeBatch batch = draw.txoptimizations$batch();
 
         if (batch != itemBatch || color != itemColor || light != itemLight) {
@@ -227,7 +227,7 @@ public final class GpuCubes {
             itemLight = light;
         }
 
-        draw.txoptimizations$addRef(GpuCubeDraw.QUADS, batch.addRef(quad.txoptimizations$gpuIndex(), itemSlot), draw.txoptimizations$rawVertices() + ((DirectVertexBuffer) builder).txoptimizations$vertexCount());
+        draw.txoptimizations$addRef(GpuCubeDraw.QUADS, batch.addRef(quad.txoptimizations$gpuIndex(), itemSlot), rawVertices);
     }
 
     public static boolean accepts(VertexFormat format, PrimitiveTopology topology, @Nullable VertexSorting sorting, @Nullable PreparedRenderType prepared) {
