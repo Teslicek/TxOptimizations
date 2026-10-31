@@ -8,7 +8,6 @@ import com.mojang.renderpearl.api.commands.CommandEncoder;
 import com.mojang.renderpearl.api.device.GpuSurface;
 import com.mojang.renderpearl.api.device.SurfaceException;
 import com.teslicek.txoptimizations.AcquiredImageDiscard;
-import com.teslicek.txoptimizations.FramePacer;
 import com.teslicek.txoptimizations.FramePath;
 import com.teslicek.txoptimizations.PresentThread;
 import net.minecraft.client.Minecraft;
@@ -119,10 +118,7 @@ public abstract class MinecraftPresentThreadMixin {
     @Redirect(method = "renderFrame", at = @At(value = "INVOKE", target = "Lcom/mojang/renderpearl/api/device/GpuSurface;acquireNextTexture()V"))
     private void txoptimizations$useEarlyAcquire(GpuSurface surface) throws SurfaceException {
         if (!this.txoptimizations$frameAcquiredEarly) {
-            long acquireStart = System.nanoTime();
-
             surface.acquireNextTexture();
-            FramePacer.recordAcquire(System.nanoTime() - acquireStart);
 
             return;
         }
@@ -179,16 +175,12 @@ public abstract class MinecraftPresentThreadMixin {
         if (this.windowSurface.isAcquired() || this.surfaceIsInvalid || this.windowSurfaceNeedsReconfiguring || this.windowSurface.isSuboptimal())
             return;
 
-        long acquireStart = System.nanoTime();
-
         try {
             this.windowSurface.acquireNextTexture();
             this.txoptimizations$imageAcquiredEarly = true;
         } catch (SurfaceException exception) {
             this.txoptimizations$earlyAcquireFailure = exception;
         }
-
-        FramePacer.recordAcquire(System.nanoTime() - acquireStart);
     }
 
     @WrapOperation(method = "close", at = @At(value = "INVOKE", target = "Lcom/mojang/renderpearl/api/device/GpuSurface;close()V"))
@@ -237,9 +229,6 @@ public abstract class MinecraftPresentThreadMixin {
             this.windowSurfaceNeedsReconfiguring = true;
         }
 
-        long acquired = System.nanoTime() - acquireStart;
-
-        FramePath.recordAcquire(acquired);
-        FramePacer.recordAcquire(acquired);
+        FramePath.recordAcquire(System.nanoTime() - acquireStart);
     }
 }
