@@ -38,6 +38,7 @@ import net.minecraft.client.renderer.oit.OitStage;
 import net.minecraft.client.renderer.rendertype.PreparedRenderType;
 import net.minecraft.client.resources.model.geometry.BakedQuad;
 import net.minecraft.resources.Identifier;
+import org.joml.Matrix3f;
 import org.joml.Matrix4f;
 import org.joml.Matrix4fc;
 import org.joml.Vector3fc;
@@ -72,6 +73,8 @@ public final class GpuCubes {
     private static final int             STATIC_BYTES    = STATIC_FLOATS * Float.BYTES;
     private static final int             INITIAL_CUBES   = 4096;
     private static final int             RETIRE_FRAMES   = 4;
+    private static final long            NORMALS_AT      = 80L;
+    private static final long            TRUSTED_AT      = 116L;
     private static final BindGroupLayout LAYOUT          = BindGroupLayout.builder()
         .withUniform("TxCubeStatic", UniformType.TEXEL_BUFFER, GpuFormat.RGBA32_FLOAT)
         .withUniform("TxPoseMatrix", UniformType.TEXEL_BUFFER, GpuFormat.RGBA32_FLOAT)
@@ -90,6 +93,7 @@ public final class GpuCubes {
     private static final StagedVertexBuffer.ExecuteInfo      EMPTY_INFO  = new StagedVertexBuffer.ExecuteInfo(null, null, IndexType.SHORT, 0, 0, 0, PrimitiveTopology.QUADS);
     private static final Set<Identifier>                     PATCHED     = new HashSet<>();
     private static final float[]                             QUAD        = new float[QUAD_FLOATS];
+    private static final int[]                               AXIS_ROWS   = {1, 2, 0};
 
     private static float[]                 statics = new float[STATIC_FLOATS * INITIAL_CUBES];
     private static int                     cubes;
@@ -383,10 +387,49 @@ public final class GpuCubes {
         MemoryUtil.memPutInt(address + 64L, matrix.properties());
         MemoryUtil.memPutLong(address + 68L, VertexBytes.pairBits(overlay, light));
         MemoryUtil.memPutInt(address + 76L, VertexBytes.colorBits(color));
+
+        if (pose.trustedNormals) {
+            Matrix3f normal = pose.normal();
+
+            MemoryUtil.memPutFloat(address + NORMALS_AT, normal.m00);
+            MemoryUtil.memPutFloat(address + NORMALS_AT + 4L, normal.m01);
+            MemoryUtil.memPutFloat(address + NORMALS_AT + 8L, normal.m02);
+            MemoryUtil.memPutFloat(address + NORMALS_AT + 12L, normal.m10);
+            MemoryUtil.memPutFloat(address + NORMALS_AT + 16L, normal.m11);
+            MemoryUtil.memPutFloat(address + NORMALS_AT + 20L, normal.m12);
+            MemoryUtil.memPutFloat(address + NORMALS_AT + 24L, normal.m20);
+            MemoryUtil.memPutFloat(address + NORMALS_AT + 28L, normal.m21);
+            MemoryUtil.memPutFloat(address + NORMALS_AT + 32L, normal.m22);
+            MemoryUtil.memPutInt(address + TRUSTED_AT, 1);
+
+            return;
+        }
+
         NormalCache.selectAll(pose);
 
         for (int direction = 0; direction < CubeVertices.FACES; direction ++)
-            VertexBytes.putPaddedNormal(address + 80L + direction * 4L, NormalCache.selected(direction));
+            VertexBytes.putPaddedNormal(address + NORMALS_AT + direction * 4L, NormalCache.selected(direction));
+
+        MemoryUtil.memPutInt(address + TRUSTED_AT, 0);
+    }
+
+    public static void readNormals(long address, int[] normals) {
+        if (MemoryUtil.memGetInt(address + TRUSTED_AT) == 0) {
+            for (int direction = 0; direction < CubeVertices.FACES; direction ++)
+                normals[direction] = MemoryUtil.memGetInt(address + NORMALS_AT + direction * 4L);
+
+            return;
+        }
+
+        for (int axis = 0; axis < 3; axis ++) {
+            long  row = address + NORMALS_AT + 12L * AXIS_ROWS[axis];
+            float x   = MemoryUtil.memGetFloat(row);
+            float y   = MemoryUtil.memGetFloat(row + 4L);
+            float z   = MemoryUtil.memGetFloat(row + 8L);
+
+            normals[axis * 2]     = VertexBytes.packNormal(-x, -y, -z);
+            normals[axis * 2 + 1] = VertexBytes.packNormal(x, y, z);
+        }
     }
 
     private static @Nullable GpuCubeDraw acceptingDraw(VertexConsumer builder) {
@@ -481,6 +524,22 @@ public final class GpuCubes {
             + "ivec2 UV1;\n"
             + "ivec2 UV2;\n"
             + "vec3 Normal;\n"
+            + "uint txNormalByte(float value) {\n"
+            + "    precise float scaled = value * 127.0;\n"
+            + "    int normal = value < -1.0 ? -127 : value > 1.0 ? 127 : int(scaled);\n"
+            + "    return uint(normal) & 255u;\n"
+            + "}\n"
+            + "vec3 txFaceNormal(int pose, int facing) {\n"
+            + "    if (texelFetch(TxPoseInfo, pose * 8 + 7).y == 0u) {\n"
+            + "        return texelFetch(TxPoseNormal, pose * 32 + 20 + facing).xyz;\n"
+            + "    }\n"
+            + "    vec4 n0 = texelFetch(TxPoseMatrix, pose * 8 + 5);\n"
+            + "    vec4 n1 = texelFetch(TxPoseMatrix, pose * 8 + 6);\n"
+            + "    vec4 n2 = texelFetch(TxPoseMatrix, pose * 8 + 7);\n"
+            + "    vec3 row = facing < 2 ? vec3(n0.w, n1.x, n1.y) : facing < 4 ? vec3(n1.z, n1.w, n2.x) : n0.xyz;\n"
+            + "    vec3 normal = (facing & 1) == 0 ? -row : row;\n"
+            + "    return unpackSnorm4x8(txNormalByte(normal.x) | txNormalByte(normal.y) << 8 | txNormalByte(normal.z) << 16).xyz;\n"
+            + "}\n"
             + "float txShape(int cube, int value) {\n"
             + "    return texelFetch(TxCubeStatic, cube * 14 + (value >> 2))[value & 3];\n"
             + "}\n"
@@ -531,7 +590,7 @@ public final class GpuCubes {
             + "    UV1 = texelFetch(TxPoseCoords, pose * 32 + 17).xy;\n"
             + "    UV2 = texelFetch(TxPoseCoords, pose * 32 + 18).xy;\n"
             + "    Color = texelFetch(TxPoseColor, pose * 32 + 19);\n"
-            + "    Normal = texelFetch(TxPoseNormal, pose * 32 + 20 + facing).xyz;\n"
+            + "    Normal = txFaceNormal(pose, facing);\n"
             + "}\n";
     }
 }

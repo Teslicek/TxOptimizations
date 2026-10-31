@@ -251,9 +251,7 @@ public final class GpuCubeBatch implements AutoCloseable {
         long poseAt = this.poses + (long) MemoryUtil.memGetInt(refAt + 4L) * GpuCubes.POSE_BYTES;
 
         MATRIX.setFromAddress(poseAt).assume(MemoryUtil.memGetInt(poseAt + 64L));
-
-        for (int direction = 0; direction < FACES; direction ++)
-            NORMALS[direction] = MemoryUtil.memGetInt(poseAt + 80L + direction * 4L);
+        GpuCubes.readNormals(poseAt, NORMALS);
 
         CubeVertices.putShape(target, MATRIX, GpuCubes.shapes(), shape * GpuCubes.shapeFloats(), MemoryUtil.memGetInt(poseAt + 76L), MemoryUtil.memGetLong(poseAt + 68L), NORMALS);
     }
