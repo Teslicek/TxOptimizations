@@ -4,6 +4,7 @@ import com.mojang.renderpearl.api.pipeline.BlendFactor;
 import com.mojang.renderpearl.api.pipeline.BlendFunction;
 import com.mojang.renderpearl.api.pipeline.ColorTargetState;
 import com.mojang.renderpearl.api.pipeline.RenderPipeline;
+import com.teslicek.txoptimizations.RenderWorker;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -49,7 +50,7 @@ public final class HudCache {
     }
 
     public static boolean isRendering() {
-        return rendering;
+        return rendering && !RenderWorker.isCurrent();
     }
 
     public static boolean isFlushing() {
