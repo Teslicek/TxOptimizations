@@ -328,6 +328,7 @@
     "LevelExtractorStateAccessor",
     "LevelRendererStateAccessor",
     "MinecraftRenderStateBuffersMixin",
+    "MinecraftRenderWorkerMixin",
     "SoundEngineListenerMixin",
     "SoundEngineDeviceReuseMixin",
     "LanguageManagerPreparedMixin",

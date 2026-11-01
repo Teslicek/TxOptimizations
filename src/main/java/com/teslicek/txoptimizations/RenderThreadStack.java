@@ -4,8 +4,8 @@ import org.lwjgl.system.MemoryStack;
 
 public final class RenderThreadStack {
 
-    private static Thread      thread;
-    private static MemoryStack stack;
+    private static volatile Thread      thread;
+    private static volatile MemoryStack stack;
 
     private RenderThreadStack() {
     }
@@ -16,6 +16,15 @@ public final class RenderThreadStack {
 
         stack  = captured;
         thread = Thread.currentThread();
+    }
+
+    public static void handTo(Thread owner, MemoryStack ownerStack) {
+        stack  = ownerStack;
+        thread = owner;
+    }
+
+    public static Thread owner() {
+        return thread;
     }
 
     public static boolean isOwner() {
