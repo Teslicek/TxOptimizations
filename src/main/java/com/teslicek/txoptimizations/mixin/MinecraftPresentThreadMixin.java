@@ -242,7 +242,9 @@ public abstract class MinecraftPresentThreadMixin {
     private void txoptimizations$renderJob(GameRenderer renderer, Operation<Void> original, boolean acquire, int width, int height, boolean vsync, List<AnimationUploads.Upload> uploads, List<HudFrameOps.Op> hud, boolean timer) {
         FramePath.beginFrame(PresentThread.canDeferAcquire(this.windowSurface));
 
-        if (timer)
+        boolean timed = timer && this.timerQuery.getStatus() == TimerQuery.Status.NOT_RECORDING;
+
+        if (timed)
             this.timerQuery.beginProfile();
 
         ((VisibleSectionBinding) this.levelRenderer).txoptimizations$bindRenderSections();
@@ -268,7 +270,7 @@ public abstract class MinecraftPresentThreadMixin {
             PresentThread.arm(this.windowSurface);
         }
 
-        if (timer)
+        if (timed)
             this.timerQuery.endProfile();
 
         try {
