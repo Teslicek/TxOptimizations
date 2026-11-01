@@ -13,6 +13,9 @@ public final class AnimatedItemAtlas extends GuiItemAtlas {
 
     private static final int MINIMUM_TEXTURE_SIZE = 128;
 
+    private long drawnTick   = -1L;
+    private long drawnMillis = -1L;
+
     public AnimatedItemAtlas(FeatureRenderDispatcher featureRenderDispatcher, int textureSize, int slotTextureSize) {
         super(featureRenderDispatcher, textureSize, slotTextureSize);
     }
@@ -25,16 +28,25 @@ public final class AnimatedItemAtlas extends GuiItemAtlas {
         return super.getOrUpdate(item);
     }
 
-    @Override
-    public void endFrame() {
-        if (!this.allocator.usedSlotByKey.isEmpty()) {
-            RenderSystem.getDevice().createCommandEncoder().clearColorAndDepthTextures(this.texture, GuiRenderer.CLEAR_COLOR, this.depthTexture, 0.0);
+    public void beginFrame() {
+        long tick   = ClientClock.tick();
+        long millis = ClientClock.frameMillis();
 
-            for (DynamicAtlasAllocator.Slot slot : this.allocator.usedSlotByKey.values())
-                slot.fresh = true;
-        }
+        if (tick == this.drawnTick && millis == this.drawnMillis)
+            return;
 
-        super.endFrame();
+        this.drawnTick   = tick;
+        this.drawnMillis = millis;
+
+        if (this.allocator.usedSlotByKey.isEmpty())
+            return;
+
+        RenderSystem.getDevice().createCommandEncoder().clearColorAndDepthTextures(this.texture, GuiRenderer.CLEAR_COLOR, this.depthTexture, 0.0);
+
+        for (DynamicAtlasAllocator.Slot slot : this.allocator.usedSlotByKey.values())
+            slot.fresh = true;
+
+        this.allocator.endFrame();
     }
 
     public static int textureSizeFor(int slotTextureSize, int slotCount) {

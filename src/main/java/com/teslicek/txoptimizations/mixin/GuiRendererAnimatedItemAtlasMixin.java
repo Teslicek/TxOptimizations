@@ -65,14 +65,6 @@ public abstract class GuiRendererAnimatedItemAtlasMixin {
         return this.txoptimizations$animatedAtlas;
     }
 
-    @Inject(method = "endFrame", at = @At("RETURN"))
-    private void txoptimizations$endAnimatedAtlasFrame(CallbackInfo ci) {
-        if (this.txoptimizations$animatedAtlas == null)
-            return;
-
-        this.txoptimizations$animatedAtlas.endFrame();
-    }
-
     @Inject(method = {"invalidateItemAtlas", "close"}, at = @At("RETURN"))
     private void txoptimizations$releaseAnimatedAtlas(CallbackInfo ci) {
         this.txoptimizations$closeAnimatedAtlas();
@@ -89,6 +81,8 @@ public abstract class GuiRendererAnimatedItemAtlasMixin {
             this.txoptimizations$closeAnimatedAtlas();
             this.txoptimizations$animatedAtlas = new AnimatedItemAtlas(this.featureRenderDispatcher, textureSize, slotTextureSize);
         }
+
+        this.txoptimizations$animatedAtlas.beginFrame();
 
         return this.txoptimizations$animatedAtlas.tryPrepareFor(animatedItems);
     }
