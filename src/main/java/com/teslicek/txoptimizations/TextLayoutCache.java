@@ -93,7 +93,7 @@ public final class TextLayoutCache {
         if (RenderWorker.isCurrent())
             throw new IllegalStateException("Text layouts are cleared from the render worker");
 
-        RenderWorker.awaitFrame();
+        RenderWorker.awaitFromMain();
         EXTRACT.clear();
         RENDER.clear();
     }

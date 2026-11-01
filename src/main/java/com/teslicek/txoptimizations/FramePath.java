@@ -30,19 +30,13 @@ public final class FramePath {
     private FramePath() {
     }
 
-    public static boolean beginFrame(boolean eligible) {
+    public static void beginFrame(boolean eligible) {
         frameEligible   = eligible;
         frameUsesWorker = eligible && worker;
-
-        return frameUsesWorker;
     }
 
     public static boolean frameUsesWorker() {
         return frameUsesWorker;
-    }
-
-    public static boolean nextFrameAcquiresEarly(boolean eligible) {
-        return eligible && !worker;
     }
 
     public static void recordGpuWait(long nanos) {

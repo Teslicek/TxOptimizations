@@ -17,7 +17,7 @@ public abstract class MinecraftRenderJobWaitMixin {
     @Final
     public Gui gui;
 
-    @Inject(method = {"close", "setLevel", "disconnect(Lnet/minecraft/client/gui/screens/Screen;Z)V", "disconnect(Lnet/minecraft/client/gui/screens/Screen;ZZ)V", "clearClientLevel", "updateLevelInEngines(Lnet/minecraft/client/multiplayer/ClientLevel;)V", "updateLevelInEngines(Lnet/minecraft/client/multiplayer/ClientLevel;Z)V"}, at = @At("HEAD"), require = 7)
+    @Inject(method = {"close", "setLevel", "disconnect(Lnet/minecraft/client/gui/screens/Screen;Z)V", "disconnect(Lnet/minecraft/client/gui/screens/Screen;ZZ)V", "clearClientLevel", "updateLevelInEngines(Lnet/minecraft/client/multiplayer/ClientLevel;)V", "updateLevelInEngines(Lnet/minecraft/client/multiplayer/ClientLevel;Z)V", "invalidateSurfaceConfiguration"}, at = @At("HEAD"), require = 8)
     private void txoptimizations$waitBeforeLevelChange(CallbackInfo ci) {
         RenderWorker.awaitFromMain();
     }

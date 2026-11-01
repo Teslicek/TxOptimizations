@@ -1,10 +1,13 @@
 package com.teslicek.txoptimizations;
 
+import com.mojang.logging.LogUtils;
 import java.util.concurrent.locks.LockSupport;
 import org.lwjgl.system.MemoryStack;
+import org.slf4j.Logger;
 
 public final class RenderWorker {
 
+    private static final Logger LOGGER     = LogUtils.getLogger();
     private static final long   SPIN_NANOS = 200_000L;
     private static final Thread WORKER     = Thread.ofPlatform().name("TxOptimizations Render").daemon().priority(Thread.MAX_PRIORITY).start(RenderWorker::work);
 
@@ -22,7 +25,7 @@ public final class RenderWorker {
     }
 
     public static void start(Runnable frame) {
-        awaitIdle();
+        awaitFrame();
         RenderThreadStack.ensureCaptured();
         workerStack();
 
@@ -45,6 +48,7 @@ public final class RenderWorker {
 
     public static void awaitFrame() {
         awaitIdle();
+        rethrowFailure();
     }
 
     public static void awaitFromMain() {
@@ -68,7 +72,9 @@ public final class RenderWorker {
 
             waiting = null;
         }
+    }
 
+    private static void rethrowFailure() {
         Throwable thrown = failure;
 
         if (thrown == null)
@@ -109,6 +115,7 @@ public final class RenderWorker {
             try {
                 next.run();
             } catch (Throwable thrown) {
+                LOGGER.error("The render job failed", thrown);
                 failure = thrown;
             }
 

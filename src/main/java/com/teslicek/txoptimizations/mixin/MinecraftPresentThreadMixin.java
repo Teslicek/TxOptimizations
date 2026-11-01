@@ -10,6 +10,7 @@ import com.mojang.renderpearl.api.device.GpuSurface;
 import com.mojang.renderpearl.api.device.SurfaceException;
 import com.mojang.renderpearl.api.textures.GpuTextureView;
 import com.teslicek.txoptimizations.AcquiredImageDiscard;
+import com.teslicek.txoptimizations.ClientClock;
 import com.teslicek.txoptimizations.FramePath;
 import com.teslicek.txoptimizations.PresentThread;
 import com.teslicek.txoptimizations.RenderStateBuffers;
@@ -101,8 +102,6 @@ public abstract class MinecraftPresentThreadMixin {
 
     @ModifyExpressionValue(method = "renderFrame", at = @At(value = "FIELD", target = "Lnet/minecraft/client/Minecraft;windowSurfaceNeedsReconfiguring:Z", opcode = Opcodes.GETFIELD))
     private boolean txoptimizations$deferAcquire(boolean needsReconfiguring) {
-        FramePath.beginFrame(PresentThread.canDeferAcquire(this.windowSurface));
-
         if (needsReconfiguring)
             RenderWorker.awaitFrame();
 
@@ -190,11 +189,13 @@ public abstract class MinecraftPresentThreadMixin {
 
         VisibleSectionBuffers.handOff();
         RenderStateBuffers.handOff();
+        ClientClock.handOff();
         RenderWorker.start(() -> this.txoptimizations$renderJob(renderer, original, acquire, width, height, vsync));
     }
 
     @Unique
     private void txoptimizations$renderJob(GameRenderer renderer, Operation<Void> original, boolean acquire, int width, int height, boolean vsync) {
+        FramePath.beginFrame(PresentThread.canDeferAcquire(this.windowSurface));
         ((VisibleSectionBinding) this.levelRenderer).txoptimizations$bindRenderSections();
         RenderStateBuffers.bindRender((Minecraft) (Object) this);
         RenderSystem.executePendingTasks();
