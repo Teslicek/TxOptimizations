@@ -198,10 +198,14 @@ public abstract class MinecraftPresentThreadMixin {
 
         this.txoptimizations$acquireDeferred = false;
 
+        RenderWorker.start(() -> txoptimizations$handOff(), () -> this.txoptimizations$renderJob(renderer, original, acquire, width, height, vsync, uploads, hud));
+    }
+
+    @Unique
+    private static void txoptimizations$handOff() {
         VisibleSectionBuffers.handOff();
         RenderStateBuffers.handOff();
         ClientClock.handOff();
-        RenderWorker.start(() -> this.txoptimizations$renderJob(renderer, original, acquire, width, height, vsync, uploads, hud));
     }
 
     @Unique

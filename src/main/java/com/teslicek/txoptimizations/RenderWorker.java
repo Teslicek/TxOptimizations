@@ -25,7 +25,7 @@ public final class RenderWorker {
         return Thread.currentThread() == WORKER;
     }
 
-    public static void start(Runnable frame) {
+    public static void start(Runnable handOff, Runnable frame) {
         long begin = System.nanoTime();
 
         if (job != null) {
@@ -34,6 +34,7 @@ public final class RenderWorker {
         }
 
         rethrowFailure();
+        handOff.run();
         RenderThreadStack.ensureCaptured();
         workerStack();
 
