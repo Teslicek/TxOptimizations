@@ -15,6 +15,7 @@
     "RenderTypeGroupParallelMixin",
     "StagedVertexBufferListAccessor",
     "TextureManagerParallelMixin",
+    "compat.FabricLevelRenderContextMixin",
     "compat.XaeroMinimapCoreHudCacheMixin",
     "LevelExtractorFrameMillisMixin",
     "LevelRendererFrameMillisMixin",

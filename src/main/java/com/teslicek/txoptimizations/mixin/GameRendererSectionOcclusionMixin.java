@@ -1,5 +1,6 @@
 package com.teslicek.txoptimizations.mixin;
 
+import com.teslicek.txoptimizations.FabricLevelRenderContext;
 import com.teslicek.txoptimizations.RenderStateBuffers;
 import com.teslicek.txoptimizations.RenderWorker;
 import net.minecraft.client.DeltaTracker;
@@ -55,6 +56,7 @@ public abstract class GameRendererSectionOcclusionMixin {
         accessor.txoptimizations$repositionCamera(camera);
         levelRenderer.sectionOcclusionGraph().update(camera, state.optionsRenderState.fov, state.levelRenderState.chunkLoadingRenderState);
         storage.setUseImprovedTransparency(this.useImprovedTransparency());
+        ((FabricLevelRenderContext) levelRenderer).txoptimizations$prepareBeforeFirstRender(state.levelRenderState, storage);
 
         try (Gizmos.TemporaryCollection ignored = levelRenderer.collectPerFrameRenderThreadGizmos()) {
             accessor.txoptimizations$submitFeatures(state.levelRenderState, storage, this.shouldRenderBlockOutline());
