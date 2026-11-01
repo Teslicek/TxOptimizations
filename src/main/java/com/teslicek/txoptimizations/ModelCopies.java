@@ -15,14 +15,12 @@ import java.util.Set;
 import java.util.function.Function;
 import net.minecraft.client.animation.KeyframeAnimation;
 import net.minecraft.client.model.Model;
-import net.minecraft.client.model.animal.equine.BabyDonkeyModel;
 import net.minecraft.client.model.geom.ModelPart;
 import org.jspecify.annotations.Nullable;
 
 public final class ModelCopies {
 
     private static final String                  MINECRAFT     = "net.minecraft.";
-    private static final Set<Class<?>>           STATE_WRITERS = Set.of(BabyDonkeyModel.class);
     private static final Set<Class<?>>           SHAREABLE     = Set.of(ModelPart.class, ModelPart[].class, List.class, KeyframeAnimation.class, Function.class, String.class);
     private static final Layout                  UNSUPPORTED   = new Layout(false, new Field[0]);
     private static final Map<Source, List<Pair>> SOURCES       = new EnumMap<>(Source.class);
@@ -127,9 +125,6 @@ public final class ModelCopies {
         List<Field> references = new ArrayList<>();
 
         for (Class<?> level = type; level != Model.class; level = level.getSuperclass()) {
-            if (STATE_WRITERS.contains(level))
-                return UNSUPPORTED;
-
             for (Field field : level.getDeclaredFields()) {
                 int      modifiers = field.getModifiers();
                 Class<?> kind      = field.getType();
