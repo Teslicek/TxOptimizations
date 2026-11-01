@@ -23,14 +23,28 @@ public final class GlyphRun implements GuiElementRenderState {
     private final ScreenRectangle scissor;
     private final RenderPipeline  pipeline;
     private final GpuTextureView  textureView;
-    private TextRenderable[]      glyphs = new TextRenderable[INITIAL_GLYPHS];
+    private final TextureSetup    textureSetup;
+    private final boolean         shared;
+    private TextRenderable[]      glyphs;
     private int                   count;
 
     GlyphRun(Matrix3x2fc pose, @Nullable ScreenRectangle scissor, RenderPipeline pipeline, GpuTextureView textureView) {
-        this.pose        = pose;
-        this.scissor     = scissor;
-        this.pipeline    = pipeline;
-        this.textureView = textureView;
+        this(pose, scissor, pipeline, textureView, new TextRenderable[INITIAL_GLYPHS], 0, false);
+    }
+
+    GlyphRun(Matrix3x2fc pose, @Nullable ScreenRectangle scissor, SegmentedText.Segment segment) {
+        this(pose, scissor, segment.pipeline(), segment.textureView(), segment.glyphs(), segment.glyphs().length, true);
+    }
+
+    private GlyphRun(Matrix3x2fc pose, @Nullable ScreenRectangle scissor, RenderPipeline pipeline, GpuTextureView textureView, TextRenderable[] glyphs, int count, boolean shared) {
+        this.pose         = pose;
+        this.scissor      = scissor;
+        this.pipeline     = pipeline;
+        this.textureView  = textureView;
+        this.textureSetup = TextureSetup.singleTextureWithLightmap(textureView, RenderSystem.getSamplerCache().getClampToEdge(FilterMode.NEAREST));
+        this.shared       = shared;
+        this.glyphs       = glyphs;
+        this.count        = count;
     }
 
     boolean accepts(RenderPipeline glyphPipeline, GpuTextureView glyphTexture) {
@@ -38,6 +52,9 @@ public final class GlyphRun implements GuiElementRenderState {
     }
 
     void add(TextRenderable glyph) {
+        if (this.shared)
+            throw new IllegalStateException("A glyph run of a segmented text cannot take more glyphs");
+
         if (this.count == this.glyphs.length)
             this.glyphs = Arrays.copyOf(this.glyphs, this.count * 2);
 
@@ -46,7 +63,7 @@ public final class GlyphRun implements GuiElementRenderState {
 
     @Override
     public void buildVertices(VertexConsumer vertexConsumer) {
-        GlyphVertexCache.build(this.glyphs, this.count, this.pose, POSE.identity().mul(this.pose), vertexConsumer);
+        GlyphVertexCache.build(this.glyphs, this.count, this.shared, this.pose, POSE.identity().mul(this.pose), vertexConsumer);
     }
 
     @Override
@@ -56,7 +73,7 @@ public final class GlyphRun implements GuiElementRenderState {
 
     @Override
     public TextureSetup textureSetup() {
-        return TextureSetup.singleTextureWithLightmap(this.textureView, RenderSystem.getSamplerCache().getClampToEdge(FilterMode.NEAREST));
+        return this.textureSetup;
     }
 
     @Override

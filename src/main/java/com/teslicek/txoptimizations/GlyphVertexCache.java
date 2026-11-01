@@ -23,7 +23,7 @@ public final class GlyphVertexCache {
     private GlyphVertexCache() {
     }
 
-    public static void build(TextRenderable[] glyphs, int count, Matrix3x2fc pose, Matrix4f matrix, VertexConsumer consumer) {
+    public static void build(TextRenderable[] glyphs, int count, boolean shared, Matrix3x2fc pose, Matrix4f matrix, VertexConsumer consumer) {
         if (count == 0)
             throw new IllegalArgumentException("A glyph run without glyphs cannot build vertices");
 
@@ -48,7 +48,7 @@ public final class GlyphVertexCache {
             if (ENTRIES.size() >= MAX_ENTRIES)
                 clear();
 
-            ENTRIES.put(glyphs[0], new Entry(Arrays.copyOf(glyphs, count), pose, format, frame));
+            ENTRIES.put(glyphs[0], new Entry(shared ? glyphs : Arrays.copyOf(glyphs, count), pose, format, frame));
             return;
         }
 
@@ -135,6 +135,9 @@ public final class GlyphVertexCache {
         private boolean matches(TextRenderable[] glyphs, int count, Matrix3x2fc pose, VertexFormat format) {
             if (this.glyphs.length != count || this.format != format || !same(this.m00, pose.m00()) || !same(this.m01, pose.m01()) || !same(this.m10, pose.m10()) || !same(this.m11, pose.m11()) || !same(this.m20, pose.m20()) || !same(this.m21, pose.m21()))
                 return false;
+
+            if (this.glyphs == glyphs)
+                return true;
 
             for (int index = 0; index < count; index ++) {
                 if (this.glyphs[index] != glyphs[index])

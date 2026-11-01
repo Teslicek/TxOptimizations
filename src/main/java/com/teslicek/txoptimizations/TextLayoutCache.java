@@ -72,19 +72,14 @@ public final class TextLayoutCache {
         if (!isStable(text))
             return prepared;
 
-        if (ENTRIES.size() >= MAX_ENTRIES) {
-            ENTRIES.clear();
-            entryClears ++;
-        }
+        return put(prepared, font, text, x, y, color, dropShadow, backgroundColor, includeEmpty, outline);
+    }
 
-        Key key = new Key();
+    public static Font.PreparedText storeSegmented(Font.PreparedText prepared, Font font, FormattedCharSequence text, float x, float y, int color, boolean dropShadow, int backgroundColor, boolean includeEmpty) {
+        if (!isStable(text))
+            return prepared;
 
-        key.set(font, text, x, y, color, dropShadow, backgroundColor, includeEmpty, outline);
-        key.prepared = prepared;
-        key.frame    = ClientClock.frame();
-        ENTRIES.put(key, key);
-
-        return prepared;
+        return put(new SegmentedText(prepared), font, text, x, y, color, dropShadow, backgroundColor, includeEmpty, false);
     }
 
     public static int width(Font font, FormattedText text) {
@@ -214,6 +209,22 @@ public final class TextLayoutCache {
         SEQUENCES.clear();
         HELD.clear();
         generation ++;
+    }
+
+    private static Font.PreparedText put(Font.PreparedText prepared, Font font, FormattedCharSequence text, float x, float y, int color, boolean dropShadow, int backgroundColor, boolean includeEmpty, boolean outline) {
+        if (ENTRIES.size() >= MAX_ENTRIES) {
+            ENTRIES.clear();
+            entryClears ++;
+        }
+
+        Key key = new Key();
+
+        key.set(font, text, x, y, color, dropShadow, backgroundColor, includeEmpty, outline);
+        key.prepared = prepared;
+        key.frame    = ClientClock.frame();
+        ENTRIES.put(key, key);
+
+        return prepared;
     }
 
     private static boolean isStable(FormattedCharSequence text) {

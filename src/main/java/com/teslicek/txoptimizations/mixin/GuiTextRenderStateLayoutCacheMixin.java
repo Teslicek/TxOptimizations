@@ -21,6 +21,6 @@ public abstract class GuiTextRenderStateLayoutCacheMixin {
         if (cached != null)
             return cached;
 
-        return TextLayoutCache.store(font.prepareText(text, x, y, color, dropShadow, includeEmpty, backgroundColor), font, text, x, y, color, dropShadow, backgroundColor, includeEmpty, false);
+        return TextLayoutCache.storeSegmented(font.prepareText(text, x, y, color, dropShadow, includeEmpty, backgroundColor), font, text, x, y, color, dropShadow, backgroundColor, includeEmpty);
     }
 }

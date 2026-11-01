@@ -17,10 +17,23 @@ public final class GlyphRunBuilder implements Font.GlyphVisitor {
         if (this.text != null)
             throw new IllegalStateException("Glyph runs of a text are still being built while the next text starts");
 
+        Font.PreparedText prepared = textState.ensurePrepared();
+
+        if (prepared instanceof SegmentedText segmentedText) {
+            SegmentedText.Segment[] segments = segmentedText.ensureSegments();
+
+            if (segments != null) {
+                for (SegmentedText.Segment segment : segments)
+                    state.addGlyphToCurrentLayer(new GlyphRun(textState.pose, textState.scissor, segment));
+
+                return;
+            }
+        }
+
         this.renderState = state;
         this.text        = textState;
 
-        textState.ensurePrepared().visit(this);
+        prepared.visit(this);
         this.flush();
 
         this.renderState = null;
