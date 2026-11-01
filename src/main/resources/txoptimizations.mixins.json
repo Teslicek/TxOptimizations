@@ -330,6 +330,8 @@
     "MinecraftRenderStateBuffersMixin",
     "FrontendGpuDeviceMainThreadMixin",
     "VulkanResourceCloseMainThreadMixin",
+    "SectionOcclusionUpdateMixin",
+    "GameRendererSectionOcclusionMixin",
     "SoundEngineListenerMixin",
     "SoundEngineDeviceReuseMixin",
     "LanguageManagerPreparedMixin",

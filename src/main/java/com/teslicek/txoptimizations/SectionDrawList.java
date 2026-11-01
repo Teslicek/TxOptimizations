@@ -39,8 +39,6 @@ public final class SectionDrawList {
     private static final IndexType[] INDEX_TYPES       = IndexType.values();
     private static final int[]       INDEX_TYPE_HASHES = indexTypeHashes();
 
-    private static int visibleRefills;
-
     private GpuBuffer[]           vertexBuffers = new GpuBuffer[INITIAL_GROUPS];
     private @Nullable GpuBuffer[] indexBuffers  = new GpuBuffer[INITIAL_GROUPS];
     private @Nullable IndexType[] indexTypes    = new IndexType[INITIAL_GROUPS];
@@ -207,12 +205,8 @@ public final class SectionDrawList {
         return this;
     }
 
-    public static void visibleSectionsRefilled() {
-        visibleRefills ++;
-    }
-
     public static int visibleRefills() {
-        return visibleRefills;
+        return VisibleSectionBuffers.stamp();
     }
 
     public long build() {

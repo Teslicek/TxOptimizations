@@ -13,6 +13,8 @@ import com.teslicek.txoptimizations.AcquiredImageDiscard;
 import com.teslicek.txoptimizations.FramePath;
 import com.teslicek.txoptimizations.PresentThread;
 import com.teslicek.txoptimizations.RenderWorker;
+import com.teslicek.txoptimizations.VisibleSectionBinding;
+import com.teslicek.txoptimizations.VisibleSectionBuffers;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Gui;
 import net.minecraft.client.gui.screens.LevelLoadingScreen;
@@ -185,11 +187,13 @@ public abstract class MinecraftPresentThreadMixin {
 
         this.txoptimizations$acquireDeferred = false;
 
+        VisibleSectionBuffers.handOff();
         RenderWorker.runAndWait(() -> this.txoptimizations$renderJob(renderer, original, acquire, width, height, vsync));
     }
 
     @Unique
     private void txoptimizations$renderJob(GameRenderer renderer, Operation<Void> original, boolean acquire, int width, int height, boolean vsync) {
+        ((VisibleSectionBinding) this.levelRenderer).txoptimizations$bindRenderSections();
         RenderSystem.executePendingTasks();
 
         try (Gizmos.TemporaryCollection ignored = this.levelRenderer.collectPerFrameRenderThreadGizmos()) {
