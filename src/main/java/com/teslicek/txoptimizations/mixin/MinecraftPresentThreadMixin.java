@@ -6,6 +6,7 @@ import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
 import com.mojang.blaze3d.platform.Window;
 import com.mojang.blaze3d.systems.RenderSystem;
 import com.mojang.renderpearl.api.commands.CommandEncoder;
+import com.mojang.renderpearl.api.device.GpuDevice;
 import com.mojang.renderpearl.api.device.GpuSurface;
 import com.mojang.renderpearl.api.device.SurfaceException;
 import com.mojang.renderpearl.api.textures.GpuTextureView;
@@ -158,6 +159,11 @@ public abstract class MinecraftPresentThreadMixin {
     @Redirect(method = "renderFrame", at = @At(value = "INVOKE", target = "Lcom/mojang/renderpearl/api/device/GpuSurface;isAcquired()Z", ordinal = 1))
     private boolean txoptimizations$acquireBeforeBlit(GpuSurface surface) {
         return false;
+    }
+
+    @Redirect(method = "renderFrame", at = @At(value = "INVOKE", target = "Lcom/mojang/renderpearl/api/device/GpuDevice;createCommandEncoder()Lcom/mojang/renderpearl/api/commands/CommandEncoder;", ordinal = 1), require = 1)
+    private CommandEncoder txoptimizations$submitInRenderJob(GpuDevice device) {
+        return null;
     }
 
     @Redirect(method = "renderFrame", at = @At(value = "INVOKE", target = "Lcom/mojang/renderpearl/api/commands/CommandEncoder;submit()V"))
