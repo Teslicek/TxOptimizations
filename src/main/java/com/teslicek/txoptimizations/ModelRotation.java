@@ -1,7 +1,6 @@
 package com.teslicek.txoptimizations;
 
 import com.mojang.blaze3d.vertex.PoseStack;
-import java.util.List;
 import org.joml.Math;
 import org.joml.Matrix3f;
 import org.joml.Matrix4f;
@@ -33,17 +32,7 @@ public final class ModelRotation {
         rotateZYX(pose, pose, matrix.m30(), matrix.m31(), matrix.m32(), matrix.m33(), matrix.properties(), angleZ, angleY, angleX);
     }
 
-    public static void pushTranslatedRotated(PoseStack stack, float x, float y, float z, float angleZ, float angleY, float angleX) {
-        List<PoseStack.Pose> poses  = stack.poses;
-        PoseStack.Pose       parent = poses.get(stack.lastIndex);
-
-        stack.lastIndex ++;
-
-        if (stack.lastIndex >= poses.size())
-            poses.add(new PoseStack.Pose());
-
-        PoseStack.Pose child = poses.get(stack.lastIndex);
-
+    public static void translateRotate(PoseStack.Pose child, PoseStack.Pose parent, float x, float y, float z, float angleZ, float angleY, float angleX) {
         if (angleX == 0.0F && angleY == 0.0F && angleZ == 0.0F) {
             child.set(parent);
             child.translate(x, y, z);
