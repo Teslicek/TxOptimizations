@@ -136,6 +136,7 @@ public final class GpuPassProfiler {
         Arrays.fill(SLOW_TEXTS, null);
         FramePath.resetCounts();
         ProfileCounters.reset();
+        MainWaits.reset();
         FragmentCounts.reset();
         HudProfile.reset();
         ParticleProfile.reset();
@@ -487,6 +488,7 @@ public final class GpuPassProfiler {
         report.append(warmup).append(String.format(Locale.ROOT, "%n"));
         report.append(frameTimeReport());
         report.append(ProfileCounters.report(framesRead));
+        report.append(MainWaits.report(framesRead));
         report.append(context);
 
         if (screenFormats == null)

@@ -1,6 +1,7 @@
 package com.teslicek.txoptimizations;
 
 import com.mojang.logging.LogUtils;
+import com.teslicek.txoptimizations.gpu.MainWaits;
 import java.util.concurrent.locks.LockSupport;
 import org.lwjgl.system.MemoryStack;
 import org.slf4j.Logger;
@@ -25,7 +26,14 @@ public final class RenderWorker {
     }
 
     public static void start(Runnable frame) {
-        awaitFrame();
+        long begin = System.nanoTime();
+
+        if (job != null) {
+            awaitIdle();
+            MainWaits.recordHandOff(begin);
+        }
+
+        rethrowFailure();
         RenderThreadStack.ensureCaptured();
         workerStack();
 
@@ -52,8 +60,13 @@ public final class RenderWorker {
     }
 
     public static void awaitFromMain() {
-        if (RenderThreadStack.isMain())
-            awaitIdle();
+        if (!RenderThreadStack.isMain() || job == null)
+            return;
+
+        long begin = System.nanoTime();
+
+        awaitIdle();
+        MainWaits.recordWait(begin);
     }
 
     private static void awaitIdle() {
