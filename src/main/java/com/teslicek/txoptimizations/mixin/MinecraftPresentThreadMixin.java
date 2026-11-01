@@ -18,6 +18,7 @@ import com.teslicek.txoptimizations.RenderStateBuffers;
 import com.teslicek.txoptimizations.RenderWorker;
 import com.teslicek.txoptimizations.VisibleSectionBinding;
 import com.teslicek.txoptimizations.VisibleSectionBuffers;
+import com.teslicek.txoptimizations.hud.HudFrameOps;
 import java.util.List;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Gui;
@@ -187,21 +188,23 @@ public abstract class MinecraftPresentThreadMixin {
         int                           height  = this.window.getHeight();
         boolean                       vsync   = this.options.enableVsync().get();
         List<AnimationUploads.Upload> uploads = AnimationUploads.takeForFrame();
+        List<HudFrameOps.Op>          hud     = HudFrameOps.takeForFrame();
 
         this.txoptimizations$acquireDeferred = false;
 
         VisibleSectionBuffers.handOff();
         RenderStateBuffers.handOff();
         ClientClock.handOff();
-        RenderWorker.start(() -> this.txoptimizations$renderJob(renderer, original, acquire, width, height, vsync, uploads));
+        RenderWorker.start(() -> this.txoptimizations$renderJob(renderer, original, acquire, width, height, vsync, uploads, hud));
     }
 
     @Unique
-    private void txoptimizations$renderJob(GameRenderer renderer, Operation<Void> original, boolean acquire, int width, int height, boolean vsync, List<AnimationUploads.Upload> uploads) {
+    private void txoptimizations$renderJob(GameRenderer renderer, Operation<Void> original, boolean acquire, int width, int height, boolean vsync, List<AnimationUploads.Upload> uploads, List<HudFrameOps.Op> hud) {
         FramePath.beginFrame(PresentThread.canDeferAcquire(this.windowSurface));
         ((VisibleSectionBinding) this.levelRenderer).txoptimizations$bindRenderSections();
-        RenderStateBuffers.bindRender((Minecraft) (Object) this);
         AnimationUploads.submit(uploads);
+        HudFrameOps.run(hud);
+        RenderStateBuffers.bindRender((Minecraft) (Object) this);
         RenderSystem.executePendingTasks();
 
         try (Gizmos.TemporaryCollection ignored = this.levelRenderer.collectPerFrameRenderThreadGizmos()) {

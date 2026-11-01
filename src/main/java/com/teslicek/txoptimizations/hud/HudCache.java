@@ -126,10 +126,8 @@ public final class HudCache {
             buffers.markForCatchUp();
         }
 
-        if (pass > 0) {
+        if (pass > 0)
             buffers.resize();
-            buffers.bind();
-        }
 
         rendering = true;
         position  = 0;
@@ -139,10 +137,9 @@ public final class HudCache {
             keepUncachedAbove();
 
         if (pass > 0)
-            flush();
+            HudFrameOps.flush(graphics.guiRenderState, buffers.back());
 
         nextPass(buffers);
-        buffers.unbind();
         rendering = false;
 
         if (buffers.needsCatchUp()) {
@@ -229,10 +226,8 @@ public final class HudCache {
         orderChanged = true;
     }
 
-    private static void flush() {
-        flushing = true;
-        ((HudCacheRenderer) Minecraft.getInstance().gameRenderer.guiRenderer).txoptimizations$renderHudCache();
-        flushing = false;
+    static void setFlushing(boolean value) {
+        flushing = value;
     }
 
     private static void nextPass(HudFramebuffers buffers) {

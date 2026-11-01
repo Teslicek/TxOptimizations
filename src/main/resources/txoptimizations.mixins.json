@@ -341,6 +341,7 @@
     "CartographyMapStateAccessor",
     "CartographyMapStateMixin",
     "SmithingPreviewWaitMixin",
+    "GuiRenderStateMoveAccessor",
     "SoundEngineListenerMixin",
     "SoundEngineDeviceReuseMixin",
     "LanguageManagerPreparedMixin",

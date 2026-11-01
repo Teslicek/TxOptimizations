@@ -3,18 +3,12 @@ package com.teslicek.txoptimizations.hud;
 import com.mojang.blaze3d.pipeline.RenderTarget;
 import com.mojang.blaze3d.pipeline.TextureTarget;
 import com.mojang.blaze3d.platform.Window;
-import com.mojang.blaze3d.systems.RenderSystem;
 import com.mojang.renderpearl.api.GpuFormat;
 import java.util.List;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.navigation.ScreenRectangle;
-import net.minecraft.client.renderer.GameRenderer;
-import org.joml.Vector4f;
-import org.joml.Vector4fc;
 
 final class HudFramebuffers {
-
-    private static final Vector4fc CLEAR_COLOR = new Vector4f(0.0F);
 
     private final HudAreas backAreas = new HudAreas();
 
@@ -22,7 +16,6 @@ final class HudFramebuffers {
     private RenderTarget          front      = new TextureTarget("txoptimizations_hud_front", 1, 1, GpuFormat.RGBA8_UNORM, null);
     private List<ScreenRectangle> frontAreas = List.of();
     private ScreenRectangle       frontBounds = ScreenRectangle.empty();
-    private RenderTarget          mainTarget;
     private boolean               dropFrame;
     private int                   serial;
     private int                   catchUpSerial;
@@ -67,7 +60,7 @@ final class HudFramebuffers {
 
         this.backAreas.clear();
 
-        RenderSystem.getDevice().createCommandEncoder().clearColorTexture(this.back.getColorTexture(), CLEAR_COLOR);
+        HudFrameOps.clear(this.back);
         this.dropFrame = false;
 
         return swapped;
@@ -75,24 +68,6 @@ final class HudFramebuffers {
 
     void dropFrame() {
         this.dropFrame = true;
-    }
-
-    void bind() {
-        GameRenderer gameRenderer = Minecraft.getInstance().gameRenderer;
-
-        if (this.mainTarget != null)
-            throw new IllegalStateException("HUD framebuffer is already bound");
-
-        this.mainTarget               = gameRenderer.mainRenderTarget;
-        gameRenderer.mainRenderTarget = this.back;
-    }
-
-    void unbind() {
-        if (this.mainTarget == null)
-            return;
-
-        Minecraft.getInstance().gameRenderer.mainRenderTarget = this.mainTarget;
-        this.mainTarget                                       = null;
     }
 
     void markForCatchUp() {
@@ -105,6 +80,10 @@ final class HudFramebuffers {
 
     RenderTarget front() {
         return this.front;
+    }
+
+    RenderTarget back() {
+        return this.back;
     }
 
     List<ScreenRectangle> frontAreas() {
