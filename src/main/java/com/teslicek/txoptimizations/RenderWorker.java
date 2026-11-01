@@ -25,6 +25,10 @@ public final class RenderWorker {
         return Thread.currentThread() == WORKER;
     }
 
+    public static boolean isBusy() {
+        return job != null;
+    }
+
     public static void start(Runnable handOff, Runnable frame) {
         long begin = System.nanoTime();
 

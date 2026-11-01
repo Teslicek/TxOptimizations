@@ -108,8 +108,10 @@ final class FeatureWorker {
 
         long waitStart = System.nanoTime();
 
-        while (!this.done)
+        while (!this.done) {
+            WorkerTextureLoads.serve();
             Thread.onSpinWait();
+        }
 
         this.recordFrame(System.nanoTime() - waitStart, this.jobNanos);
 
