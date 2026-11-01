@@ -7,11 +7,8 @@ import com.mojang.renderpearl.backend.vulkan.VulkanDevice;
 import com.mojang.renderpearl.backend.vulkan.VulkanQueryPool;
 import com.mojang.renderpearl.frontend.FrontendRenderPipeline;
 import com.teslicek.txoptimizations.FramePath;
+import com.teslicek.txoptimizations.RenderThreadStack;
 import com.teslicek.txoptimizations.mixin.gpu.VulkanQueryPoolAccessor;
-import org.lwjgl.vulkan.KHRSynchronization2;
-import org.lwjgl.vulkan.VK12;
-import org.lwjgl.vulkan.VK13;
-import org.lwjgl.vulkan.VkCommandBuffer;
 import java.lang.management.CompilationMXBean;
 import java.lang.management.ManagementFactory;
 import java.nio.file.Path;
@@ -24,6 +21,10 @@ import java.util.Map;
 import java.util.OptionalLong;
 import net.minecraft.client.Minecraft;
 import net.minecraft.network.chat.MutableComponent;
+import org.lwjgl.vulkan.KHRSynchronization2;
+import org.lwjgl.vulkan.VK12;
+import org.lwjgl.vulkan.VK13;
+import org.lwjgl.vulkan.VkCommandBuffer;
 
 public final class GpuPassProfiler {
 
@@ -119,7 +120,7 @@ public final class GpuPassProfiler {
         resetMeasurements();
         context = ProfileContext.capture(Minecraft.getInstance());
         GcPauses.start();
-        CpuSampler.start(Thread.currentThread(), DURATION);
+        CpuSampler.start(Thread.currentThread(), RenderThreadStack.mainThread(), DURATION);
         JfrRecorder.measureFromNow();
         recording    = true;
         measuredFrom = System.nanoTime();

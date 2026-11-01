@@ -22,6 +22,15 @@ public final class RenderThreadStack {
             throw new IllegalStateException("The main thread was captured as " + main.getName() + ", not " + Thread.currentThread().getName());
     }
 
+    public static Thread mainThread() {
+        Thread captured = main;
+
+        if (captured == null)
+            throw new IllegalStateException("The main thread was requested before it was captured");
+
+        return captured;
+    }
+
     public static boolean isMain() {
         return Thread.currentThread() == main;
     }

@@ -26,22 +26,28 @@ final class CpuSampler {
     private static final double       SLOW_FRACTION     = 0.99;
     private static final int          WORST_FRAMES      = 10;
 
+    private static final int MAIN_SELF  = 40;
+    private static final int MAIN_TOTAL = 60;
+
     private static Thread sampler;
     private static Result result;
+    private static Result mainResult;
 
     private CpuSampler() {
     }
 
-    static void start(Thread target, long durationNanos) {
+    static void start(Thread target, Thread main, long durationNanos) {
         if (sampler != null)
             throw new IllegalStateException("CPU sampler is already running");
 
         Map<Long, Long> cpuBefore   = threadCpuTimes();
         Map<Long, Long> allocBefore = threadAllocations();
         Result          sampled     = new Result(target.threadId(), cpuBefore, allocBefore);
+        Result          mainSampled = new Result(main.threadId(), cpuBefore, allocBefore);
 
-        result  = sampled;
-        sampler = Thread.ofPlatform().name("TxOptimizations CPU Sampler").daemon().start(() -> sample(target, durationNanos, sampled));
+        result     = sampled;
+        mainResult = mainSampled;
+        sampler    = Thread.ofPlatform().name("TxOptimizations CPU Sampler").daemon().start(() -> sample(target, main, durationNanos, sampled, mainSampled));
     }
 
     static String finish(long[] frameEnds, long[] frameTimes, int frameCount, List<GcPauses.Pause> pauses) {
@@ -58,14 +64,16 @@ final class CpuSampler {
         }
 
         Result finished = result;
+        Result main     = mainResult;
 
-        sampler = null;
-        result  = null;
+        sampler    = null;
+        result     = null;
+        mainResult = null;
 
-        return finished.report() + finished.slowFrameReport(frameEnds, frameTimes, frameCount, pauses);
+        return finished.report() + main.threadReport("Main thread") + finished.slowFrameReport(frameEnds, frameTimes, frameCount, pauses);
     }
 
-    private static void sample(Thread target, long durationNanos, Result sampled) {
+    private static void sample(Thread target, Thread main, long durationNanos, Result sampled, Result mainSampled) {
         long start = System.nanoTime();
         long next  = start;
 
@@ -73,6 +81,7 @@ final class CpuSampler {
             long sampledAt = System.nanoTime();
 
             sampled.add(sampledAt, target.getStackTrace());
+            mainSampled.add(sampledAt, main.getStackTrace());
             next += INTERVAL_NANOS;
 
             long wait = next - System.nanoTime();
@@ -238,6 +247,30 @@ final class CpuSampler {
                 .map(entry -> Map.entry(entry.getKey(), entry.getValue() - this.cpuBefore.get(entry.getKey())))
                 .sorted(Map.Entry.<Long, Long>comparingByValue(Comparator.reverseOrder()))
                 .forEach(entry -> report.append(String.format(Locale.ROOT, "%6.1f%%  %s%n", entry.getValue() / 1.0e7 / this.seconds, threadName(entry.getKey()))));
+
+            return report.toString();
+        }
+
+        private String threadReport(String title) {
+            StringBuilder report = new StringBuilder();
+
+            report.append(String.format(Locale.ROOT, "%n%s: %d samples%n%n%s self time%n", title, this.samples, title));
+            this.self.entrySet().stream()
+                .sorted(Map.Entry.<String, Integer>comparingByValue().reversed())
+                .limit(MAIN_SELF)
+                .forEach(entry -> {
+                    report.append(String.format(Locale.ROOT, "%6.2f%%  %s%n", this.share(entry.getValue()), entry.getKey()));
+                    this.callers.get(entry.getKey()).entrySet().stream()
+                        .sorted(Map.Entry.<String, Integer>comparingByValue().reversed())
+                        .limit(TOP_CALLERS)
+                        .forEach(caller -> report.append(String.format(Locale.ROOT, "          %6.2f%%  <- %s%n", this.share(caller.getValue()), caller.getKey())));
+                });
+
+            report.append(String.format(Locale.ROOT, "%n%s total time including callees%n", title));
+            this.inclusive.entrySet().stream()
+                .sorted(Map.Entry.<String, Integer>comparingByValue().reversed())
+                .limit(MAIN_TOTAL)
+                .forEach(entry -> report.append(String.format(Locale.ROOT, "%6.2f%%  %s%n", this.share(entry.getValue()), entry.getKey())));
 
             return report.toString();
         }
