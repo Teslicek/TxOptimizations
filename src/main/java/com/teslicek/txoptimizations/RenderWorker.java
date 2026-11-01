@@ -26,21 +26,14 @@ public final class RenderWorker {
             throw new IllegalStateException("A render frame is already running on the render worker");
 
         RenderThreadStack.ensureCaptured();
+        workerStack();
 
-        if (!RenderThreadStack.isOwner())
-            throw new IllegalStateException("A render frame was handed off from " + Thread.currentThread().getName() + ", which does not own rendering");
-
-        Thread      owner      = Thread.currentThread();
-        MemoryStack ownerStack = RenderThreadStack.stack();
-
-        RenderThreadStack.handTo(WORKER, workerStack());
         job = frame;
 
         if (parked)
             LockSupport.unpark(WORKER);
 
         awaitIdle();
-        RenderThreadStack.handTo(owner, ownerStack);
 
         Throwable thrown = failure;
 
@@ -56,6 +49,10 @@ public final class RenderWorker {
             throw error;
 
         throw new IllegalStateException("The render worker failed", thrown);
+    }
+
+    public static MemoryStack stack() {
+        return stack;
     }
 
     private static MemoryStack workerStack() {

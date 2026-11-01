@@ -145,7 +145,7 @@ public final class HitboxGizmos implements Gizmo {
     }
 
     public static void endEntity() {
-        if (!RenderThreadStack.isOwner())
+        if (!RenderThreadStack.isMain())
             return;
 
         HitboxGizmos batch = open;
@@ -212,7 +212,7 @@ public final class HitboxGizmos implements Gizmo {
     }
 
     private static @Nullable HitboxGizmos batch() {
-        if (!RenderThreadStack.isOwner())
+        if (!RenderThreadStack.isMain())
             return null;
 
         if (!(GizmoCollectorCache.get(GizmosAccessor.txoptimizations$collector()) instanceof SimpleGizmoCollector current) || current.getClass() != SimpleGizmoCollector.class)

@@ -1,6 +1,7 @@
 package com.teslicek.txoptimizations.mixin;
 
 import com.teslicek.txoptimizations.RenderThreadStack;
+import com.teslicek.txoptimizations.RenderWorker;
 import org.lwjgl.system.MemoryStack;
 import org.spongepowered.asm.mixin.Final;
 import org.spongepowered.asm.mixin.Mixin;
@@ -16,8 +17,11 @@ public abstract class MemoryStackRenderThreadMixin {
 
     @Overwrite
     public static MemoryStack stackGet() {
-        if (RenderThreadStack.isOwner())
-            return RenderThreadStack.stack();
+        if (RenderThreadStack.isMain())
+            return RenderThreadStack.mainStack();
+
+        if (RenderWorker.isCurrent())
+            return RenderWorker.stack();
 
         return TLS.get();
     }

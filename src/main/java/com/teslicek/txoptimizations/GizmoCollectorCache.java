@@ -5,21 +5,21 @@ import org.jspecify.annotations.Nullable;
 
 public final class GizmoCollectorCache {
 
-    private static @Nullable GizmoCollector renderThreadCollector;
+    private static @Nullable GizmoCollector mainThreadCollector;
 
     private GizmoCollectorCache() {
     }
 
     public static Object get(ThreadLocal<GizmoCollector> collector) {
-        if (RenderThreadStack.isOwner())
-            return renderThreadCollector;
+        if (RenderThreadStack.isMain())
+            return mainThreadCollector;
 
         return collector.get();
     }
 
     public static void set(ThreadLocal<GizmoCollector> collector, Object value) {
-        if (RenderThreadStack.isOwner()) {
-            renderThreadCollector = (GizmoCollector) value;
+        if (RenderThreadStack.isMain()) {
+            mainThreadCollector = (GizmoCollector) value;
             return;
         }
 

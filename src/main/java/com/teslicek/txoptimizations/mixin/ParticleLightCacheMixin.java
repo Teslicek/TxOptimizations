@@ -68,8 +68,8 @@ public abstract class ParticleLightCacheMixin implements ParticleBaseLight {
         if (this.txoptimizations$lightTick == tick && this.txoptimizations$lightX == this.x && this.txoptimizations$lightY == this.y && this.txoptimizations$lightZ == this.z)
             return this.txoptimizations$light;
 
-        if (!RenderThreadStack.isOwner())
-            throw new IllegalStateException("Particle light for " + this + " was not warmed on the render thread before it was read on " + Thread.currentThread().getName());
+        if (!RenderThreadStack.isMain())
+            throw new IllegalStateException("Particle light for " + this + " was not warmed on the main thread before it was read on " + Thread.currentThread().getName());
 
         BlockPos pos = LIGHT_POS.set(this.x, this.y, this.z);
 

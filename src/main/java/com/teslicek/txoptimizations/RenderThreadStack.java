@@ -4,38 +4,33 @@ import org.lwjgl.system.MemoryStack;
 
 public final class RenderThreadStack {
 
-    private static volatile Thread      thread;
-    private static volatile MemoryStack stack;
+    private static volatile Thread      main;
+    private static volatile MemoryStack mainStack;
 
     private RenderThreadStack() {
     }
 
     public static void ensureCaptured() {
-        if (thread == null) {
-            stack  = MemoryStack.stackGet();
-            thread = Thread.currentThread();
+        if (main == null) {
+            mainStack = MemoryStack.stackGet();
+            main      = Thread.currentThread();
 
             return;
         }
 
-        if (thread != Thread.currentThread() && !RenderWorker.isCurrent())
-            throw new IllegalStateException("The render thread memory stack was captured on " + thread.getName() + ", not " + Thread.currentThread().getName());
+        if (main != Thread.currentThread())
+            throw new IllegalStateException("The main thread was captured as " + main.getName() + ", not " + Thread.currentThread().getName());
     }
 
-    public static void handTo(Thread owner, MemoryStack ownerStack) {
-        stack  = ownerStack;
-        thread = owner;
-    }
-
-    public static Thread owner() {
-        return thread;
+    public static boolean isMain() {
+        return Thread.currentThread() == main;
     }
 
     public static boolean isOwner() {
-        return Thread.currentThread() == thread;
+        return RenderWorker.isCurrent();
     }
 
-    public static MemoryStack stack() {
-        return stack;
+    public static MemoryStack mainStack() {
+        return mainStack;
     }
 }
