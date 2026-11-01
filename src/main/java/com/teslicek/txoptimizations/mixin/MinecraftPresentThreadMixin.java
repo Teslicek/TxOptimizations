@@ -5,6 +5,7 @@ import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
 import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
 import com.mojang.blaze3d.platform.Window;
 import com.mojang.blaze3d.systems.RenderSystem;
+import com.mojang.blaze3d.systems.TimerQuery;
 import com.mojang.renderpearl.api.commands.CommandEncoder;
 import com.mojang.renderpearl.api.device.GpuDevice;
 import com.mojang.renderpearl.api.device.GpuSurface;
@@ -14,6 +15,7 @@ import com.teslicek.txoptimizations.AcquiredImageDiscard;
 import com.teslicek.txoptimizations.AnimationUploads;
 import com.teslicek.txoptimizations.ClientClock;
 import com.teslicek.txoptimizations.FramePath;
+import com.teslicek.txoptimizations.GpuTimerRelay;
 import com.teslicek.txoptimizations.PresentThread;
 import com.teslicek.txoptimizations.RenderStateBuffers;
 import com.teslicek.txoptimizations.RenderWorker;
@@ -80,6 +82,13 @@ public abstract class MinecraftPresentThreadMixin {
     @Shadow
     @Final
     public GameRenderer gameRenderer;
+
+    @Shadow
+    @Final
+    private TimerQuery timerQuery;
+
+    @Unique
+    private boolean txoptimizations$timerRequested;
 
     @Unique
     private boolean txoptimizations$acquireDeferred;
@@ -161,6 +170,25 @@ public abstract class MinecraftPresentThreadMixin {
         return false;
     }
 
+    @Redirect(method = "renderFrame", at = @At(value = "INVOKE", target = "Lcom/mojang/blaze3d/systems/TimerQuery;getStatus()Lcom/mojang/blaze3d/systems/TimerQuery$Status;"), require = 1)
+    private TimerQuery.Status txoptimizations$publishedTimerStatus(TimerQuery query) {
+        return GpuTimerRelay.status();
+    }
+
+    @Redirect(method = "renderFrame", at = @At(value = "INVOKE", target = "Lcom/mojang/blaze3d/systems/TimerQuery;beginProfile()V"), require = 1)
+    private void txoptimizations$beginTimerInRenderJob(TimerQuery query) {
+        this.txoptimizations$timerRequested = true;
+    }
+
+    @Redirect(method = "renderFrame", at = @At(value = "INVOKE", target = "Lcom/mojang/blaze3d/systems/TimerQuery;endProfile()V"), require = 1)
+    private void txoptimizations$endTimerInRenderJob(TimerQuery query) {
+    }
+
+    @Redirect(method = "renderFrame", at = @At(value = "INVOKE", target = "Lcom/mojang/blaze3d/systems/TimerQuery;get()J"), require = 1)
+    private long txoptimizations$publishedTimerNanos(TimerQuery query) {
+        return GpuTimerRelay.nanos();
+    }
+
     @Redirect(method = "renderFrame", at = @At(value = "INVOKE", target = "Lcom/mojang/renderpearl/api/device/GpuDevice;createCommandEncoder()Lcom/mojang/renderpearl/api/commands/CommandEncoder;", ordinal = 1), require = 1)
     private CommandEncoder txoptimizations$submitInRenderJob(GpuDevice device) {
         return null;
@@ -195,10 +223,12 @@ public abstract class MinecraftPresentThreadMixin {
         boolean                       vsync   = this.options.enableVsync().get();
         List<AnimationUploads.Upload> uploads = AnimationUploads.takeForFrame();
         List<HudFrameOps.Op>          hud     = HudFrameOps.takeForFrame();
+        boolean                       timer   = this.txoptimizations$timerRequested;
 
         this.txoptimizations$acquireDeferred = false;
+        this.txoptimizations$timerRequested  = false;
 
-        RenderWorker.start(() -> txoptimizations$handOff(), () -> this.txoptimizations$renderJob(renderer, original, acquire, width, height, vsync, uploads, hud));
+        RenderWorker.start(() -> txoptimizations$handOff(), () -> this.txoptimizations$renderJob(renderer, original, acquire, width, height, vsync, uploads, hud, timer));
     }
 
     @Unique
@@ -209,8 +239,12 @@ public abstract class MinecraftPresentThreadMixin {
     }
 
     @Unique
-    private void txoptimizations$renderJob(GameRenderer renderer, Operation<Void> original, boolean acquire, int width, int height, boolean vsync, List<AnimationUploads.Upload> uploads, List<HudFrameOps.Op> hud) {
+    private void txoptimizations$renderJob(GameRenderer renderer, Operation<Void> original, boolean acquire, int width, int height, boolean vsync, List<AnimationUploads.Upload> uploads, List<HudFrameOps.Op> hud, boolean timer) {
         FramePath.beginFrame(PresentThread.canDeferAcquire(this.windowSurface));
+
+        if (timer)
+            this.timerQuery.beginProfile();
+
         ((VisibleSectionBinding) this.levelRenderer).txoptimizations$bindRenderSections();
         AnimationUploads.submit(uploads);
         HudFrameOps.run(hud);
@@ -234,6 +268,9 @@ public abstract class MinecraftPresentThreadMixin {
             PresentThread.arm(this.windowSurface);
         }
 
+        if (timer)
+            this.timerQuery.endProfile();
+
         try {
             RenderSystem.getDevice().createCommandEncoder().submit();
         } finally {
@@ -241,6 +278,7 @@ public abstract class MinecraftPresentThreadMixin {
         }
 
         FramePath.frameSubmitted();
+        GpuTimerRelay.publish(this.timerQuery);
         RenderSystem.getDynamicUniforms().reset();
         this.levelRenderer.endFrame();
     }
