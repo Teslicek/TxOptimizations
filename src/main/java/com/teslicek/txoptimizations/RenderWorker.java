@@ -25,6 +25,8 @@ public final class RenderWorker {
         if (job != null)
             throw new IllegalStateException("A render frame is already running on the render worker");
 
+        RenderThreadStack.ensureCaptured();
+
         if (!RenderThreadStack.isOwner())
             throw new IllegalStateException("A render frame was handed off from " + Thread.currentThread().getName() + ", which does not own rendering");
 

@@ -10,12 +10,16 @@ public final class RenderThreadStack {
     private RenderThreadStack() {
     }
 
-    public static void capture(MemoryStack captured) {
-        if (thread != null)
-            throw new IllegalStateException("The render thread memory stack is already captured");
+    public static void ensureCaptured() {
+        if (thread == null) {
+            stack  = MemoryStack.stackGet();
+            thread = Thread.currentThread();
 
-        stack  = captured;
-        thread = Thread.currentThread();
+            return;
+        }
+
+        if (thread != Thread.currentThread() && !RenderWorker.isCurrent())
+            throw new IllegalStateException("The render thread memory stack was captured on " + thread.getName() + ", not " + Thread.currentThread().getName());
     }
 
     public static void handTo(Thread owner, MemoryStack ownerStack) {
