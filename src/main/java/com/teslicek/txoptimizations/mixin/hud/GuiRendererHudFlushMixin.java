@@ -1,7 +1,10 @@
 package com.teslicek.txoptimizations.mixin.hud;
 
 import com.mojang.blaze3d.systems.RenderSystem;
+import com.teslicek.txoptimizations.RenderWorker;
 import com.teslicek.txoptimizations.hud.HudCacheRenderer;
+import com.teslicek.txoptimizations.mixin.GuiRendererStateAccessor;
+import net.minecraft.client.Minecraft;
 import java.util.List;
 import net.minecraft.client.gui.render.GuiRenderer;
 import net.minecraft.client.renderer.CubeMap;
@@ -52,6 +55,9 @@ public abstract class GuiRendererHudFlushMixin implements HudCacheRenderer {
 
     @Override
     public void txoptimizations$renderHudCache() {
+        RenderWorker.awaitFromMain();
+        ((GuiRendererStateAccessor) this).txoptimizations$setRenderState(Minecraft.getInstance().gameRenderer.gameRenderState().guiRenderState);
+
         ProfilerFiller profiler = Profiler.get();
 
         if (this.renderState.panoramaRenderState != null)

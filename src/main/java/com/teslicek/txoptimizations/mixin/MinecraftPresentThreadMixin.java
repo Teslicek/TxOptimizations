@@ -190,7 +190,7 @@ public abstract class MinecraftPresentThreadMixin {
 
         VisibleSectionBuffers.handOff();
         RenderStateBuffers.handOff();
-        RenderWorker.runAndWait(() -> this.txoptimizations$renderJob(renderer, original, acquire, width, height, vsync));
+        RenderWorker.start(() -> this.txoptimizations$renderJob(renderer, original, acquire, width, height, vsync));
     }
 
     @Unique

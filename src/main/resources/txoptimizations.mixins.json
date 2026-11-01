@@ -336,6 +336,8 @@
     "MinecraftRenderJobWaitMixin",
     "RendererRenderJobWaitMixin",
     "LevelRendererGeometryWaitMixin",
+    "LevelExtractorTransientBlockMixin",
+    "LevelRendererTransientBlockMixin",
     "SoundEngineListenerMixin",
     "SoundEngineDeviceReuseMixin",
     "LanguageManagerPreparedMixin",

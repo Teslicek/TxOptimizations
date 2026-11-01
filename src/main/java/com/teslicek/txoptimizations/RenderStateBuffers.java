@@ -16,6 +16,7 @@ public final class RenderStateBuffers {
     private static GameRenderState @Nullable [] trees;
     private static int                          current;
     private static volatile GameRenderState     renderTree;
+    private static volatile int                 renderParity;
 
     private RenderStateBuffers() {
     }
@@ -45,7 +46,12 @@ public final class RenderStateBuffers {
         if (trees == null)
             throw new IllegalStateException("A render job was handed off before the first render state swap");
 
-        renderTree = trees[current];
+        renderTree   = trees[current];
+        renderParity = current;
+    }
+
+    public static int renderParity() {
+        return renderParity;
     }
 
     public static void bindRender(Minecraft minecraft) {

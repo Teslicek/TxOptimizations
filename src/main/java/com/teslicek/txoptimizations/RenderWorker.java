@@ -21,10 +21,8 @@ public final class RenderWorker {
         return Thread.currentThread() == WORKER;
     }
 
-    public static void runAndWait(Runnable frame) {
-        if (job != null)
-            throw new IllegalStateException("A render frame is already running on the render worker");
-
+    public static void start(Runnable frame) {
+        awaitIdle();
         RenderThreadStack.ensureCaptured();
         workerStack();
 
@@ -32,23 +30,6 @@ public final class RenderWorker {
 
         if (parked)
             LockSupport.unpark(WORKER);
-
-        awaitIdle();
-
-        Throwable thrown = failure;
-
-        if (thrown == null)
-            return;
-
-        failure = null;
-
-        if (thrown instanceof RuntimeException runtime)
-            throw runtime;
-
-        if (thrown instanceof Error error)
-            throw error;
-
-        throw new IllegalStateException("The render worker failed", thrown);
     }
 
     public static MemoryStack stack() {
@@ -87,6 +68,21 @@ public final class RenderWorker {
 
             waiting = null;
         }
+
+        Throwable thrown = failure;
+
+        if (thrown == null)
+            return;
+
+        failure = null;
+
+        if (thrown instanceof RuntimeException runtime)
+            throw runtime;
+
+        if (thrown instanceof Error error)
+            throw error;
+
+        throw new IllegalStateException("The render worker failed", thrown);
     }
 
     private static void work() {
