@@ -27,8 +27,9 @@ public final class DisplayPreCull {
     private static final float HITBOX_REACH = 3.5F;
     private static final float RADIUS_SLACK = 1.0E-3F;
 
-    private static final Matrix4f            PROJECTION      = new Matrix4f();
-    private static final Matrix4f            VIEW            = new Matrix4f();
+    private static final Matrix4f[]          PROJECTIONS     = {new Matrix4f(), new Matrix4f()};
+    private static final Matrix4f[]          VIEWS           = {new Matrix4f(), new Matrix4f()};
+    private static final long[]              FRAMES          = {-1L, -1L};
     private static final Matrix4f            VIEW_PROJECTION = new Matrix4f();
     private static final Matrix4f            WIDENED         = new Matrix4f();
     private static final Matrix4f            TRANSFORM       = new Matrix4f();
@@ -36,7 +37,6 @@ public final class DisplayPreCull {
     private static final Vector3f            CORNER          = new Vector3f();
     private static final Vector3f            AXIS            = new Vector3f(0.0F, Mth.SQRT_OF_TWO / 2.0F, Mth.SQRT_OF_TWO / 2.0F);
 
-    private static long   frame = -1L;
     private static double cameraX;
     private static double cameraY;
     private static double cameraZ;
@@ -51,40 +51,45 @@ public final class DisplayPreCull {
         PoseStack         bob     = new PoseStack();
         float             scale   = state.optionsRenderState.screenEffectScale;
         float             spin    = Math.max(player.portalEffectIntensity, player.nauseaEffectIntensity) * (scale * scale);
+        int               parity  = RenderStateBuffers.parity();
+        Matrix4f          project = PROJECTIONS[parity];
+        Matrix4f          view    = VIEWS[parity];
 
         ((GameRendererBobAccessor) renderer).txoptimizations$bobHurt(camera, bob);
 
         if (state.optionsRenderState.bobView)
             ((GameRendererBobAccessor) renderer).txoptimizations$bobView(camera, bob);
 
-        PROJECTION.set(camera.projectionMatrix).mul(bob.last().pose());
+        project.set(camera.projectionMatrix).mul(bob.last().pose());
 
         if (spin > 0.0F) {
             float skew  = 5.0F / (spin * spin + 5.0F) - spin * 0.04F;
             float angle = player.spinningEffectAngle * (float) (Math.PI / 180.0);
 
             skew *= skew;
-            PROJECTION.rotate(angle, AXIS);
-            PROJECTION.scale(1.0F / skew, 1.0F, 1.0F);
-            PROJECTION.rotate(-angle, AXIS);
+            project.rotate(angle, AXIS);
+            project.scale(1.0F / skew, 1.0F, 1.0F);
+            project.rotate(-angle, AXIS);
         }
 
-        VIEW.set(camera.viewRotationMatrix);
-        VIEW_PROJECTION.set(PROJECTION).mul(VIEW);
+        view.set(camera.viewRotationMatrix);
+        VIEW_PROJECTION.set(project).mul(view);
         FRUSTUM.set(DisplayCulling.widen(VIEW_PROJECTION, WIDENED), true);
 
-        cameraX = camera.pos.x;
-        cameraY = camera.pos.y;
-        cameraZ = camera.pos.z;
-        frame   = ClientClock.frame();
+        cameraX        = camera.pos.x;
+        cameraY        = camera.pos.y;
+        cameraZ        = camera.pos.z;
+        FRAMES[parity] = ClientClock.frame();
     }
 
     public static void verify(Matrix4fc projection, Matrix4fc modelView) {
-        if (frame != ClientClock.frame())
+        int parity = RenderStateBuffers.renderParity();
+
+        if (FRAMES[parity] != ClientClock.frame())
             return;
 
-        if (!PROJECTION.equals(projection) || !VIEW.equals(modelView))
-            throw new IllegalStateException("Display pre-culling used projection " + PROJECTION + " and view " + VIEW + " but the frame drew with " + projection + " and " + modelView);
+        if (!PROJECTIONS[parity].equals(projection) || !VIEWS[parity].equals(modelView))
+            throw new IllegalStateException("Display pre-culling used projection " + PROJECTIONS[parity] + " and view " + VIEWS[parity] + " but the frame drew with " + projection + " and " + modelView);
     }
 
     public static void remember(Display.ItemDisplay display, ItemDisplayEntityRenderState state) {
@@ -124,7 +129,7 @@ public final class DisplayPreCull {
     }
 
     public static boolean isHidden(Display.ItemDisplay display, float partialTicks) {
-        if (frame != ClientClock.frame())
+        if (FRAMES[RenderStateBuffers.parity()] != ClientClock.frame())
             return false;
 
         ItemDisplayCullCache cache       = (ItemDisplayCullCache) display;
