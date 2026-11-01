@@ -23,6 +23,7 @@ import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
+import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.function.Supplier;
 import net.minecraft.client.renderer.MappableRingBuffer;
 import net.minecraft.client.renderer.texture.SpriteContents;
@@ -48,17 +49,19 @@ public final class AtlasAnimation implements AutoCloseable {
         .withColorTargetState(ColorTargetState.DEFAULT)
         .build();
 
-    private final Supplier<String>   label;
-    private final int                atlasWidth;
-    private final int                atlasHeight;
-    private final int                levels;
-    private final int                alignment;
-    private final FrameSheet[]       sheets;
-    private final int[]              drawn;
-    private final MappableRingBuffer uniforms;
-    private final FrameSheet[]       chunkSheets;
-    private final GpuBufferSlice[]   chunkSlices;
-    private final int[]              chunkCounts;
+    private final Supplier<String>                   label;
+    private final int                                atlasWidth;
+    private final int                                atlasHeight;
+    private final int                                levels;
+    private final int                                alignment;
+    private final int                                bytes;
+    private final int                                chunks;
+    private final FrameSheet[]                       sheets;
+    private final int[]                              drawn;
+    private final MappableRingBuffer                 uniforms;
+    private final GpuBufferSlice[]                   chunkSlices;
+    private final List<PendingDraw>                  allocated = new ArrayList<>();
+    private final ConcurrentLinkedQueue<PendingDraw> free      = new ConcurrentLinkedQueue<>();
 
     private AtlasAnimation(Identifier location, int atlasWidth, int atlasHeight, int levels, FrameSheet[] sheets) {
         int alignment = RenderSystem.getDevice().getDeviceInfo().limits().minUniformOffsetAlignment();
@@ -77,15 +80,18 @@ public final class AtlasAnimation implements AutoCloseable {
         this.atlasHeight = atlasHeight;
         this.levels      = levels;
         this.alignment   = alignment;
+        this.bytes       = bytes;
+        this.chunks      = chunks;
         this.sheets      = sheets;
         this.drawn       = new int[sheets.length];
         this.uniforms    = new MappableRingBuffer(() -> "Animated sprites " + location, GpuBuffer.USAGE_UNIFORM | GpuBuffer.USAGE_MAP_WRITE, bytes);
-        this.chunkSheets = new FrameSheet[chunks];
         this.chunkSlices = new GpuBufferSlice[chunks];
-        this.chunkCounts = new int[chunks];
     }
 
-    public void draw(GpuTextureView[] mipViews) {
+    public void prepare(GpuTextureView[] mipViews) {
+        if (RenderWorker.isCurrent())
+            throw new IllegalStateException("Animated sprites were prepared on the render worker");
+
         if (mipViews.length != this.levels)
             throw new IllegalStateException("Animated sprites were uploaded for " + this.levels + " mip levels but the atlas has " + mipViews.length);
 
@@ -99,18 +105,35 @@ public final class AtlasAnimation implements AutoCloseable {
         if (drawn == 0)
             return;
 
+        PendingDraw pending = this.free.poll();
+
+        if (pending == null) {
+            pending = new PendingDraw(this.bytes, this.chunks);
+            this.allocated.add(pending);
+        }
+
+        this.write(pending);
+        AnimationUploads.add(this, pending, mipViews);
+    }
+
+    public void submit(PendingDraw pending, GpuTextureView[] mipViews) {
+        if (!RenderWorker.isCurrent())
+            throw new IllegalStateException("Animated sprites were drawn outside the render worker");
+
         this.uniforms.rotate();
 
         GpuBuffer target = this.uniforms.currentBuffer();
-        int       chunks;
 
         if (target instanceof VulkanGpuBuffer.Direct) {
-            chunks = this.write(((PersistentRingBuffer) this.uniforms).txoptimizations$mapCurrent(), target);
+            pending.copyTo(((PersistentRingBuffer) this.uniforms).txoptimizations$mapCurrent());
         } else {
             try (GpuBufferSlice.MappedView view = target.map(false, true)) {
-                chunks = this.write(view.data(), target);
+                pending.copyTo(view.data());
             }
         }
+
+        for (int chunk = 0; chunk < pending.chunks; chunk ++)
+            this.chunkSlices[chunk] = target.slice(pending.chunkOffsets[chunk], pending.chunkBytes[chunk]);
 
         CommandEncoder         encoder  = RenderSystem.getDevice().createCommandEncoder();
         CompiledRenderPipeline pipeline = RenderSystem.getCompiledPipeline(PIPELINE);
@@ -120,18 +143,21 @@ public final class AtlasAnimation implements AutoCloseable {
             try (RenderPass pass = encoder.createRenderPass(this.label, mipViews[level], Optional.empty())) {
                 pass.setPipeline(pipeline);
 
-                for (int chunk = 0; chunk < chunks; chunk ++) {
-                    pass.setUniform("Frames", this.chunkSheets[chunk].view, sampler);
+                for (int chunk = 0; chunk < pending.chunks; chunk ++) {
+                    pass.setUniform("Frames", pending.chunkSheets[chunk].view, sampler);
                     pass.setUniform("AnimatedSprites", this.chunkSlices[chunk]);
-                    pass.draw(CORNERS, this.chunkCounts[chunk], level << LEVEL_SHIFT, 0);
+                    pass.draw(CORNERS, pending.chunkCounts[chunk], level << LEVEL_SHIFT, 0);
                 }
             }
         }
+
+        this.free.add(pending);
     }
 
-    private int write(ByteBuffer data, GpuBuffer target) {
+    private void write(PendingDraw pending) {
         int chunks = 0;
         int offset = 0;
+        int end    = 0;
 
         for (int index = 0; index < this.sheets.length; index ++) {
             FrameSheet sheet     = this.sheets[index];
@@ -141,7 +167,7 @@ public final class AtlasAnimation implements AutoCloseable {
             while (remaining > 0) {
                 int  count   = Math.min(remaining, SPRITES_PER_DRAW);
                 int  bytes   = HEADER_BYTES + count * SPRITE_BYTES;
-                long address = NativeWrites.at(data, offset, bytes);
+                long address = NativeWrites.at(pending.data, offset, bytes);
                 int  written = 0;
 
                 MemoryUtil.memPutInt(address, this.atlasWidth);
@@ -158,21 +184,30 @@ public final class AtlasAnimation implements AutoCloseable {
                     written ++;
                 }
 
-                this.chunkSheets[chunks] = sheet;
-                this.chunkSlices[chunks] = target.slice(offset, bytes);
-                this.chunkCounts[chunks] = count;
+                pending.chunkSheets[chunks]  = sheet;
+                pending.chunkOffsets[chunks] = offset;
+                pending.chunkBytes[chunks]   = bytes;
+                pending.chunkCounts[chunks]  = count;
                 chunks ++;
-                offset     = Mth.roundToward(offset + bytes, this.alignment);
+                end        = offset + bytes;
+                offset     = Mth.roundToward(end, this.alignment);
                 remaining -= count;
             }
         }
 
-        return chunks;
+        pending.chunks = chunks;
+        pending.used   = end;
     }
 
     @Override
     public void close() {
+        if (RenderWorker.isCurrent())
+            throw new IllegalStateException("Animated sprites were closed on the render worker");
+
         this.uniforms.close();
+
+        for (PendingDraw pending : this.allocated)
+            MemoryUtil.memFree(pending.data);
 
         for (FrameSheet sheet : this.sheets) {
             sheet.view.close();
@@ -292,6 +327,29 @@ public final class AtlasAnimation implements AutoCloseable {
             }
 
             return new FrameSheet(texture, device.createTextureView(texture), animated);
+        }
+    }
+
+    public static final class PendingDraw {
+
+        private final ByteBuffer   data;
+        private final FrameSheet[] chunkSheets;
+        private final int[]        chunkOffsets;
+        private final int[]        chunkBytes;
+        private final int[]        chunkCounts;
+        private int                chunks;
+        private int                used;
+
+        private PendingDraw(int bytes, int chunks) {
+            this.data         = MemoryUtil.memAlloc(bytes);
+            this.chunkSheets  = new FrameSheet[chunks];
+            this.chunkOffsets = new int[chunks];
+            this.chunkBytes   = new int[chunks];
+            this.chunkCounts  = new int[chunks];
+        }
+
+        private void copyTo(ByteBuffer target) {
+            MemoryUtil.memCopy(NativeWrites.at(this.data, 0, this.used), NativeWrites.at(target, 0, this.used), this.used);
         }
     }
 

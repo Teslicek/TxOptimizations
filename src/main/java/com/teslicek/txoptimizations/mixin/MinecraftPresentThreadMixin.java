@@ -10,6 +10,7 @@ import com.mojang.renderpearl.api.device.GpuSurface;
 import com.mojang.renderpearl.api.device.SurfaceException;
 import com.mojang.renderpearl.api.textures.GpuTextureView;
 import com.teslicek.txoptimizations.AcquiredImageDiscard;
+import com.teslicek.txoptimizations.AnimationUploads;
 import com.teslicek.txoptimizations.ClientClock;
 import com.teslicek.txoptimizations.FramePath;
 import com.teslicek.txoptimizations.PresentThread;
@@ -17,6 +18,7 @@ import com.teslicek.txoptimizations.RenderStateBuffers;
 import com.teslicek.txoptimizations.RenderWorker;
 import com.teslicek.txoptimizations.VisibleSectionBinding;
 import com.teslicek.txoptimizations.VisibleSectionBuffers;
+import java.util.List;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Gui;
 import net.minecraft.client.gui.screens.LevelLoadingScreen;
@@ -180,24 +182,26 @@ public abstract class MinecraftPresentThreadMixin {
 
     @WrapOperation(method = "renderFrame", at = @At(value = "INVOKE", target = "Lnet/minecraft/client/renderer/GameRenderer;render()V"), require = 1)
     private void txoptimizations$renderInRenderJob(GameRenderer renderer, Operation<Void> original) {
-        boolean acquire = this.txoptimizations$acquireDeferred && !this.txoptimizations$holdFrame;
-        int     width   = this.window.getWidth();
-        int     height  = this.window.getHeight();
-        boolean vsync   = this.options.enableVsync().get();
+        boolean                       acquire = this.txoptimizations$acquireDeferred && !this.txoptimizations$holdFrame;
+        int                           width   = this.window.getWidth();
+        int                           height  = this.window.getHeight();
+        boolean                       vsync   = this.options.enableVsync().get();
+        List<AnimationUploads.Upload> uploads = AnimationUploads.takeForFrame();
 
         this.txoptimizations$acquireDeferred = false;
 
         VisibleSectionBuffers.handOff();
         RenderStateBuffers.handOff();
         ClientClock.handOff();
-        RenderWorker.start(() -> this.txoptimizations$renderJob(renderer, original, acquire, width, height, vsync));
+        RenderWorker.start(() -> this.txoptimizations$renderJob(renderer, original, acquire, width, height, vsync, uploads));
     }
 
     @Unique
-    private void txoptimizations$renderJob(GameRenderer renderer, Operation<Void> original, boolean acquire, int width, int height, boolean vsync) {
+    private void txoptimizations$renderJob(GameRenderer renderer, Operation<Void> original, boolean acquire, int width, int height, boolean vsync, List<AnimationUploads.Upload> uploads) {
         FramePath.beginFrame(PresentThread.canDeferAcquire(this.windowSurface));
         ((VisibleSectionBinding) this.levelRenderer).txoptimizations$bindRenderSections();
         RenderStateBuffers.bindRender((Minecraft) (Object) this);
+        AnimationUploads.submit(uploads);
         RenderSystem.executePendingTasks();
 
         try (Gizmos.TemporaryCollection ignored = this.levelRenderer.collectPerFrameRenderThreadGizmos()) {

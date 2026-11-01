@@ -1,7 +1,9 @@
 package com.teslicek.txoptimizations.mixin;
 
 import com.mojang.renderpearl.api.textures.GpuTextureView;
+import com.teslicek.txoptimizations.AnimationUploads;
 import com.teslicek.txoptimizations.AtlasAnimation;
+import com.teslicek.txoptimizations.RenderWorker;
 import java.util.List;
 import net.minecraft.client.renderer.texture.SpriteContents;
 import net.minecraft.client.renderer.texture.SpriteLoader;
@@ -55,6 +57,8 @@ public abstract class TextureAtlasBatchedAnimationMixin {
         if (this.txoptimizations$animation == null)
             return;
 
+        RenderWorker.awaitFromMain();
+        AnimationUploads.drop(this.txoptimizations$animation);
         this.txoptimizations$animation.close();
         this.txoptimizations$animation = null;
     }
@@ -67,6 +71,6 @@ public abstract class TextureAtlasBatchedAnimationMixin {
         if (this.txoptimizations$animation == null)
             throw new IllegalStateException("Atlas " + this.location + " drew its animated sprites before uploading them");
 
-        this.txoptimizations$animation.draw(this.mipViews);
+        this.txoptimizations$animation.prepare(this.mipViews);
     }
 }
