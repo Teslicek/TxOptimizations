@@ -328,6 +328,8 @@
     "LevelExtractorStateAccessor",
     "LevelRendererStateAccessor",
     "MinecraftRenderStateBuffersMixin",
+    "FrontendGpuDeviceMainThreadMixin",
+    "VulkanResourceCloseMainThreadMixin",
     "SoundEngineListenerMixin",
     "SoundEngineDeviceReuseMixin",
     "LanguageManagerPreparedMixin",
