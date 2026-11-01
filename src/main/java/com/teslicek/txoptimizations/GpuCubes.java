@@ -106,6 +106,9 @@ public final class GpuCubes {
     private static int                     partOverlay;
     private static int                     partColor;
     private static int                     partSlot;
+    private static int                     partFirstRef;
+    private static int                     partRefs;
+    private static int                     partRawVertices;
     private static int                     itemOverlay;
     private static int                     itemColor;
     private static int                     itemLight;
@@ -168,6 +171,7 @@ public final class GpuCubes {
         partOverlay = overlay;
         partColor   = color;
         partSlot    = -1;
+        partRefs    = 0;
 
         return draw;
     }
@@ -175,8 +179,11 @@ public final class GpuCubes {
     public static boolean add(GpuCubeDraw draw, GpuCube cube, VertexConsumer builder) {
         int shape = cube.txoptimizations$gpuIndex();
 
-        if (shape < 0)
+        if (shape < 0) {
+            flushPart(draw);
+
             return false;
+        }
 
         GpuCubeBatch batch = draw.txoptimizations$batch();
 
@@ -191,7 +198,15 @@ public final class GpuCubes {
 
         int ref = batch.addRef(shape, partSlot);
 
-        draw.txoptimizations$addRefs(GpuCubeDraw.CUBES, ref, 1, draw.txoptimizations$rawVertices() + ((DirectVertexBuffer) builder).txoptimizations$vertexCount());
+        if (partRefs > 0 && ref != partFirstRef + partRefs)
+            throw new IllegalStateException("A GPU cube got reference " + ref + " instead of " + (partFirstRef + partRefs) + " inside one model part");
+
+        if (partRefs == 0) {
+            partFirstRef    = ref;
+            partRawVertices = draw.txoptimizations$rawVertices() + ((DirectVertexBuffer) builder).txoptimizations$vertexCount();
+        }
+
+        partRefs ++;
 
         if (draw.txoptimizations$isSorted()) {
             CubeVertices.faceKeys(partPose.pose(), statics, shape * STATIC_FLOATS, FACE_KEYS, 0);
@@ -201,7 +216,8 @@ public final class GpuCubes {
         return true;
     }
 
-    public static void endPart() {
+    public static void endPart(GpuCubeDraw draw) {
+        flushPart(draw);
         partPose = null;
     }
 
@@ -428,6 +444,14 @@ public final class GpuCubes {
             normals[axis * 2]     = VertexBytes.packNormal(-x, -y, -z);
             normals[axis * 2 + 1] = VertexBytes.packNormal(x, y, z);
         }
+    }
+
+    private static void flushPart(GpuCubeDraw draw) {
+        if (partRefs == 0)
+            return;
+
+        draw.txoptimizations$addRefs(GpuCubeDraw.CUBES, partFirstRef, partRefs, partRawVertices);
+        partRefs = 0;
     }
 
     private static @Nullable GpuCubeDraw acceptingDraw(VertexConsumer builder) {

@@ -6,6 +6,8 @@ import com.teslicek.txoptimizations.ArrayMapValues;
 import com.teslicek.txoptimizations.GpuCube;
 import com.teslicek.txoptimizations.GpuCubeDraw;
 import com.teslicek.txoptimizations.GpuCubes;
+import com.teslicek.txoptimizations.ModelPartTree;
+import com.teslicek.txoptimizations.ModelPoseTree;
 import com.teslicek.txoptimizations.ModelRotation;
 import it.unimi.dsi.fastutil.objects.Object2ObjectArrayMap;
 import java.util.List;
@@ -18,7 +20,7 @@ import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.Unique;
 
 @Mixin(value = ModelPart.class, priority = 999)
-public abstract class ModelPartIdentityMixin {
+public abstract class ModelPartIdentityMixin implements ModelPartTree {
 
     @Shadow
     public float x;
@@ -68,7 +70,7 @@ public abstract class ModelPartIdentityMixin {
         if (this.xRot != 0.0F || this.yRot != 0.0F || this.zRot != 0.0F)
             ModelRotation.rotateZYX(poseStack.last(), this.zRot, this.yRot, this.xRot);
 
-        this.txoptimizations$scale(poseStack);
+        this.txoptimizations$scale(poseStack.last());
     }
 
     @Overwrite
@@ -83,47 +85,52 @@ public abstract class ModelPartIdentityMixin {
         }
 
         if (draw != null)
-            GpuCubes.endPart();
+            GpuCubes.endPart(draw);
     }
 
     @Overwrite
     public void render(PoseStack poseStack, VertexConsumer buffer, int lightCoords, int overlayCoords, int color) {
+        this.txoptimizations$render(poseStack.last(), ModelPoseTree.current(), buffer, lightCoords, overlayCoords, color);
+    }
+
+    @Override
+    public void txoptimizations$render(PoseStack.Pose parent, ModelPoseTree tree, VertexConsumer buffer, int lightCoords, int overlayCoords, int color) {
         if (!this.visible || this.cubes.isEmpty() && this.children.isEmpty())
             return;
 
-        boolean transformed = !this.txoptimizations$isIdentity();
-
-        if (transformed)
-            this.txoptimizations$pushTransform(poseStack);
+        boolean        transformed = !this.txoptimizations$isIdentity();
+        PoseStack.Pose pose        = transformed ? this.txoptimizations$transform(tree.push(), parent) : parent;
 
         if (!this.skipDraw && !this.cubes.isEmpty())
-            this.compile(poseStack.last(), buffer, lightCoords, overlayCoords, color);
+            this.compile(pose, buffer, lightCoords, overlayCoords, color);
 
         if (this.children instanceof Object2ObjectArrayMap<String, ModelPart> arrayMap) {
             Object[] parts = ArrayMapValues.values(arrayMap);
             int      size  = ArrayMapValues.size(arrayMap);
 
             for (int index = 0; index < size; index ++)
-                ((ModelPart) parts[index]).render(poseStack, buffer, lightCoords, overlayCoords, color);
+                ((ModelPartTree) parts[index]).txoptimizations$render(pose, tree, buffer, lightCoords, overlayCoords, color);
         } else {
             for (ModelPart child : this.children.values())
-                child.render(poseStack, buffer, lightCoords, overlayCoords, color);
+                ((ModelPartTree) (Object) child).txoptimizations$render(pose, tree, buffer, lightCoords, overlayCoords, color);
         }
 
         if (transformed)
-            poseStack.popPose();
+            tree.pop();
     }
 
     @Unique
-    private void txoptimizations$pushTransform(PoseStack poseStack) {
-        ModelRotation.pushTranslatedRotated(poseStack, this.x / 16.0F, this.y / 16.0F, this.z / 16.0F, this.zRot, this.yRot, this.xRot);
-        this.txoptimizations$scale(poseStack);
+    private PoseStack.Pose txoptimizations$transform(PoseStack.Pose pose, PoseStack.Pose parent) {
+        ModelRotation.translateRotate(pose, parent, this.x / 16.0F, this.y / 16.0F, this.z / 16.0F, this.zRot, this.yRot, this.xRot);
+        this.txoptimizations$scale(pose);
+
+        return pose;
     }
 
     @Unique
-    private void txoptimizations$scale(PoseStack poseStack) {
+    private void txoptimizations$scale(PoseStack.Pose pose) {
         if (this.xScale != 1.0F || this.yScale != 1.0F || this.zScale != 1.0F)
-            poseStack.scale(this.xScale, this.yScale, this.zScale);
+            pose.scale(this.xScale, this.yScale, this.zScale);
     }
 
     @Unique
