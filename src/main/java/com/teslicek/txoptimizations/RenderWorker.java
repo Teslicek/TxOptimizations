@@ -66,6 +66,11 @@ public final class RenderWorker {
         awaitIdle();
     }
 
+    public static void awaitFromMain() {
+        if (RenderThreadStack.isMain())
+            awaitIdle();
+    }
+
     private static void awaitIdle() {
         long deadline = System.nanoTime() + SPIN_NANOS;
 
