@@ -15,6 +15,7 @@ public final class RenderStateBuffers {
 
     private static GameRenderState @Nullable [] trees;
     private static int                          current;
+    private static volatile GameRenderState     renderTree;
 
     private RenderStateBuffers() {
     }
@@ -26,23 +27,43 @@ public final class RenderStateBuffers {
     public static void swap(Minecraft minecraft) {
         GameRenderer renderer = minecraft.gameRenderer;
 
-        if (trees == null)
-            trees = new GameRenderState[] {renderer.gameRenderState(), new GameRenderState()};
-
-        if (renderer.gameRenderState() != trees[current])
-            throw new IllegalStateException("The game render state was replaced outside the render state buffers");
+        if (trees == null) {
+            trees      = new GameRenderState[] {renderer.gameRenderState(), new GameRenderState()};
+            renderTree = trees[0];
+        }
 
         current ^= 1;
 
-        GameRenderState           next     = trees[current];
-        GameRendererStateAccessor accessor = (GameRendererStateAccessor) renderer;
+        GameRenderState next = trees[current];
 
-        accessor.txoptimizations$setGameRenderState(next);
-        ((FeatureRenderDispatcherStateAccessor) renderer.featureRenderDispatcher()).txoptimizations$setGameRenderState(next);
+        ((GameRendererStateAccessor) renderer).txoptimizations$setGameRenderState(next);
         ((LevelExtractorStateAccessor) minecraft.levelExtractor).txoptimizations$setLevelRenderState(next.levelRenderState);
-        ((LevelRendererStateAccessor) minecraft.levelRenderer).txoptimizations$setLevelRenderState(next.levelRenderState);
-        ((LevelRendererStateAccessor) minecraft.levelRenderer).txoptimizations$setOptionsRenderState(next.optionsRenderState);
         ((GuiStateAccessor) minecraft.gui).txoptimizations$setGuiRenderState(next.guiRenderState);
-        ((GuiRendererStateAccessor) accessor.txoptimizations$guiRenderer()).txoptimizations$setRenderState(next.guiRenderState);
+    }
+
+    public static void handOff() {
+        if (trees == null)
+            throw new IllegalStateException("A render job was handed off before the first render state swap");
+
+        renderTree = trees[current];
+    }
+
+    public static void bindRender(Minecraft minecraft) {
+        GameRenderState            tree     = renderTree;
+        GameRenderer               renderer = minecraft.gameRenderer;
+        LevelRendererStateAccessor level    = (LevelRendererStateAccessor) minecraft.levelRenderer;
+
+        ((FeatureRenderDispatcherStateAccessor) renderer.featureRenderDispatcher()).txoptimizations$setGameRenderState(tree);
+        level.txoptimizations$setLevelRenderState(tree.levelRenderState);
+        level.txoptimizations$setOptionsRenderState(tree.optionsRenderState);
+        ((GuiRendererStateAccessor) ((GameRendererStateAccessor) renderer).txoptimizations$guiRenderer()).txoptimizations$setRenderState(tree.guiRenderState);
+    }
+
+    public static GameRenderState renderTree() {
+        return renderTree;
+    }
+
+    public static GameRenderState forRole(GameRenderState extractionTree) {
+        return RenderWorker.isCurrent() ? renderTree : extractionTree;
     }
 }

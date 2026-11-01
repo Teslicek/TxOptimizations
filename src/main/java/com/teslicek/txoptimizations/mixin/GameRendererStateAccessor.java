@@ -14,6 +14,9 @@ public interface GameRendererStateAccessor {
     @Mutable
     void txoptimizations$setGameRenderState(GameRenderState value);
 
+    @Accessor("gameRenderState")
+    GameRenderState txoptimizations$gameRenderState();
+
     @Accessor("guiRenderer")
     GuiRenderer txoptimizations$guiRenderer();
 }

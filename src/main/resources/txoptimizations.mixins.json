@@ -332,6 +332,7 @@
     "VulkanResourceCloseMainThreadMixin",
     "SectionOcclusionUpdateMixin",
     "GameRendererSectionOcclusionMixin",
+    "GameRendererRoleStateMixin",
     "SoundEngineListenerMixin",
     "SoundEngineDeviceReuseMixin",
     "LanguageManagerPreparedMixin",
