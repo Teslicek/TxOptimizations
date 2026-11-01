@@ -1,9 +1,9 @@
 package com.teslicek.txoptimizations.mixin;
 
 import com.teslicek.txoptimizations.ItemDisplayItemState;
+import com.teslicek.txoptimizations.RenderStateBuffers;
 import net.minecraft.client.renderer.item.ItemStackRenderState;
 import net.minecraft.world.entity.Display;
-import org.jspecify.annotations.Nullable;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Unique;
 
@@ -11,34 +11,40 @@ import org.spongepowered.asm.mixin.Unique;
 public abstract class ItemDisplayItemStateMixin implements ItemDisplayItemState {
 
     @Unique
-    private ItemStackRenderState txoptimizations$itemState;
+    private final ItemStackRenderState[] txoptimizations$itemStates = new ItemStackRenderState[2];
 
     @Unique
-    private @Nullable Object txoptimizations$resolvedItem;
+    private final Object[] txoptimizations$resolvedItems = new Object[2];
 
     @Unique
-    private @Nullable Object txoptimizations$resolvedLevel;
+    private final Object[] txoptimizations$resolvedLevels = new Object[2];
 
     @Unique
-    private @Nullable Object txoptimizations$resolvedModels;
+    private final Object[] txoptimizations$resolvedModels = new Object[2];
 
     @Override
     public ItemStackRenderState txoptimizations$reusedItemState() {
-        if (this.txoptimizations$itemState == null)
-            this.txoptimizations$itemState = new ItemStackRenderState();
+        int parity = RenderStateBuffers.parity();
 
-        return this.txoptimizations$itemState;
+        if (this.txoptimizations$itemStates[parity] == null)
+            this.txoptimizations$itemStates[parity] = new ItemStackRenderState();
+
+        return this.txoptimizations$itemStates[parity];
     }
 
     @Override
     public boolean txoptimizations$resolvedFor(Object item, Object level, Object models) {
-        return item == this.txoptimizations$resolvedItem && level == this.txoptimizations$resolvedLevel && models == this.txoptimizations$resolvedModels;
+        int parity = RenderStateBuffers.parity();
+
+        return item == this.txoptimizations$resolvedItems[parity] && level == this.txoptimizations$resolvedLevels[parity] && models == this.txoptimizations$resolvedModels[parity];
     }
 
     @Override
     public void txoptimizations$setResolved(Object item, Object level, Object models, boolean pure) {
-        this.txoptimizations$resolvedItem   = pure ? item : null;
-        this.txoptimizations$resolvedLevel  = pure ? level : null;
-        this.txoptimizations$resolvedModels = pure ? models : null;
+        int parity = RenderStateBuffers.parity();
+
+        this.txoptimizations$resolvedItems[parity]  = pure ? item : null;
+        this.txoptimizations$resolvedLevels[parity] = pure ? level : null;
+        this.txoptimizations$resolvedModels[parity] = pure ? models : null;
     }
 }
