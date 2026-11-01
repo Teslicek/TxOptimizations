@@ -92,7 +92,7 @@ public final class RenderWorker {
     }
 
     private static void work() {
-        stack = MemoryStack.stackGet();
+        stack = MemoryStack.create();
 
         while (true) {
             Runnable next = job;
