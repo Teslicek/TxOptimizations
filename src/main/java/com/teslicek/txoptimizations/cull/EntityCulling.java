@@ -22,7 +22,6 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.core.SectionPos;
 import net.minecraft.util.Mth;
 import net.minecraft.world.entity.Entity;
-import net.minecraft.world.entity.EntityAttachment;
 import net.minecraft.world.entity.EntityTypes;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.ai.attributes.Attributes;
@@ -169,7 +168,7 @@ public final class EntityCulling {
 
         if (distance < Mth.square(nameTagDistance)) {
             state.nameTag           = memo.txoptimizations$reuseNameTag(entity.getDisplayName());
-            state.nameTagAttachment = entity.getAttachments().getNullable(EntityAttachment.NAME_TAG, 0, entity.getYRot(partialTick));
+            state.nameTagAttachment = memo.txoptimizations$nameTagAttachment(entity.getAttachments(), entity.getYRot(partialTick));
         }
 
         return state;

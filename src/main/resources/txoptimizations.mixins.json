@@ -208,6 +208,7 @@
     "LivingEntityScaleMixin",
     "MobRendererNameMixin",
     "AvatarRendererNameMixin",
+    "AvatarRendererExtractMixin",
     "PatchedDataComponentMapVersionMixin",
     "GuiGraphicsExtractorItemCacheMixin",
     "GuiGraphicsExtractorCountTextMixin",
