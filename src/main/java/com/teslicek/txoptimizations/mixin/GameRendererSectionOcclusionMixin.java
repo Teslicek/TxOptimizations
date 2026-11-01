@@ -1,9 +1,13 @@
 package com.teslicek.txoptimizations.mixin;
 
+import com.teslicek.txoptimizations.RenderWorker;
 import net.minecraft.client.DeltaTracker;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.GameRenderer;
+import net.minecraft.client.renderer.LevelRenderer;
 import net.minecraft.client.renderer.state.GameRenderState;
+import net.minecraft.client.renderer.state.level.CameraRenderState;
+import net.minecraft.core.SectionPos;
 import org.spongepowered.asm.mixin.Final;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
@@ -28,6 +32,13 @@ public abstract class GameRendererSectionOcclusionMixin {
         if (!state.shouldRenderLevel)
             return;
 
-        this.minecraft.levelRenderer.sectionOcclusionGraph().update(state.levelRenderState.cameraRenderState, state.optionsRenderState.fov, state.levelRenderState.chunkLoadingRenderState);
+        LevelRenderer     levelRenderer = this.minecraft.levelRenderer;
+        CameraRenderState camera        = state.levelRenderState.cameraRenderState;
+
+        if (!SectionPos.of(camera.pos).equals(levelRenderer.viewArea().getCameraSectionPos()))
+            RenderWorker.awaitFromMain();
+
+        ((LevelRendererStateAccessor) levelRenderer).txoptimizations$repositionCamera(camera);
+        levelRenderer.sectionOcclusionGraph().update(camera, state.optionsRenderState.fov, state.levelRenderState.chunkLoadingRenderState);
     }
 }
