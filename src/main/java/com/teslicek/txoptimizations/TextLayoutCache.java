@@ -13,57 +13,37 @@ import net.minecraft.util.FormattedCharSink;
 
 public final class TextLayoutCache {
 
-    private static final int  MAX_ENTRIES         = 4096;
-    private static final int  MAX_SEQUENCE_WIDTHS = 16384;
-    private static final long UNUSED_FRAMES       = 200L;
-
-    private static final Map<Key, Key>                     ENTRIES         = new HashMap<>();
-    private static final Map<MutableComponent, Width>      WIDTHS          = new IdentityHashMap<>();
-    private static final Map<FormattedCharSequence, Width> SEQUENCE_WIDTHS = new IdentityHashMap<>();
-    private static final Map<String, Width>                STRING_WIDTHS   = new HashMap<>();
-    private static final Map<String, SharedText>           SEQUENCES       = new HashMap<>();
-    private static final Map<FormattedCharSequence, Held>  HELD            = new IdentityHashMap<>();
-    private static final Key                               PROBE           = new Key();
-
-    private static long lastEviction;
-    private static int  generation;
-    private static int  entryClears;
+    private static final int    MAX_ENTRIES         = 4096;
+    private static final int    MAX_SEQUENCE_WIDTHS = 16384;
+    private static final long   UNUSED_FRAMES       = 200L;
+    private static final Caches EXTRACT             = new Caches(false);
+    private static final Caches RENDER              = new Caches(true);
 
     private TextLayoutCache() {
     }
 
     public static int generation() {
-        return generation;
+        return current().generation;
     }
 
     public static int entryClears() {
-        return entryClears;
+        return current().entryClears;
     }
 
     public static Font.PreparedText find(Font font, FormattedCharSequence text, float x, float y, int color, boolean dropShadow, int backgroundColor, boolean includeEmpty, boolean outline) {
-        long frame = ClientClock.frame();
-
-        evictUnused(frame);
-        PROBE.set(font, text, x, y, color, dropShadow, backgroundColor, includeEmpty, outline);
-
-        Key entry = ENTRIES.get(PROBE);
-
-        if (entry == null)
-            return null;
-
-        entry.frame = frame;
-
-        return entry.prepared;
+        return current().find(font, text, x, y, color, dropShadow, backgroundColor, includeEmpty, outline);
     }
 
     public static boolean ensure(Font font, FormattedCharSequence text, float x, float y, int color, boolean dropShadow, int backgroundColor, boolean outline) {
-        if (find(font, text, x, y, color, dropShadow, backgroundColor, false, outline) != null)
+        Caches caches = current();
+
+        if (caches.find(font, text, x, y, color, dropShadow, backgroundColor, false, outline) != null)
             return true;
 
         if (!isStable(text))
             return false;
 
-        store(outline ? font.prepare8xTextOutline(text, x, y, color) : font.prepareText(text, x, y, color, dropShadow, false, backgroundColor), font, text, x, y, color, dropShadow, backgroundColor, false, outline);
+        caches.put(outline ? font.prepare8xTextOutline(text, x, y, color) : font.prepareText(text, x, y, color, dropShadow, false, backgroundColor), font, text, x, y, color, dropShadow, backgroundColor, false, outline);
 
         return true;
     }
@@ -72,177 +52,245 @@ public final class TextLayoutCache {
         if (!isStable(text))
             return prepared;
 
-        return put(prepared, font, text, x, y, color, dropShadow, backgroundColor, includeEmpty, outline);
+        return current().put(prepared, font, text, x, y, color, dropShadow, backgroundColor, includeEmpty, outline);
     }
 
     public static Font.PreparedText storeSegmented(Font.PreparedText prepared, Font font, FormattedCharSequence text, float x, float y, int color, boolean dropShadow, int backgroundColor, boolean includeEmpty) {
         if (!isStable(text))
             return prepared;
 
-        return put(new SegmentedText(prepared), font, text, x, y, color, dropShadow, backgroundColor, includeEmpty, false);
+        return current().put(new SegmentedText(prepared), font, text, x, y, color, dropShadow, backgroundColor, includeEmpty, false);
     }
 
     public static int width(Font font, FormattedText text) {
         if (!(text instanceof MutableComponent component))
             return font.width(text);
 
-        long frame = ClientClock.frame();
-
-        evictUnused(frame);
-
-        Width cached = WIDTHS.get(component);
-
-        if (cached != null && cached.font == font) {
-            cached.frame = frame;
-
-            return cached.width;
-        }
-
-        if (WIDTHS.size() >= MAX_ENTRIES)
-            WIDTHS.clear();
-
-        int width = font.width(component);
-
-        WIDTHS.put(component, new Width(font, width, frame));
-
-        return width;
+        return current().width(font, component);
     }
 
     public static int width(Font font, FormattedCharSequence text) {
-        long frame = ClientClock.frame();
-
-        evictUnused(frame);
-
-        Width cached = SEQUENCE_WIDTHS.get(text);
-
-        if (cached != null && cached.font == font) {
-            cached.frame = frame;
-
-            return cached.width;
-        }
-
-        if (SEQUENCE_WIDTHS.size() >= MAX_SEQUENCE_WIDTHS)
-            SEQUENCE_WIDTHS.clear();
-
-        int width = font.width(text);
-
-        SEQUENCE_WIDTHS.put(text, new Width(font, width, frame));
-
-        return width;
+        return current().width(font, text);
     }
 
     public static int width(Font font, String text) {
-        long frame = ClientClock.frame();
-
-        evictUnused(frame);
-
-        Width cached = STRING_WIDTHS.get(text);
-
-        if (cached != null && cached.font == font) {
-            cached.frame = frame;
-
-            return cached.width;
-        }
-
-        if (STRING_WIDTHS.size() >= MAX_ENTRIES)
-            STRING_WIDTHS.clear();
-
-        int width = font.width(text);
-
-        STRING_WIDTHS.put(text, new Width(font, width, frame));
-
-        return width;
+        return current().width(font, text);
     }
 
     public static FormattedCharSequence visualOrder(Language language, String text) {
-        long frame = ClientClock.frame();
-
-        evictUnused(frame);
-
-        SharedText cached = SEQUENCES.get(text);
-
-        if (cached != null && cached.language == language) {
-            cached.repeated |= cached.frame != frame;
-            cached.frame     = frame;
-
-            return cached;
-        }
-
-        if (SEQUENCES.size() >= MAX_ENTRIES)
-            SEQUENCES.clear();
-
-        SharedText sequence = new SharedText(language, language.getVisualOrder(FormattedText.of(text)), frame);
-
-        SEQUENCES.put(text, sequence);
-
-        return sequence;
+        return current().visualOrder(language, text);
     }
 
     public static boolean isRepeated(FormattedCharSequence text) {
-        return text instanceof SharedText shared && shared.repeated || HELD.containsKey(text);
+        return text instanceof SharedText shared && shared.repeated || current().held.containsKey(text);
     }
 
     public static FormattedCharSequence hold(FormattedCharSequence text) {
-        long frame = ClientClock.frame();
-        Held held  = HELD.get(text);
-
-        evictUnused(frame);
-
-        if (held != null) {
-            held.frame = frame;
-            return text;
-        }
-
-        if (HELD.size() >= MAX_ENTRIES)
-            HELD.clear();
-
-        HELD.put(text, new Held(frame));
-
-        return text;
+        return current().hold(text);
     }
 
     public static void clear() {
-        ENTRIES.clear();
-        WIDTHS.clear();
-        SEQUENCE_WIDTHS.clear();
-        STRING_WIDTHS.clear();
-        SEQUENCES.clear();
-        HELD.clear();
-        generation ++;
+        if (RenderWorker.isCurrent())
+            throw new IllegalStateException("Text layouts are cleared from the render worker");
+
+        RenderWorker.awaitFrame();
+        EXTRACT.clear();
+        RENDER.clear();
     }
 
-    private static Font.PreparedText put(Font.PreparedText prepared, Font font, FormattedCharSequence text, float x, float y, int color, boolean dropShadow, int backgroundColor, boolean includeEmpty, boolean outline) {
-        if (ENTRIES.size() >= MAX_ENTRIES) {
-            ENTRIES.clear();
-            entryClears ++;
-        }
-
-        Key key = new Key();
-
-        key.set(font, text, x, y, color, dropShadow, backgroundColor, includeEmpty, outline);
-        key.prepared = prepared;
-        key.frame    = ClientClock.frame();
-        ENTRIES.put(key, key);
-
-        return prepared;
+    private static Caches current() {
+        return RenderWorker.isCurrent() || ParallelFeatures.isWorkerThread() ? RENDER : EXTRACT;
     }
 
     private static boolean isStable(FormattedCharSequence text) {
         return text.accept((position, style, codepoint) -> !style.isObfuscated() && style.getFont() instanceof FontDescription.Resource);
     }
 
-    private static void evictUnused(long frame) {
-        if (frame - lastEviction < UNUSED_FRAMES || !RenderThreadStack.isOwner())
-            return;
+    private static final class Caches {
 
-        lastEviction = frame;
+        private final Map<Key, Key>                     entries        = new HashMap<>();
+        private final Map<MutableComponent, Width>      widths         = new IdentityHashMap<>();
+        private final Map<FormattedCharSequence, Width> sequenceWidths = new IdentityHashMap<>();
+        private final Map<String, Width>                stringWidths   = new HashMap<>();
+        private final Map<String, SharedText>           sequences      = new HashMap<>();
+        private final Map<FormattedCharSequence, Held>  held           = new IdentityHashMap<>();
+        private final Key                               probe          = new Key();
+        private final boolean                           render;
+        private long                                    lastEviction;
+        private int                                     generation;
+        private int                                     entryClears;
 
-        ENTRIES.values().removeIf(entry -> frame - entry.frame > UNUSED_FRAMES);
-        WIDTHS.values().removeIf(width -> frame - width.frame > UNUSED_FRAMES);
-        SEQUENCE_WIDTHS.values().removeIf(width -> frame - width.frame > UNUSED_FRAMES);
-        STRING_WIDTHS.values().removeIf(width -> frame - width.frame > UNUSED_FRAMES);
-        SEQUENCES.values().removeIf(sequence -> frame - sequence.frame > UNUSED_FRAMES);
-        HELD.values().removeIf(held -> frame - held.frame > UNUSED_FRAMES);
+        private Caches(boolean render) {
+            this.render = render;
+        }
+
+        private Font.PreparedText find(Font font, FormattedCharSequence text, float x, float y, int color, boolean dropShadow, int backgroundColor, boolean includeEmpty, boolean outline) {
+            long frame = ClientClock.frame();
+
+            this.evictUnused(frame);
+            this.probe.set(font, text, x, y, color, dropShadow, backgroundColor, includeEmpty, outline);
+
+            Key entry = this.entries.get(this.probe);
+
+            if (entry == null)
+                return null;
+
+            entry.frame = frame;
+
+            return entry.prepared;
+        }
+
+        private Font.PreparedText put(Font.PreparedText prepared, Font font, FormattedCharSequence text, float x, float y, int color, boolean dropShadow, int backgroundColor, boolean includeEmpty, boolean outline) {
+            if (this.entries.size() >= MAX_ENTRIES) {
+                this.entries.clear();
+                this.entryClears ++;
+            }
+
+            Key key = new Key();
+
+            key.set(font, text, x, y, color, dropShadow, backgroundColor, includeEmpty, outline);
+            key.prepared = prepared;
+            key.frame    = ClientClock.frame();
+            this.entries.put(key, key);
+
+            return prepared;
+        }
+
+        private int width(Font font, MutableComponent component) {
+            long frame = ClientClock.frame();
+
+            this.evictUnused(frame);
+
+            Width cached = this.widths.get(component);
+
+            if (cached != null && cached.font == font) {
+                cached.frame = frame;
+
+                return cached.width;
+            }
+
+            if (this.widths.size() >= MAX_ENTRIES)
+                this.widths.clear();
+
+            int width = font.width(component);
+
+            this.widths.put(component, new Width(font, width, frame));
+
+            return width;
+        }
+
+        private int width(Font font, FormattedCharSequence text) {
+            long frame = ClientClock.frame();
+
+            this.evictUnused(frame);
+
+            Width cached = this.sequenceWidths.get(text);
+
+            if (cached != null && cached.font == font) {
+                cached.frame = frame;
+
+                return cached.width;
+            }
+
+            if (this.sequenceWidths.size() >= MAX_SEQUENCE_WIDTHS)
+                this.sequenceWidths.clear();
+
+            int width = font.width(text);
+
+            this.sequenceWidths.put(text, new Width(font, width, frame));
+
+            return width;
+        }
+
+        private int width(Font font, String text) {
+            long frame = ClientClock.frame();
+
+            this.evictUnused(frame);
+
+            Width cached = this.stringWidths.get(text);
+
+            if (cached != null && cached.font == font) {
+                cached.frame = frame;
+
+                return cached.width;
+            }
+
+            if (this.stringWidths.size() >= MAX_ENTRIES)
+                this.stringWidths.clear();
+
+            int width = font.width(text);
+
+            this.stringWidths.put(text, new Width(font, width, frame));
+
+            return width;
+        }
+
+        private FormattedCharSequence visualOrder(Language language, String text) {
+            long frame = ClientClock.frame();
+
+            this.evictUnused(frame);
+
+            SharedText cached = this.sequences.get(text);
+
+            if (cached != null && cached.language == language) {
+                cached.repeated |= cached.frame != frame;
+                cached.frame     = frame;
+
+                return cached;
+            }
+
+            if (this.sequences.size() >= MAX_ENTRIES)
+                this.sequences.clear();
+
+            SharedText sequence = new SharedText(language, language.getVisualOrder(FormattedText.of(text)), frame);
+
+            this.sequences.put(text, sequence);
+
+            return sequence;
+        }
+
+        private FormattedCharSequence hold(FormattedCharSequence text) {
+            long frame = ClientClock.frame();
+            Held held  = this.held.get(text);
+
+            this.evictUnused(frame);
+
+            if (held != null) {
+                held.frame = frame;
+                return text;
+            }
+
+            if (this.held.size() >= MAX_ENTRIES)
+                this.held.clear();
+
+            this.held.put(text, new Held(frame));
+
+            return text;
+        }
+
+        private void clear() {
+            this.entries.clear();
+            this.widths.clear();
+            this.sequenceWidths.clear();
+            this.stringWidths.clear();
+            this.sequences.clear();
+            this.held.clear();
+            this.generation ++;
+        }
+
+        private void evictUnused(long frame) {
+            if (frame - this.lastEviction < UNUSED_FRAMES || this.render != RenderWorker.isCurrent())
+                return;
+
+            this.lastEviction = frame;
+
+            this.entries.values().removeIf(entry -> frame - entry.frame > UNUSED_FRAMES);
+            this.widths.values().removeIf(width -> frame - width.frame > UNUSED_FRAMES);
+            this.sequenceWidths.values().removeIf(width -> frame - width.frame > UNUSED_FRAMES);
+            this.stringWidths.values().removeIf(width -> frame - width.frame > UNUSED_FRAMES);
+            this.sequences.values().removeIf(sequence -> frame - sequence.frame > UNUSED_FRAMES);
+            this.held.values().removeIf(held -> frame - held.frame > UNUSED_FRAMES);
+        }
     }
 
     private static final class Key {

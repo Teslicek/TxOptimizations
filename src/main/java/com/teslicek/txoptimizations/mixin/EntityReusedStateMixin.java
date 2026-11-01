@@ -1,5 +1,6 @@
 package com.teslicek.txoptimizations.mixin;
 
+import com.teslicek.txoptimizations.RenderStateBuffers;
 import com.teslicek.txoptimizations.ReusedEntityState;
 import net.minecraft.client.renderer.entity.EntityRenderer;
 import net.minecraft.client.renderer.entity.state.EntityRenderState;
@@ -11,19 +12,35 @@ import org.spongepowered.asm.mixin.Unique;
 public abstract class EntityReusedStateMixin implements ReusedEntityState {
 
     @Unique
-    private EntityRenderer<?, ?> txoptimizations$stateRenderer;
+    private EntityRenderer<?, ?> txoptimizations$evenRenderer;
 
     @Unique
-    private EntityRenderState txoptimizations$state;
+    private EntityRenderState txoptimizations$evenState;
+
+    @Unique
+    private EntityRenderer<?, ?> txoptimizations$oddRenderer;
+
+    @Unique
+    private EntityRenderState txoptimizations$oddState;
 
     @Override
     public EntityRenderState txoptimizations$reusedState(EntityRenderer<?, ?> renderer) {
-        return this.txoptimizations$stateRenderer == renderer ? this.txoptimizations$state : null;
+        if (RenderStateBuffers.parity() == 0)
+            return this.txoptimizations$evenRenderer == renderer ? this.txoptimizations$evenState : null;
+
+        return this.txoptimizations$oddRenderer == renderer ? this.txoptimizations$oddState : null;
     }
 
     @Override
     public void txoptimizations$keepState(EntityRenderer<?, ?> renderer, EntityRenderState state) {
-        this.txoptimizations$stateRenderer = renderer;
-        this.txoptimizations$state         = state;
+        if (RenderStateBuffers.parity() == 0) {
+            this.txoptimizations$evenRenderer = renderer;
+            this.txoptimizations$evenState    = state;
+
+            return;
+        }
+
+        this.txoptimizations$oddRenderer = renderer;
+        this.txoptimizations$oddState    = state;
     }
 }

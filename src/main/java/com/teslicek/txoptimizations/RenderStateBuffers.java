@@ -19,6 +19,10 @@ public final class RenderStateBuffers {
     private RenderStateBuffers() {
     }
 
+    public static int parity() {
+        return current;
+    }
+
     public static void swap(Minecraft minecraft) {
         GameRenderer renderer = minecraft.gameRenderer;
 
