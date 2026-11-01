@@ -10,7 +10,7 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 @Mixin(LevelRenderer.class)
 public abstract class LevelRendererGeometryWaitMixin {
 
-    @Inject(method = "invalidateCompiledGeometry", at = @At("HEAD"), require = 1)
+    @Inject(method = {"invalidateCompiledGeometry", "resetLevelRenderData"}, at = @At("HEAD"), require = 2)
     private void txoptimizations$waitBeforeInvalidating(CallbackInfo ci) {
         RenderWorker.awaitFromMain();
     }
