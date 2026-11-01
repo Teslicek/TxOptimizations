@@ -26,6 +26,11 @@ public final class InFlightVertexCopy {
         source = null;
     }
 
+    public static void finishOther(BackgroundVertexCopy copy) {
+        if (owner != null && owner != copy)
+            owner.txoptimizations$finishVertexCopy();
+    }
+
     public static void finish() {
         if (owner != null)
             owner.txoptimizations$finishVertexCopy();

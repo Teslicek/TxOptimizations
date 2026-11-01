@@ -1,6 +1,7 @@
 package com.teslicek.txoptimizations.mixin.hud;
 
 import com.mojang.blaze3d.systems.RenderSystem;
+import com.teslicek.txoptimizations.BackgroundVertexCopy;
 import com.teslicek.txoptimizations.hud.HudCacheRenderer;
 import java.util.List;
 import net.minecraft.client.gui.render.GuiRenderer;
@@ -12,6 +13,9 @@ import net.minecraft.util.profiling.ProfilerFiller;
 import org.spongepowered.asm.mixin.Final;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
+import org.spongepowered.asm.mixin.injection.At;
+import org.spongepowered.asm.mixin.injection.Inject;
+import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 @Mixin(GuiRenderer.class)
 public abstract class GuiRendererHudFlushMixin implements HudCacheRenderer {
@@ -50,6 +54,11 @@ public abstract class GuiRendererHudFlushMixin implements HudCacheRenderer {
         throw new AssertionError();
     }
 
+    @Inject(method = "render", at = @At(value = "INVOKE", target = "Lnet/minecraft/client/renderer/StagedVertexBuffer;upload()V", shift = At.Shift.AFTER), require = 1)
+    private void txoptimizations$copyGuiVerticesInBackground(CallbackInfo ci) {
+        ((BackgroundVertexCopy) this.vertexBuffer).txoptimizations$copyVerticesInBackground();
+    }
+
     @Override
     public void txoptimizations$renderHudCache() {
         ProfilerFiller profiler = Profiler.get();
@@ -61,6 +70,7 @@ public abstract class GuiRendererHudFlushMixin implements HudCacheRenderer {
         this.prepare();
         profiler.popPush("upload");
         this.vertexBuffer.upload();
+        ((BackgroundVertexCopy) this.vertexBuffer).txoptimizations$copyVerticesInBackground();
         RenderSystem.resizeAllAutoStorageIndexBuffers();
         profiler.popPush("draw");
         this.draw();

@@ -23,14 +23,16 @@ public final class GlyphRun implements GuiElementRenderState {
     private final ScreenRectangle scissor;
     private final RenderPipeline  pipeline;
     private final GpuTextureView  textureView;
+    private final TextureSetup    textureSetup;
     private TextRenderable[]      glyphs = new TextRenderable[INITIAL_GLYPHS];
     private int                   count;
 
     GlyphRun(Matrix3x2fc pose, @Nullable ScreenRectangle scissor, RenderPipeline pipeline, GpuTextureView textureView) {
-        this.pose        = pose;
-        this.scissor     = scissor;
-        this.pipeline    = pipeline;
-        this.textureView = textureView;
+        this.pose         = pose;
+        this.scissor      = scissor;
+        this.pipeline     = pipeline;
+        this.textureView  = textureView;
+        this.textureSetup = TextureSetup.singleTextureWithLightmap(textureView, RenderSystem.getSamplerCache().getClampToEdge(FilterMode.NEAREST));
     }
 
     boolean accepts(RenderPipeline glyphPipeline, GpuTextureView glyphTexture) {
@@ -56,7 +58,7 @@ public final class GlyphRun implements GuiElementRenderState {
 
     @Override
     public TextureSetup textureSetup() {
-        return TextureSetup.singleTextureWithLightmap(this.textureView, RenderSystem.getSamplerCache().getClampToEdge(FilterMode.NEAREST));
+        return this.textureSetup;
     }
 
     @Override
