@@ -31,7 +31,7 @@ public final class GpuPassProfiler {
     public static final String                               SCREEN_WAIT     = "wait for screen image";
     public static final String                               SCREEN_COPY     = "screen copy";
 
-    private static final int                                 SLOTS           = 3;
+    private static final int                                 SLOTS           = 4;
     private static final int                                 CAPACITY        = 4096;
     private static final long                                DURATION        = 10_000_000_000L;
     private static final long                                WARMUP          = 1_000_000_000L;

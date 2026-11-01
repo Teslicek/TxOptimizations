@@ -7,7 +7,7 @@ import java.util.Arrays;
 public final class GpuBufferRing implements AutoCloseable {
 
     private static final int  MINIMUM     = 512;
-    private static final long BUSY_FRAMES = 3L;
+    private static final long BUSY_FRAMES = 4L;
 
     private final String label;
     private final int    usage;
