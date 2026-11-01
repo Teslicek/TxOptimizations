@@ -65,6 +65,10 @@ public final class RenderWorker {
         return stack;
     }
 
+    public static void awaitFrame() {
+        awaitIdle();
+    }
+
     private static void awaitIdle() {
         long deadline = System.nanoTime() + SPIN_NANOS;
 

@@ -4,16 +4,23 @@ import com.llamalad7.mixinextras.injector.ModifyExpressionValue;
 import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
 import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
 import com.mojang.blaze3d.platform.Window;
+import com.mojang.blaze3d.systems.RenderSystem;
 import com.mojang.renderpearl.api.commands.CommandEncoder;
 import com.mojang.renderpearl.api.device.GpuSurface;
 import com.mojang.renderpearl.api.device.SurfaceException;
+import com.mojang.renderpearl.api.textures.GpuTextureView;
 import com.teslicek.txoptimizations.AcquiredImageDiscard;
 import com.teslicek.txoptimizations.FramePath;
 import com.teslicek.txoptimizations.PresentThread;
+import com.teslicek.txoptimizations.RenderWorker;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Gui;
 import net.minecraft.client.gui.screens.LevelLoadingScreen;
 import net.minecraft.client.multiplayer.ClientLevel;
+import net.minecraft.client.renderer.DynamicGpuData;
+import net.minecraft.client.renderer.GameRenderer;
+import net.minecraft.client.renderer.LevelRenderer;
+import net.minecraft.gizmos.Gizmos;
 import net.minecraft.client.Options;
 import org.objectweb.asm.Opcodes;
 import org.slf4j.Logger;
@@ -58,6 +65,14 @@ public abstract class MinecraftPresentThreadMixin {
     @Final
     public Gui gui;
 
+    @Shadow
+    @Final
+    public LevelRenderer levelRenderer;
+
+    @Shadow
+    @Final
+    public GameRenderer gameRenderer;
+
     @Unique
     private boolean txoptimizations$acquireDeferred;
 
@@ -78,22 +93,19 @@ public abstract class MinecraftPresentThreadMixin {
 
     @Redirect(method = "renderFrame", at = @At(value = "INVOKE", target = "Lcom/mojang/renderpearl/api/device/GpuSurface;isAcquired()Z", ordinal = 0))
     private boolean txoptimizations$startWithEarlyImage(GpuSurface surface) {
-        if (this.txoptimizations$imageAcquiredEarly)
-            return false;
-
-        return surface.isAcquired();
+        return false;
     }
 
     @ModifyExpressionValue(method = "renderFrame", at = @At(value = "FIELD", target = "Lnet/minecraft/client/Minecraft;windowSurfaceNeedsReconfiguring:Z", opcode = Opcodes.GETFIELD))
     private boolean txoptimizations$deferAcquire(boolean needsReconfiguring) {
-        boolean worker = FramePath.beginFrame(PresentThread.canDeferAcquire(this.windowSurface));
+        FramePath.beginFrame(PresentThread.canDeferAcquire(this.windowSurface));
 
-        this.txoptimizations$acquireDeferred    = !needsReconfiguring && worker;
+        if (needsReconfiguring)
+            RenderWorker.awaitFrame();
+
+        this.txoptimizations$acquireDeferred    = !needsReconfiguring;
         this.txoptimizations$holdFrame          = !this.txoptimizations$worldShown && this.level != null && this.gui.screen() instanceof LevelLoadingScreen;
-        this.txoptimizations$frameAcquiredEarly = this.txoptimizations$imageAcquiredEarly || this.txoptimizations$earlyAcquireFailure != null;
-
-        if (this.txoptimizations$frameAcquiredEarly && (worker || this.txoptimizations$holdFrame))
-            throw new IllegalStateException("A frame that acquired its screen image early cannot defer or hold it");
+        this.txoptimizations$frameAcquiredEarly = false;
 
         if (this.level != null && !this.txoptimizations$holdFrame)
             this.txoptimizations$worldShown = true;
@@ -140,47 +152,78 @@ public abstract class MinecraftPresentThreadMixin {
 
     @Redirect(method = "renderFrame", at = @At(value = "INVOKE", target = "Lcom/mojang/renderpearl/api/device/GpuSurface;isAcquired()Z", ordinal = 1))
     private boolean txoptimizations$acquireBeforeBlit(GpuSurface surface) {
-        if (this.txoptimizations$acquireDeferred) {
-            this.txoptimizations$acquireDeferred = false;
-
-            if (!this.txoptimizations$holdFrame)
-                this.txoptimizations$configureAndAcquire();
-        }
-
-        return surface.isAcquired();
+        return false;
     }
 
     @Redirect(method = "renderFrame", at = @At(value = "INVOKE", target = "Lcom/mojang/renderpearl/api/commands/CommandEncoder;submit()V"))
     private void txoptimizations$presentOnPresentThread(CommandEncoder encoder) {
-        if (this.windowSurface.isAcquired())
+    }
+
+    @Redirect(method = "renderFrame", at = @At(value = "INVOKE", target = "Lcom/mojang/renderpearl/api/device/GpuSurface;isAcquired()Z", ordinal = 2))
+    private boolean txoptimizations$presentInRenderJob(GpuSurface surface) {
+        return false;
+    }
+
+    @WrapOperation(method = "renderFrame", at = @At(value = "INVOKE", target = "Lcom/mojang/blaze3d/systems/RenderSystem;executePendingTasks()V"), require = 1)
+    private void txoptimizations$pendingTasksInRenderJob(Operation<Void> original) {
+    }
+
+    @WrapOperation(method = "renderFrame", at = @At(value = "INVOKE", target = "Lnet/minecraft/client/renderer/DynamicGpuData;reset()V"), require = 1)
+    private void txoptimizations$uniformResetInRenderJob(DynamicGpuData uniforms, Operation<Void> original) {
+    }
+
+    @WrapOperation(method = "renderFrame", at = @At(value = "INVOKE", target = "Lnet/minecraft/client/renderer/LevelRenderer;endFrame()V"), require = 1)
+    private void txoptimizations$endFrameInRenderJob(LevelRenderer renderer, Operation<Void> original) {
+    }
+
+    @WrapOperation(method = "renderFrame", at = @At(value = "INVOKE", target = "Lnet/minecraft/client/renderer/GameRenderer;render()V"), require = 1)
+    private void txoptimizations$renderInRenderJob(GameRenderer renderer, Operation<Void> original) {
+        boolean acquire = this.txoptimizations$acquireDeferred && !this.txoptimizations$holdFrame;
+        int     width   = this.window.getWidth();
+        int     height  = this.window.getHeight();
+        boolean vsync   = this.options.enableVsync().get();
+
+        this.txoptimizations$acquireDeferred = false;
+
+        RenderWorker.runAndWait(() -> this.txoptimizations$renderJob(renderer, original, acquire, width, height, vsync));
+    }
+
+    @Unique
+    private void txoptimizations$renderJob(GameRenderer renderer, Operation<Void> original, boolean acquire, int width, int height, boolean vsync) {
+        RenderSystem.executePendingTasks();
+
+        try (Gizmos.TemporaryCollection ignored = this.levelRenderer.collectPerFrameRenderThreadGizmos()) {
+            original.call(renderer);
+        }
+
+        if (acquire)
+            this.txoptimizations$configureAndAcquire(width, height, vsync);
+
+        if (this.windowSurface.isAcquired()) {
+            GpuTextureView colorTexture = this.gameRenderer.mainRenderTarget().getColorTextureView();
+
+            if (colorTexture == null)
+                throw new IllegalStateException("Can't blit to screen, color texture doesn't exist yet");
+
+            this.windowSurface.blitFromTexture(RenderSystem.getDevice().createCommandEncoder(), colorTexture);
             PresentThread.arm(this.windowSurface);
+        }
 
         try {
-            encoder.submit();
+            RenderSystem.getDevice().createCommandEncoder().submit();
         } finally {
             PresentThread.disarm();
         }
 
         FramePath.frameSubmitted();
+        RenderSystem.getDynamicUniforms().reset();
+        this.levelRenderer.endFrame();
     }
 
     @Inject(method = "renderFrame", at = @At("TAIL"))
     private void txoptimizations$acquireNextEarly(boolean advanceGameTime, CallbackInfo ci) {
         if (this.txoptimizations$frameAcquiredEarly)
             throw new IllegalStateException("The screen image acquired early was not used by its frame");
-
-        if (!this.txoptimizations$worldShown || !FramePath.nextFrameAcquiresEarly(PresentThread.canDeferAcquire(this.windowSurface)))
-            return;
-
-        if (this.windowSurface.isAcquired() || this.surfaceIsInvalid || this.windowSurfaceNeedsReconfiguring || this.windowSurface.isSuboptimal())
-            return;
-
-        try {
-            this.windowSurface.acquireNextTexture();
-            this.txoptimizations$imageAcquiredEarly = true;
-        } catch (SurfaceException exception) {
-            this.txoptimizations$earlyAcquireFailure = exception;
-        }
     }
 
     @WrapOperation(method = "close", at = @At(value = "INVOKE", target = "Lcom/mojang/renderpearl/api/device/GpuSurface;close()V"))
@@ -200,11 +243,10 @@ public abstract class MinecraftPresentThreadMixin {
     }
 
     @Unique
-    private void txoptimizations$configureAndAcquire() {
+    private void txoptimizations$configureAndAcquire(int width, int height, boolean vsync) {
         if ((this.windowSurfaceNeedsReconfiguring || this.windowSurface.isSuboptimal() && !this.surfaceIsInvalid) && !this.window.isIconified()) {
-            Window.FramebufferSize   framebufferSize = this.window.queryFramebufferSize();
-            GpuSurface.PresentMode   presentMode     = GpuSurface.PresentMode.getSupportedVsyncMode(this.windowSurface.supportedPresentModes(), this.options.enableVsync().get());
-            GpuSurface.Configuration config          = new GpuSurface.Configuration(framebufferSize.width(), framebufferSize.height(), presentMode);
+            GpuSurface.PresentMode   presentMode = GpuSurface.PresentMode.getSupportedVsyncMode(this.windowSurface.supportedPresentModes(), vsync);
+            GpuSurface.Configuration config      = new GpuSurface.Configuration(width, height, presentMode);
 
             try {
                 this.windowSurface.configure(config);
