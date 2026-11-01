@@ -82,6 +82,7 @@
     "EntityHitboxDebugRendererMixin",
     "EntityLookupValuesMixin",
     "EntityRenderDispatcherCacheMixin",
+    "EntityPassengerIndexMixin",
     "EntityPlayerPassengersMixin",
     "EntityRenderDispatcherSkinCacheMixin",
     "EntitySharedFlagsMixin",
