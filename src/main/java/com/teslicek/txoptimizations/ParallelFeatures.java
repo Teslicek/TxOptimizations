@@ -6,7 +6,7 @@ import com.teslicek.txoptimizations.mixin.FeaturePreparedGroupAccessor;
 import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.atomic.AtomicReference;
+import java.util.concurrent.locks.ReentrantLock;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.renderer.StagedVertexBuffer;
 import net.minecraft.client.renderer.feature.BlockModelFeatureRenderer;
@@ -27,7 +27,7 @@ import org.joml.Matrix4f;
 
 public final class ParallelFeatures {
 
-    private static final AtomicReference<Thread>                     OWNER      = new AtomicReference<>();
+    private static final ReentrantLock                               LOCK       = new ReentrantLock();
     private static final Matrix4f                                    MODEL_VIEW = new Matrix4f();
     private static final FeatureWorker                               TEXT       = new FeatureWorker("TxOptimizations Text Worker");
     private static final FeatureWorker                               GEOMETRY   = new FeatureWorker("TxOptimizations Geometry Worker");
@@ -35,7 +35,6 @@ public final class ParallelFeatures {
 
     private static ProjectionType   projectionType;
     private static boolean          allowed;
-    private static int              lockDepth;
     private static volatile boolean active;
 
     private ParallelFeatures() {
@@ -109,7 +108,7 @@ public final class ParallelFeatures {
     }
 
     public static boolean isPreparingOnWorker() {
-        return active && OWNER.get() == Thread.currentThread() && isWorkerThread();
+        return active && LOCK.isHeldByCurrentThread() && isWorkerThread();
     }
 
     public static Matrix4f modelViewMatrixCopy() {
@@ -135,29 +134,13 @@ public final class ParallelFeatures {
         if (!active || !TEXT.isRunning() && !GEOMETRY.isRunning())
             return false;
 
-        Thread current = Thread.currentThread();
-
-        if (OWNER.get() == current) {
-            lockDepth ++;
-            return true;
-        }
-
-        while (OWNER.get() != null || !OWNER.compareAndSet(null, current))
-            Thread.onSpinWait();
-
-        lockDepth = 1;
+        LOCK.lock();
 
         return true;
     }
 
     public static void unlock() {
-        if (OWNER.get() != Thread.currentThread())
-            throw new IllegalStateException("The feature lock is not held by " + Thread.currentThread().getName());
-
-        lockDepth --;
-
-        if (lockDepth == 0)
-            OWNER.set(null);
+        LOCK.unlock();
     }
 
     private static FeatureWorker workerFor(FeatureRendererType<?> type) {
