@@ -54,6 +54,10 @@ final class FeatureWorker {
         return Thread.currentThread() == this.thread;
     }
 
+    boolean isRunning() {
+        return !this.done;
+    }
+
     boolean claimFrame() {
         if (!this.inline)
             return true;
