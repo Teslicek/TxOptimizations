@@ -189,7 +189,6 @@
     "ModelManagerBackgroundWarningsMixin",
     "ModelManagerItemBoundsMixin",
     "ModelPartIdentityMixin",
-    "DisplayRendererOrientationMixin",
     "ConditionalItemModelPurityMixin",
     "CuboidItemModelWrapperPurityMixin",
     "ItemModelChildPurityMixin",
