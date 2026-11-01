@@ -72,7 +72,7 @@ public final class GpuCubes {
     private static final int             QUAD_INSTANCE   = 1;
     private static final int             STATIC_BYTES    = STATIC_FLOATS * Float.BYTES;
     private static final int             INITIAL_CUBES   = 4096;
-    private static final int             RETIRE_FRAMES   = 5;
+    private static final int             RETIRE_FRAMES   = 4;
     private static final long            NORMALS_AT      = 80L;
     private static final long            TRUSTED_AT      = 116L;
     private static final BindGroupLayout LAYOUT          = BindGroupLayout.builder()
