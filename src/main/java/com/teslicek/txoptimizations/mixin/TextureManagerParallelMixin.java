@@ -21,16 +21,16 @@ public abstract class TextureManagerParallelMixin {
 
     @WrapMethod(method = "getTexture(Lnet/minecraft/resources/Identifier;)Lnet/minecraft/client/renderer/texture/AbstractTexture;")
     private AbstractTexture txoptimizations$locked(Identifier location, Operation<AbstractTexture> original) {
-        if (!ParallelFeatures.lock())
+        if (WorkerTextureLoads.isServing() || !ParallelFeatures.lock())
             return original.call(location);
 
         try {
             if (!ParallelFeatures.isWorkerThread() || this.byPath.containsKey(location))
                 return original.call(location);
+
+            return WorkerTextureLoads.await((TextureManager) (Object) this, location);
         } finally {
             ParallelFeatures.unlock();
         }
-
-        return WorkerTextureLoads.await((TextureManager) (Object) this, location);
     }
 }

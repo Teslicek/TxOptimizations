@@ -9,6 +9,8 @@ public final class WorkerTextureLoads {
 
     private static final ConcurrentLinkedQueue<Request> REQUESTS = new ConcurrentLinkedQueue<>();
 
+    private static boolean serving;
+
     private WorkerTextureLoads() {
     }
 
@@ -26,12 +28,23 @@ public final class WorkerTextureLoads {
         return request.texture;
     }
 
+    public static boolean isServing() {
+        return RenderWorker.isCurrent() && serving;
+    }
+
     public static void serve() {
+        if (!RenderWorker.isCurrent())
+            throw new IllegalStateException("Feature worker textures were loaded outside the render worker");
+
         for (Request request = REQUESTS.poll(); request != null; request = REQUESTS.poll()) {
+            serving = true;
+
             try {
                 request.texture = request.manager.getTexture(request.id);
             } catch (Throwable thrown) {
                 request.failure = thrown;
+            } finally {
+                serving = false;
             }
         }
     }

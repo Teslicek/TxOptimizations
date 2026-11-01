@@ -134,7 +134,16 @@ public final class ParallelFeatures {
         if (!active || !TEXT.isRunning() && !GEOMETRY.isRunning())
             return false;
 
-        LOCK.lock();
+        if (!RenderWorker.isCurrent()) {
+            LOCK.lock();
+
+            return true;
+        }
+
+        while (!LOCK.tryLock()) {
+            WorkerTextureLoads.serve();
+            Thread.onSpinWait();
+        }
 
         return true;
     }
