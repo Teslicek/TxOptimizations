@@ -9,6 +9,7 @@ import com.teslicek.txoptimizations.ParticleLightShare;
 import com.teslicek.txoptimizations.ParticleGroupChanges;
 import com.teslicek.txoptimizations.ParticleSnapshot;
 import com.teslicek.txoptimizations.ParticleWorker;
+import com.teslicek.txoptimizations.RenderStateBuffers;
 import com.teslicek.txoptimizations.gpu.ParticleProfile;
 import java.util.Arrays;
 import net.minecraft.CrashReport;
@@ -69,6 +70,12 @@ public abstract class QuadParticleGroupPositionsMixin extends ParticleGroup<Sing
     private QuadParticleRenderState particleTypeRenderState;
 
     @Unique
+    private final QuadParticleRenderState txoptimizations$otherState = new QuadParticleRenderState();
+
+    @Unique
+    private QuadParticleRenderState txoptimizations$aheadState;
+
+    @Unique
     private double[] txoptimizations$positions = new double[0];
 
     @Unique
@@ -123,13 +130,18 @@ public abstract class QuadParticleGroupPositionsMixin extends ParticleGroup<Sing
             if (camera != this.txoptimizations$aheadCamera || Float.compare(partialTickTime, this.txoptimizations$aheadPartialTick) != 0)
                 throw new IllegalStateException("Particles were extracted ahead for camera " + this.txoptimizations$aheadCamera + " at " + this.txoptimizations$aheadPartialTick + " but are drawn for " + camera + " at " + partialTickTime);
 
-            return this.particleTypeRenderState;
+            if (this.txoptimizations$aheadState != this.txoptimizations$frameState())
+                throw new IllegalStateException("Particles were extracted ahead into another frame's render state");
+
+            return this.txoptimizations$aheadState;
         }
 
-        this.txoptimizations$snapshot();
-        this.txoptimizations$extractVisible(frustum, camera, partialTickTime);
+        QuadParticleRenderState state = this.txoptimizations$frameState();
 
-        return this.particleTypeRenderState;
+        this.txoptimizations$snapshot();
+        this.txoptimizations$extractVisible(state, frustum, camera, partialTickTime);
+
+        return state;
     }
 
     @Override
@@ -146,14 +158,22 @@ public abstract class QuadParticleGroupPositionsMixin extends ParticleGroup<Sing
         if (!enough || this.txoptimizations$blocker != null)
             return;
 
+        QuadParticleRenderState state = this.txoptimizations$frameState();
+
         this.txoptimizations$ahead            = true;
         this.txoptimizations$aheadCamera      = camera;
         this.txoptimizations$aheadPartialTick = partialTickTime;
-        ParticleWorker.start(() -> this.txoptimizations$extractVisible(frustum, camera, partialTickTime));
+        this.txoptimizations$aheadState       = state;
+        ParticleWorker.start(() -> this.txoptimizations$extractVisible(state, frustum, camera, partialTickTime));
     }
 
     @Unique
-    private void txoptimizations$extractVisible(Frustum frustum, Camera camera, float partialTickTime) {
+    private QuadParticleRenderState txoptimizations$frameState() {
+        return RenderStateBuffers.parity() == 0 ? this.particleTypeRenderState : this.txoptimizations$otherState;
+    }
+
+    @Unique
+    private void txoptimizations$extractVisible(QuadParticleRenderState state, Frustum frustum, Camera camera, float partialTickTime) {
         double[] positions = this.txoptimizations$positions;
         double[] bounds    = this.txoptimizations$bounds;
         Object[] order     = this.txoptimizations$order;
@@ -175,7 +195,7 @@ public abstract class QuadParticleGroupPositionsMixin extends ParticleGroup<Sing
 
             for (int index = start; index < end; index ++) {
                 if (shape == FrustumBoxTest.INSIDE || frustum.pointInFrustum(positions[index * AXES], positions[index * AXES + 1], positions[index * AXES + 2]))
-                    this.txoptimizations$extract((SingleQuadParticle) order[index], index, camera, partialTickTime);
+                    this.txoptimizations$extract(state, (SingleQuadParticle) order[index], index, camera, partialTickTime);
             }
         }
     }
@@ -275,16 +295,16 @@ public abstract class QuadParticleGroupPositionsMixin extends ParticleGroup<Sing
     }
 
     @Unique
-    private void txoptimizations$extract(SingleQuadParticle particle, int index, Camera camera, float partialTickTime) {
+    private void txoptimizations$extract(QuadParticleRenderState state, SingleQuadParticle particle, int index, Camera camera, float partialTickTime) {
         try {
             int flags = this.txoptimizations$ints[index * ParticleSnapshot.INTS + ParticleSnapshot.FLAGS];
 
             if ((flags & ParticleSnapshot.STORED) == 0) {
-                particle.extract(this.particleTypeRenderState, camera, partialTickTime);
+                particle.extract(state, camera, partialTickTime);
                 return;
             }
 
-            this.txoptimizations$extractStored(particle, index, flags, camera, partialTickTime);
+            this.txoptimizations$extractStored(state, particle, index, flags, camera, partialTickTime);
         } catch (Throwable throwable) {
             CrashReport         report   = CrashReport.forThrowable(throwable, "Rendering Particle");
             CrashReportCategory category = report.addCategory("Particle being rendered");
@@ -297,7 +317,7 @@ public abstract class QuadParticleGroupPositionsMixin extends ParticleGroup<Sing
     }
 
     @Unique
-    private void txoptimizations$extractStored(SingleQuadParticle particle, int index, int flags, Camera camera, float partialTickTime) {
+    private void txoptimizations$extractStored(QuadParticleRenderState state, SingleQuadParticle particle, int index, int flags, Camera camera, float partialTickTime) {
         float[]     floats   = this.txoptimizations$floats;
         int[]       ints     = this.txoptimizations$ints;
         Object[]    refs     = this.txoptimizations$refs;
@@ -322,6 +342,6 @@ public abstract class QuadParticleGroupPositionsMixin extends ParticleGroup<Sing
         float    size      = (flags & ParticleSnapshot.OWN_SIZE) == 0 ? floats[floatAt + ParticleSnapshot.SIZE] : particle.getQuadSize(partialTickTime);
         int      light     = (flags & ParticleSnapshot.OWN_LIGHT) == 0 ? ints[intAt + ParticleSnapshot.LIGHT] : ((ParticleSnapshot) particle).txoptimizations$lightCoords(partialTickTime);
 
-        this.particleTypeRenderState.add((SingleQuadParticle.Layer) refs[refAt + ParticleSnapshot.LAYER], x, y, z, rotation.x, rotation.y, rotation.z, rotation.w, size, floats[floatAt + ParticleSnapshot.U0], floats[floatAt + ParticleSnapshot.U1], floats[floatAt + ParticleSnapshot.V0], floats[floatAt + ParticleSnapshot.V1], ints[intAt + ParticleSnapshot.COLOR], light);
+        state.add((SingleQuadParticle.Layer) refs[refAt + ParticleSnapshot.LAYER], x, y, z, rotation.x, rotation.y, rotation.z, rotation.w, size, floats[floatAt + ParticleSnapshot.U0], floats[floatAt + ParticleSnapshot.U1], floats[floatAt + ParticleSnapshot.V0], floats[floatAt + ParticleSnapshot.V1], ints[intAt + ParticleSnapshot.COLOR], light);
     }
 }

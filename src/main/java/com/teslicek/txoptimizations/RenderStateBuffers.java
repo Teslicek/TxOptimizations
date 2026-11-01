@@ -17,6 +17,7 @@ public final class RenderStateBuffers {
     private static int                          current;
     private static volatile GameRenderState     renderTree;
     private static volatile int                 renderParity;
+    private static boolean                      extractionHandedOff = true;
 
     private RenderStateBuffers() {
     }
@@ -33,7 +34,11 @@ public final class RenderStateBuffers {
             renderTree = trees[0];
         }
 
-        current ^= 1;
+        if (!extractionHandedOff)
+            return;
+
+        current             ^= 1;
+        extractionHandedOff  = false;
 
         GameRenderState next = trees[current];
 
@@ -46,8 +51,9 @@ public final class RenderStateBuffers {
         if (trees == null)
             throw new IllegalStateException("A render job was handed off before the first render state swap");
 
-        renderTree   = trees[current];
-        renderParity = current;
+        renderTree          = trees[current];
+        renderParity        = current;
+        extractionHandedOff = true;
     }
 
     public static int renderParity() {
