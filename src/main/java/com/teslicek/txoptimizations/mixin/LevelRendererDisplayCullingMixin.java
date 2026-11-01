@@ -1,6 +1,5 @@
 package com.teslicek.txoptimizations.mixin;
 
-import com.mojang.blaze3d.systems.RenderSystem;
 import com.teslicek.txoptimizations.DisplayCulling;
 import net.minecraft.client.renderer.LevelRenderer;
 import net.minecraft.client.renderer.SubmitNodeCollector;
@@ -15,7 +14,7 @@ public abstract class LevelRendererDisplayCullingMixin {
 
     @Inject(method = "submitFeatures", at = @At("HEAD"))
     private void txoptimizations$beginDisplayCulling(LevelRenderState levelRenderState, SubmitNodeCollector submitNodeCollector, boolean renderOutline, CallbackInfo ci) {
-        DisplayCulling.begin(RenderSystem.getModelViewStack(), levelRenderState.cameraRenderState.pos);
+        DisplayCulling.begin(levelRenderState.cameraRenderState.pos);
     }
 
     @Inject(method = "submitFeatures", at = @At("RETURN"))

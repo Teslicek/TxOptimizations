@@ -34,14 +34,13 @@ public final class DisplayCulling {
     private DisplayCulling() {
     }
 
-    public static void begin(Matrix4fc modelView, Vec3 camera) {
-        active = LevelProjection.isBound();
+    public static void begin(Vec3 camera) {
+        if (RenderWorker.isCurrent())
+            throw new IllegalStateException("Display culling began on the render worker");
 
-        if (!active)
-            return;
+        active = true;
 
-        DisplayPreCull.verify(LevelProjection.matrix(), modelView);
-        FRUSTUM.set(VIEW_PROJECTION.set(LevelProjection.matrix()).mul(modelView), false);
+        FRUSTUM.set(VIEW_PROJECTION.set(DisplayPreCull.projection()).mul(DisplayPreCull.view()), false);
         GIZMO_FRUSTUM.set(widen(VIEW_PROJECTION, GIZMO_CLIP), false);
 
         cameraX = camera.x;

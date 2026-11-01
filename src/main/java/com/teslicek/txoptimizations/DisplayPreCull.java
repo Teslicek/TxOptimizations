@@ -82,14 +82,21 @@ public final class DisplayPreCull {
         FRAMES[parity] = ClientClock.frame();
     }
 
-    public static void verify(Matrix4fc projection, Matrix4fc modelView) {
-        int parity = RenderStateBuffers.renderParity();
+    public static Matrix4fc projection() {
+        return PROJECTIONS[preparedParity()];
+    }
+
+    public static Matrix4fc view() {
+        return VIEWS[preparedParity()];
+    }
+
+    private static int preparedParity() {
+        int parity = RenderStateBuffers.parity();
 
         if (FRAMES[parity] != ClientClock.frame())
-            return;
+            throw new IllegalStateException("Display culling read frame " + ClientClock.frame() + " but pre-culling last prepared frame " + FRAMES[parity]);
 
-        if (!PROJECTIONS[parity].equals(projection) || !VIEWS[parity].equals(modelView))
-            throw new IllegalStateException("Display pre-culling used projection " + PROJECTIONS[parity] + " and view " + VIEWS[parity] + " but the frame drew with " + projection + " and " + modelView);
+        return parity;
     }
 
     public static void remember(Display.ItemDisplay display, ItemDisplayEntityRenderState state) {

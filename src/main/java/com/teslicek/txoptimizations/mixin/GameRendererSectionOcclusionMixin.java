@@ -1,13 +1,16 @@
 package com.teslicek.txoptimizations.mixin;
 
+import com.teslicek.txoptimizations.RenderStateBuffers;
 import com.teslicek.txoptimizations.RenderWorker;
 import net.minecraft.client.DeltaTracker;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.GameRenderer;
 import net.minecraft.client.renderer.LevelRenderer;
+import net.minecraft.client.renderer.SubmitNodeStorage;
 import net.minecraft.client.renderer.state.GameRenderState;
 import net.minecraft.client.renderer.state.level.CameraRenderState;
 import net.minecraft.core.SectionPos;
+import net.minecraft.gizmos.Gizmos;
 import org.spongepowered.asm.mixin.Final;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
@@ -25,6 +28,14 @@ public abstract class GameRendererSectionOcclusionMixin {
     @Shadow
     public abstract GameRenderState gameRenderState();
 
+    @Shadow
+    public abstract boolean useImprovedTransparency();
+
+    @Shadow
+    private boolean shouldRenderBlockOutline() {
+        throw new AssertionError();
+    }
+
     @Inject(method = "extract", at = @At("TAIL"), require = 1)
     private void txoptimizations$updateSectionOcclusion(DeltaTracker deltaTracker, boolean advanceGameTime, CallbackInfo ci) {
         GameRenderState state = this.gameRenderState();
@@ -38,7 +49,17 @@ public abstract class GameRendererSectionOcclusionMixin {
         if (!SectionPos.of(camera.pos).equals(levelRenderer.viewArea().getCameraSectionPos()))
             RenderWorker.awaitFromMain();
 
-        ((LevelRendererStateAccessor) levelRenderer).txoptimizations$repositionCamera(camera);
+        LevelRendererStateAccessor accessor = (LevelRendererStateAccessor) levelRenderer;
+        SubmitNodeStorage          storage  = RenderStateBuffers.storageForRole();
+
+        accessor.txoptimizations$repositionCamera(camera);
         levelRenderer.sectionOcclusionGraph().update(camera, state.optionsRenderState.fov, state.levelRenderState.chunkLoadingRenderState);
+        storage.setUseImprovedTransparency(this.useImprovedTransparency());
+
+        try (Gizmos.TemporaryCollection ignored = levelRenderer.collectPerFrameRenderThreadGizmos()) {
+            accessor.txoptimizations$submitFeatures(state.levelRenderState, storage, this.shouldRenderBlockOutline());
+        }
+
+        RenderStateBuffers.setAlwaysOnTopGizmos(accessor.txoptimizations$frameHasAlwaysOnTopGizmos());
     }
 }

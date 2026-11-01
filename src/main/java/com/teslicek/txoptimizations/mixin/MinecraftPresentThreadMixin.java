@@ -30,7 +30,6 @@ import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.client.renderer.DynamicGpuData;
 import net.minecraft.client.renderer.GameRenderer;
 import net.minecraft.client.renderer.LevelRenderer;
-import net.minecraft.gizmos.Gizmos;
 import net.minecraft.client.Options;
 import org.objectweb.asm.Opcodes;
 import org.slf4j.Logger;
@@ -253,9 +252,7 @@ public abstract class MinecraftPresentThreadMixin {
         RenderStateBuffers.bindRender((Minecraft) (Object) this);
         RenderSystem.executePendingTasks();
 
-        try (Gizmos.TemporaryCollection ignored = this.levelRenderer.collectPerFrameRenderThreadGizmos()) {
-            original.call(renderer);
-        }
+        original.call(renderer);
 
         if (acquire)
             this.txoptimizations$configureAndAcquire(width, height, vsync);

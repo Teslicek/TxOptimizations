@@ -1,6 +1,8 @@
 package com.teslicek.txoptimizations.mixin;
 
 import net.minecraft.client.renderer.LevelRenderer;
+import net.minecraft.client.renderer.SubmitNodeCollector;
+import net.minecraft.client.renderer.SubmitNodeStorage;
 import net.minecraft.client.renderer.state.OptionsRenderState;
 import net.minecraft.client.renderer.state.level.CameraRenderState;
 import net.minecraft.client.renderer.state.level.LevelRenderState;
@@ -22,4 +24,13 @@ public interface LevelRendererStateAccessor {
 
     @Invoker("repositionCamera")
     void txoptimizations$repositionCamera(CameraRenderState camera);
+
+    @Accessor("submitNodeStorage")
+    SubmitNodeStorage txoptimizations$submitNodeStorage();
+
+    @Invoker("submitFeatures")
+    void txoptimizations$submitFeatures(LevelRenderState levelRenderState, SubmitNodeCollector collector, boolean renderBlockOutline);
+
+    @Invoker("frameHasAlwaysOnTopGizmos")
+    boolean txoptimizations$frameHasAlwaysOnTopGizmos();
 }
