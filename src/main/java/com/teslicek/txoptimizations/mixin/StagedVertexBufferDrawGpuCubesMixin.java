@@ -109,14 +109,10 @@ public abstract class StagedVertexBufferDrawGpuCubesMixin implements GpuCubeDraw
 
     @Override
     public void txoptimizations$setPrepared(PreparedRenderType prepared) {
-        if (this.txoptimizations$prepared == null) {
-            this.txoptimizations$prepared = prepared;
-
-            return;
-        }
-
-        if (!this.txoptimizations$prepared.equals(prepared))
+        if (this.txoptimizations$prepared != null && this.txoptimizations$prepared != prepared)
             throw new IllegalStateException("A staged draw was given a second render type " + prepared.name() + " after " + this.txoptimizations$prepared.name());
+
+        this.txoptimizations$prepared = prepared;
     }
 
     @Override
