@@ -4,6 +4,7 @@ import com.llamalad7.mixinextras.injector.ModifyExpressionValue;
 import com.llamalad7.mixinextras.sugar.Local;
 import com.teslicek.txoptimizations.SectionSubset;
 import com.teslicek.txoptimizations.cull.EntityCulling;
+import it.unimi.dsi.fastutil.longs.Long2ObjectMap;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import it.unimi.dsi.fastutil.objects.ObjectListIterator;
 import java.util.List;
@@ -32,6 +33,14 @@ public abstract class LevelExtractorBlockEntitySectionsMixin {
             EntityCulling.enterBlockEntitySection(section);
 
         return blockEntities;
+    }
+
+    @Redirect(method = "extractVisibleBlockEntities", at = @At(value = "INVOKE", target = "Lit/unimi/dsi/fastutil/longs/Long2ObjectMap;get(J)Ljava/lang/Object;"))
+    private Object txoptimizations$skipEmptyDestruction(Long2ObjectMap<?> destruction, long pos) {
+        if (destruction.isEmpty())
+            return null;
+
+        return destruction.get(pos);
     }
 
     @Inject(method = "extractVisibleBlockEntities", at = @At("RETURN"))
