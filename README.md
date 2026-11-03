@@ -6,6 +6,8 @@ Client-side Fabric mod for **Minecraft 26.3** (Java 25) that removes repeated pe
 
 TxOptimizations declares Sodium and Iris incompatible, along with the mods whose work it replaces (ImmediatelyFast, Entity Culling, FerriteCore, More Culling and others listed in `fabric.mod.json`); Iris cannot run without Sodium, so none of its code paths are kept. Every mixin that replaces a vanilla method outright is applied at priority 999 or lower, below the default, so other mods' injections into the calls those methods still make apply on top of the replacement, the way they would on vanilla. Without it, Mixin refuses another mod's hook into a replaced method and the game fails to start, as it did with Meteor Client's item glint, hitbox and entity visibility hooks.
 
+The game always starts on Vulkan. Vanilla switches to OpenGL after a startup that did not finish, but TxOptimizations renders on its own thread, which has no OpenGL context, so the game crashed during resource loading on every start after that and never got back to Vulkan. The in-game graphics API setting and the `--graphicsBackend` launch argument are therefore ignored.
+
 ## Optimizations
 
 ### Rain fog

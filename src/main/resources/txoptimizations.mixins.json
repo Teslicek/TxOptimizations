@@ -186,6 +186,7 @@
     "MinecraftSkipRenderMixin",
     "MinecraftProfileFutureAccessor",
     "MinecraftPresentThreadMixin",
+    "MinecraftForceVulkanMixin",
     "MinecraftGlowSpectatorCacheMixin",
     "MinecraftRenderThreadStackMixin",
     "ModelManagerBackgroundWarningsMixin",
