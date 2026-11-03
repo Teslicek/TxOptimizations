@@ -111,6 +111,7 @@
     "FeatureRendererMapValuesMixin",
     "DynamicAtlasTreeFreeSpaceMixin",
     "FontTextureSizeMixin",
+    "FontRandomGlyphMixin",
     "FontManagerTextLayoutCacheMixin",
     "FormattedBidiReorderFastPathMixin",
     "FrontendGpuSurfaceDiscardMixin",
