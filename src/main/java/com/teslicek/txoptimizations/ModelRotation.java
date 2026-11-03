@@ -15,11 +15,9 @@ public final class ModelRotation {
     private static final int                  TRANSLATION_PROPERTIES = Matrix4fc.PROPERTY_AFFINE | Matrix4fc.PROPERTY_TRANSLATION | Matrix4fc.PROPERTY_ORTHONORMAL;
     private static final int                  TRANSLATED_PROPERTIES  = ~(Matrix4fc.PROPERTY_PERSPECTIVE | Matrix4fc.PROPERTY_IDENTITY);
     private static final int                  ROTATION_VALUES        = 9;
+    private static final int                  KEY_VALUES             = 4;
     private static final int                  CACHE_SLOTS            = 1024;
-    private static final int[]                CACHED_X               = new int[CACHE_SLOTS];
-    private static final int[]                CACHED_Y               = new int[CACHE_SLOTS];
-    private static final int[]                CACHED_Z               = new int[CACHE_SLOTS];
-    private static final boolean[]            FILLED                 = new boolean[CACHE_SLOTS];
+    private static final int[]                KEYS                   = new int[CACHE_SLOTS * KEY_VALUES];
     private static final float[]              ROTATIONS              = new float[CACHE_SLOTS * ROTATION_VALUES];
     private static final ThreadLocal<float[]> SCRATCH                = ThreadLocal.withInitial(() -> new float[ROTATION_VALUES]);
 
@@ -84,15 +82,16 @@ public final class ModelRotation {
         int bitsZ = Float.floatToRawIntBits(angleZ);
         int hash  = (bitsX * 31 + bitsY) * 31 + bitsZ;
         int slot  = (hash ^ hash >>> 16) & CACHE_SLOTS - 1;
+        int key   = slot * KEY_VALUES;
 
-        if (FILLED[slot] && CACHED_X[slot] == bitsX && CACHED_Y[slot] == bitsY && CACHED_Z[slot] == bitsZ)
+        if (KEYS[key] != 0 && KEYS[key + 1] == bitsX && KEYS[key + 2] == bitsY && KEYS[key + 3] == bitsZ)
             return slot;
 
         fillRotation(ROTATIONS, slot * ROTATION_VALUES, angleZ, angleY, angleX);
-        CACHED_X[slot] = bitsX;
-        CACHED_Y[slot] = bitsY;
-        CACHED_Z[slot] = bitsZ;
-        FILLED[slot]   = true;
+        KEYS[key]     = 1;
+        KEYS[key + 1] = bitsX;
+        KEYS[key + 2] = bitsY;
+        KEYS[key + 3] = bitsZ;
 
         return slot;
     }
