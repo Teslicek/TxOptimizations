@@ -1,5 +1,6 @@
 package com.teslicek.txoptimizations.gpu;
 
+import com.mojang.blaze3d.platform.FramerateLimitTracker;
 import com.mojang.logging.LogUtils;
 import java.io.IOException;
 import java.nio.file.Files;
@@ -29,10 +30,13 @@ public final class PassiveProfile {
     private static final String            RECORDING         = ".jfr";
     private static final String            SUMMARY           = ".txt";
     private static final String            SAMPLE            = "jdk.ExecutionSample";
+    private static final String            NATIVE_SAMPLE     = "jdk.NativeMethodSample";
+    private static final String            PARK              = "jdk.ThreadPark";
     private static final String            GC_PAUSE          = "jdk.GCPhasePause";
     private static final String            SAFEPOINT         = "jdk.SafepointBegin";
     private static final Duration          SAMPLE_PERIOD     = Duration.ofMillis(20);
     private static final Duration          LONG_PAUSE        = Duration.ofMillis(1);
+    private static final Duration          LONG_PARK         = Duration.ofMillis(10);
     private static final Duration          KEEP_AGE          = Duration.ofMinutes(6);
     private static final long              WINDOW_NANOS      = Duration.ofMinutes(5).toNanos();
     private static final long              BUCKET_NANOS      = 50_000L;
@@ -89,6 +93,8 @@ public final class PassiveProfile {
 
         started.setName("TxOptimizations passive profile");
         started.enable(SAMPLE).withPeriod(SAMPLE_PERIOD);
+        started.enable(NATIVE_SAMPLE).withPeriod(SAMPLE_PERIOD);
+        started.enable(PARK).withThreshold(LONG_PARK);
         started.enable(GC_PAUSE).withThreshold(Duration.ZERO);
         started.enable(SAFEPOINT).withThreshold(LONG_PAUSE);
         started.setToDisk(true);
@@ -113,8 +119,9 @@ public final class PassiveProfile {
         windowNanos += frameNanos;
         longestNanos = Math.max(longestNanos, frameNanos);
 
-        if (frameNanos > LONGEST_NANOS[LONGEST_FRAMES - 1])
+        if (frameNanos > LONGEST_NANOS[LONGEST_FRAMES - 1] && Minecraft.getInstance().getFramerateLimitTracker().getThrottleReason() == FramerateLimitTracker.FramerateThrottleReason.NONE)
             keepLongest(frameNanos);
+
         HISTOGRAM[(int) Math.min(frameNanos / BUCKET_NANOS, BUCKETS)] ++;
 
         if (now - windowStart < WINDOW_NANOS)
@@ -158,7 +165,7 @@ public final class PassiveProfile {
         for (int index = 0; index < PERCENTILES.length; index ++)
             summary.append(String.format(Locale.ROOT, ", %s %.2f ms", PERCENTILE_LABELS[index], percentileMillis(PERCENTILES[index])));
 
-        summary.append(System.lineSeparator()).append("Longest frames:");
+        summary.append(System.lineSeparator()).append("Longest unthrottled frames:");
 
         for (int index = 0; index < LONGEST_FRAMES && LONGEST_NANOS[index] != 0L; index ++)
             summary.append(String.format(Locale.ROOT, " %.3f ms ending %s", LONGEST_NANOS[index] / 1.0e6, FRAME_TIME.format(LocalDateTime.ofInstant(Instant.ofEpochMilli(LONGEST_AT[index]), ZoneId.systemDefault()))));
