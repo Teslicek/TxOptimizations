@@ -18,6 +18,7 @@
     "TextureManagerParallelMixin",
     "compat.FabricLevelRenderContextMixin",
     "compat.XaeroMinimapCoreHudCacheMixin",
+    "compat.XaeroLibEndFrameMixin",
     "LevelExtractorFrameMillisMixin",
     "LevelRendererFrameMillisMixin",
     "MainStartupBackgroundMixin",
