@@ -24,6 +24,7 @@ import net.minecraft.client.renderer.feature.submit.SubmitNode;
 import net.minecraft.client.renderer.rendertype.PreparedRenderType;
 import net.minecraft.client.renderer.rendertype.RenderType;
 import org.joml.Matrix4f;
+import org.jspecify.annotations.Nullable;
 
 public final class ParallelFeatures {
 
@@ -173,7 +174,8 @@ public final class ParallelFeatures {
     }
 
     private static boolean layoutsCached(Font font, List<?> groups, List<SubmitNode> submits) {
-        int clears = TextLayoutCache.entryClears();
+        int clears     = TextLayoutCache.entryClears();
+        int generation = TextLayoutCache.generation();
 
         for (Object group : groups) {
             FeaturePreparedGroupAccessor accessor = (FeaturePreparedGroupAccessor) group;
@@ -182,12 +184,24 @@ public final class ParallelFeatures {
                 if (!(((TextFeatureRenderer.Submit) submits.get(index)).content() instanceof TextFeatureRenderer.Content.Text text))
                     continue;
 
-                if (text.outlineColor() == 0 ? !TextLayoutCache.ensure(font, text.string(), text.x(), text.y(), text.color(), text.dropShadow(), text.backgroundColor(), false) : !TextLayoutCache.ensure(font, text.string(), text.x(), text.y(), text.outlineColor(), false, 0, true) || !TextLayoutCache.ensure(font, text.string(), text.x(), text.y(), text.color(), false, 0, false))
+                if (text.outlineColor() != 0 && !remember(text, font, generation, true, TextLayoutCache.ensure(font, text.string(), text.x(), text.y(), text.outlineColor(), false, 0, true)))
+                    return false;
+
+                if (!remember(text, font, generation, false, text.outlineColor() == 0 ? TextLayoutCache.ensure(font, text.string(), text.x(), text.y(), text.color(), text.dropShadow(), text.backgroundColor(), false) : TextLayoutCache.ensure(font, text.string(), text.x(), text.y(), text.color(), false, 0, false)))
                     return false;
             }
         }
 
         return TextLayoutCache.entryClears() == clears;
+    }
+
+    private static boolean remember(TextFeatureRenderer.Content.Text text, Font font, int generation, boolean outline, Font.@Nullable PreparedText layout) {
+        if (layout == null)
+            return false;
+
+        ((TextLayouts) (Object) text).txoptimizations$setLayout(font, generation, outline, layout);
+
+        return true;
     }
 
     private static boolean withoutTexts(List<?> groups, List<SubmitNode> submits) {

@@ -1,6 +1,8 @@
 package com.teslicek.txoptimizations.mixin;
 
+import com.llamalad7.mixinextras.sugar.Local;
 import com.teslicek.txoptimizations.TextLayoutCache;
+import com.teslicek.txoptimizations.TextLayouts;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.renderer.feature.TextFeatureRenderer;
 import net.minecraft.util.FormattedCharSequence;
@@ -12,9 +14,14 @@ import org.spongepowered.asm.mixin.injection.Redirect;
 public abstract class TextFeatureRendererLayoutCacheMixin {
 
     @Redirect(method = "renderText", at = @At(value = "INVOKE", target = "Lnet/minecraft/client/gui/Font;prepareText(Lnet/minecraft/util/FormattedCharSequence;FFIZZI)Lnet/minecraft/client/gui/Font$PreparedText;"))
-    private static Font.PreparedText txoptimizations$reuseTextLayout(Font font, FormattedCharSequence text, float x, float y, int color, boolean dropShadow, boolean includeEmpty, int backgroundColor) {
+    private static Font.PreparedText txoptimizations$reuseTextLayout(Font font, FormattedCharSequence text, float x, float y, int color, boolean dropShadow, boolean includeEmpty, int backgroundColor, @Local(argsOnly = true) TextFeatureRenderer.Content.Text content) {
         if (includeEmpty)
             throw new IllegalStateException("World text layout is not expected to include empty glyphs");
+
+        Font.PreparedText known = ((TextLayouts) (Object) content).txoptimizations$layout(font, TextLayoutCache.generation(), false);
+
+        if (known != null)
+            return known;
 
         Font.PreparedText cached = TextLayoutCache.find(font, text, x, y, color, dropShadow, backgroundColor, false, false);
 
@@ -25,7 +32,12 @@ public abstract class TextFeatureRendererLayoutCacheMixin {
     }
 
     @Redirect(method = "renderText", at = @At(value = "INVOKE", target = "Lnet/minecraft/client/gui/Font;prepare8xTextOutline(Lnet/minecraft/util/FormattedCharSequence;FFI)Lnet/minecraft/client/gui/Font$PreparedText;"))
-    private static Font.PreparedText txoptimizations$reuseOutlineLayout(Font font, FormattedCharSequence text, float x, float y, int outlineColor) {
+    private static Font.PreparedText txoptimizations$reuseOutlineLayout(Font font, FormattedCharSequence text, float x, float y, int outlineColor, @Local(argsOnly = true) TextFeatureRenderer.Content.Text content) {
+        Font.PreparedText known = ((TextLayouts) (Object) content).txoptimizations$layout(font, TextLayoutCache.generation(), true);
+
+        if (known != null)
+            return known;
+
         Font.PreparedText cached = TextLayoutCache.find(font, text, x, y, outlineColor, false, 0, false, true);
 
         if (cached != null)

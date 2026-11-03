@@ -375,6 +375,7 @@
     "TextDisplayRendererCullingMixin",
     "TextCullingSlotMixin",
     "TextFeatureRendererLayoutCacheMixin",
+    "TextContentLayoutsMixin",
     "SubmitNodeCollectionNameWidthMixin",
     "TextureAtlasBatchedAnimationMixin",
     "TextureAtlasScratchViewMixin",

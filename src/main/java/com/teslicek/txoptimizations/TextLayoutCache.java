@@ -10,6 +10,7 @@ import net.minecraft.network.chat.FormattedText;
 import net.minecraft.network.chat.MutableComponent;
 import net.minecraft.util.FormattedCharSequence;
 import net.minecraft.util.FormattedCharSink;
+import org.jspecify.annotations.Nullable;
 
 public final class TextLayoutCache {
 
@@ -34,18 +35,17 @@ public final class TextLayoutCache {
         return current().find(font, text, x, y, color, dropShadow, backgroundColor, includeEmpty, outline);
     }
 
-    public static boolean ensure(Font font, FormattedCharSequence text, float x, float y, int color, boolean dropShadow, int backgroundColor, boolean outline) {
-        Caches caches = current();
+    public static Font.@Nullable PreparedText ensure(Font font, FormattedCharSequence text, float x, float y, int color, boolean dropShadow, int backgroundColor, boolean outline) {
+        Caches            caches = current();
+        Font.PreparedText cached = caches.find(font, text, x, y, color, dropShadow, backgroundColor, false, outline);
 
-        if (caches.find(font, text, x, y, color, dropShadow, backgroundColor, false, outline) != null)
-            return true;
+        if (cached != null)
+            return cached;
 
         if (!isStable(text))
-            return false;
+            return null;
 
-        caches.put(outline ? font.prepare8xTextOutline(text, x, y, color) : font.prepareText(text, x, y, color, dropShadow, false, backgroundColor), font, text, x, y, color, dropShadow, backgroundColor, false, outline);
-
-        return true;
+        return caches.put(outline ? font.prepare8xTextOutline(text, x, y, color) : font.prepareText(text, x, y, color, dropShadow, false, backgroundColor), font, text, x, y, color, dropShadow, backgroundColor, false, outline);
     }
 
     public static Font.PreparedText store(Font.PreparedText prepared, Font font, FormattedCharSequence text, float x, float y, int color, boolean dropShadow, int backgroundColor, boolean includeEmpty, boolean outline) {
