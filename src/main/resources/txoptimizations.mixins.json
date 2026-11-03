@@ -19,6 +19,8 @@
     "compat.FabricLevelRenderContextMixin",
     "compat.XaeroMinimapCoreHudCacheMixin",
     "compat.XaeroLibEndFrameMixin",
+    "compat.XaeroMinimapTickMixin",
+    "compat.XaeroMinimapRenderTickMixin",
     "LevelExtractorFrameMillisMixin",
     "LevelRendererFrameMillisMixin",
     "MainStartupBackgroundMixin",
