@@ -26,9 +26,7 @@ import java.nio.ByteOrder;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashSet;
-import java.util.IdentityHashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import net.minecraft.client.model.geom.builders.UVPair;
@@ -86,8 +84,6 @@ public final class GpuCubes {
         .build();
 
     private static final int[]                               FACE_KEYS   = new int[CubeVertices.FACES];
-    private static final Map<RenderPipeline, RenderPipeline> VARIANTS    = new IdentityHashMap<>();
-    private static final Map<RenderPipeline, Boolean>        ELIGIBLE    = new IdentityHashMap<>();
     private static final List<GpuBuffer>                     RETIRED     = new ArrayList<>();
     private static final List<Long>                          RETIRED_AT  = new ArrayList<>();
     private static final StagedVertexBuffer.ExecuteInfo      EMPTY_INFO  = new StagedVertexBuffer.ExecuteInfo(null, null, IndexType.SHORT, 0, 0, 0, PrimitiveTopology.QUADS);
@@ -95,7 +91,8 @@ public final class GpuCubes {
     private static final float[]                             QUAD        = new float[QUAD_FLOATS];
     private static final int[]                               AXIS_ROWS   = {1, 2, 0};
 
-    private static float[]                 statics = new float[STATIC_FLOATS * INITIAL_CUBES];
+    private static int                     shaderGeneration = 1;
+    private static float[]                 statics          = new float[STATIC_FLOATS * INITIAL_CUBES];
     private static int                     cubes;
     private static int                     uploadedCubes;
     private static @Nullable GpuBuffer     staticBuffer;
@@ -264,10 +261,12 @@ public final class GpuCubes {
     }
 
     public static RenderPipeline variant(RenderPipeline vanilla) {
-        if (!isEligible(vanilla))
+        RenderPipeline variant = cubeVariant(vanilla);
+
+        if (variant == null)
             throw new IllegalStateException(vanilla.getLocation() + " draws GPU cubes but cannot compute them in its vertex shader");
 
-        return VARIANTS.get(vanilla);
+        return variant;
     }
 
     public static void uploadStatic(GpuDevice device) {
@@ -472,23 +471,30 @@ public final class GpuCubes {
     }
 
     private static boolean isEligible(@Nullable RenderPipeline pipeline) {
-        return pipeline != null && ELIGIBLE.computeIfAbsent(pipeline, GpuCubes::eligible);
+        return pipeline != null && cubeVariant(pipeline) != null;
     }
 
-    private static boolean eligible(RenderPipeline vanilla) {
+    private static @Nullable RenderPipeline cubeVariant(RenderPipeline vanilla) {
+        GpuCubePipeline cached = (GpuCubePipeline) vanilla;
+
+        if (cached.txoptimizations$cubeGeneration() != shaderGeneration)
+            cached.txoptimizations$setCubeVariant(shaderGeneration, eligibleVariant(vanilla));
+
+        return cached.txoptimizations$cubeVariant();
+    }
+
+    private static @Nullable RenderPipeline eligibleVariant(RenderPipeline vanilla) {
         if (!PATCHED.contains(vanilla.getShaders().get(ShaderType.VERTEX)) || vanilla.getShaderDefines().flags().contains(GLINT_SPECIAL) || vanilla.getPrimitiveTopology() != PrimitiveTopology.QUADS || vanilla.getVertexFormatBinding(0) != DefaultVertexFormat.ENTITY)
-            return false;
+            return null;
 
         List<VertexFormat> bindings = vanilla.getVertexFormatBindings();
 
         for (int slot = 1; slot < bindings.size(); slot ++) {
             if (bindings.get(slot) != null)
-                return false;
+                return null;
         }
 
-        VARIANTS.put(vanilla, variantOf(vanilla, bindings.size()));
-
-        return true;
+        return variantOf(vanilla, bindings.size());
     }
 
     private static RenderPipeline variantOf(RenderPipeline vanilla, int slots) {
@@ -517,8 +523,7 @@ public final class GpuCubes {
         PATCHED.clear();
         markPatched(cache, ENTITY_SHADER);
         markPatched(cache, ITEM_SHADER);
-        ELIGIBLE.clear();
-        VARIANTS.clear();
+        shaderGeneration ++;
     }
 
     private static void markPatched(PipelineCache cache, Identifier shader) {

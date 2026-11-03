@@ -284,6 +284,7 @@
     "RenderSectionMeshReleaseMixin",
     "RenderSetupTextureCacheMixin",
     "RenderPipelineFormatArrayMixin",
+    "RenderPipelineGpuCubesMixin",
     "EnvironmentAttributeSamplerLayersMixin",
     "EntityViewVectorMemoMixin",
     "StagedVertexBufferDrawOutlineMixin",
