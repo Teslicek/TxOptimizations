@@ -13,6 +13,9 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.TreeMap;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import jdk.jfr.Recording;
 import jdk.jfr.consumer.RecordedEvent;
 import jdk.jfr.consumer.RecordedFrame;
@@ -45,17 +48,25 @@ final class JfrRecorder {
     private static final int      TOP_EVENTS     = 15;
     private static final int      TOP_WORKERS    = 8;
 
-    private static Recording recording;
-    private static Instant   startTime;
-    private static String    renderThread;
+    private static final ExecutorService STARTER = Executors.newSingleThreadExecutor(Thread.ofPlatform().name("TxOptimizations Flight Recorder").daemon().factory());
+
+    private static volatile CompletableFuture<Recording> starting;
+    private static Instant                               startTime;
+    private static String                                renderThread;
 
     private JfrRecorder() {
     }
 
     static void start(Thread target) {
-        if (recording != null)
+        if (starting != null)
             throw new IllegalStateException("Flight Recorder profile is already running");
 
+        startTime    = Instant.now();
+        renderThread = target.getName();
+        starting     = CompletableFuture.supplyAsync(JfrRecorder::open, STARTER);
+    }
+
+    private static Recording open() {
         Recording started = new Recording();
 
         started.enable(ALLOCATION).with("throttle", "5000/s").withStackTrace();
@@ -74,25 +85,19 @@ final class JfrRecorder {
         started.enable(GpuCallEvent.class).withThreshold(WAIT_THRESHOLD);
         started.start();
         GpuCallEvent.setRecording(true);
-        recording    = started;
-        startTime    = Instant.now();
-        renderThread = target.getName();
+
+        return started;
     }
 
     static void measureFromNow() {
-        if (recording == null)
-            throw new IllegalStateException("Flight Recorder profile was never started");
-
+        started();
         startTime = Instant.now();
     }
 
     static String finish(double seconds) {
-        Recording finished = recording;
+        Recording finished = started();
 
-        if (finished == null)
-            throw new IllegalStateException("Flight Recorder profile was never started");
-
-        recording = null;
+        starting = null;
         GpuCallEvent.setRecording(false);
         finished.stop();
 
@@ -112,6 +117,15 @@ final class JfrRecorder {
         } catch (IOException exception) {
             throw new UncheckedIOException("Could not read the Flight Recorder profile", exception);
         }
+    }
+
+    private static Recording started() {
+        CompletableFuture<Recording> started = starting;
+
+        if (started == null)
+            throw new IllegalStateException("Flight Recorder profile was never started");
+
+        return started.join();
     }
 
     private static String jvmReport(List<RecordedEvent> events) {
