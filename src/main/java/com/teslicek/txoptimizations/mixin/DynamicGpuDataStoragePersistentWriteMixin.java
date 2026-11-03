@@ -216,7 +216,8 @@ public abstract class DynamicGpuDataStoragePersistentWriteMixin<T extends Dynami
 
     @Unique
     private void txoptimizations$forgetHeldDraws() {
-        Arrays.fill(this.txoptimizations$heldBuffers, null);
+        if (this.txoptimizations$heldBuffers[0] != null)
+            Arrays.fill(this.txoptimizations$heldBuffers, null);
     }
 
     @Unique
