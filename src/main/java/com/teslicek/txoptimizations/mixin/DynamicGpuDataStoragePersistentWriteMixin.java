@@ -30,6 +30,9 @@ public abstract class DynamicGpuDataStoragePersistentWriteMixin<T extends Dynami
     @Unique
     private static final int HELD_BUFFERS = 8;
 
+    @Unique
+    private static final int SLICE_POOLS = 3;
+
     @Shadow
     @Final
     private static Logger LOGGER;
@@ -55,10 +58,13 @@ public abstract class DynamicGpuDataStoragePersistentWriteMixin<T extends Dynami
     private String label;
 
     @Unique
-    private GpuBufferSlice txoptimizations$lastSlice;
+    private final GpuBuffer[] txoptimizations$sliceBuffers = new GpuBuffer[SLICE_POOLS];
 
     @Unique
-    private int txoptimizations$lastSliceBlock;
+    private final GpuBufferSlice[][] txoptimizations$slices = new GpuBufferSlice[SLICE_POOLS][];
+
+    @Unique
+    private int txoptimizations$nextSlicePool;
 
     @Unique
     private final GpuBuffer[] txoptimizations$heldBuffers = new GpuBuffer[HELD_BUFFERS];
@@ -84,14 +90,8 @@ public abstract class DynamicGpuDataStoragePersistentWriteMixin<T extends Dynami
     public GpuBufferSlice writeData(T gpuData) {
         this.txoptimizations$forgetHeldDraws();
 
-        if (this.lastData != null && this.lastData.equals(gpuData)) {
-            GpuBuffer current = this.ringBuffer.currentBuffer();
-
-            if (this.txoptimizations$lastSlice != null && this.txoptimizations$lastSliceBlock == this.nextBlock - 1 && this.txoptimizations$lastSlice.buffer() == current)
-                return this.txoptimizations$lastSlice;
-
-            return current.slice((this.nextBlock - 1) * this.blockSize, this.blockSize);
-        }
+        if (this.lastData != null && this.lastData.equals(gpuData))
+            return this.txoptimizations$blockSlice(this.ringBuffer.currentBuffer(), this.nextBlock - 1);
 
         if (this.nextBlock >= this.capacity) {
             int newCapacity = this.capacity * 2;
@@ -114,10 +114,8 @@ public abstract class DynamicGpuDataStoragePersistentWriteMixin<T extends Dynami
             }
         }
 
-        GpuBufferSlice slice = buffer.slice(offset, this.blockSize);
+        GpuBufferSlice slice = this.txoptimizations$blockSlice(buffer, this.nextBlock);
 
-        this.txoptimizations$lastSlice      = slice;
-        this.txoptimizations$lastSliceBlock = this.nextBlock;
         this.nextBlock ++;
         this.lastData = gpuData;
 
@@ -212,6 +210,54 @@ public abstract class DynamicGpuDataStoragePersistentWriteMixin<T extends Dynami
         this.txoptimizations$heldBuilds[free]  = build;
         this.txoptimizations$heldOffsets[free] = offset;
         this.txoptimizations$heldBytes[free]   = bytes;
+    }
+
+    @Unique
+    private GpuBufferSlice txoptimizations$blockSlice(GpuBuffer buffer, int block) {
+        GpuBufferSlice[] slices = this.txoptimizations$slicesFor(buffer);
+
+        if (block >= slices.length) {
+            slices = Arrays.copyOf(slices, Math.max(block + 1, this.capacity));
+
+            this.txoptimizations$slices[this.txoptimizations$poolOf(buffer)] = slices;
+        }
+
+        GpuBufferSlice slice = slices[block];
+
+        if (slice == null) {
+            slice         = buffer.slice((long) block * this.blockSize, this.blockSize);
+            slices[block] = slice;
+        }
+
+        return slice;
+    }
+
+    @Unique
+    private GpuBufferSlice[] txoptimizations$slicesFor(GpuBuffer buffer) {
+        int pool = this.txoptimizations$poolOf(buffer);
+
+        if (pool != -1)
+            return this.txoptimizations$slices[pool];
+
+        pool = this.txoptimizations$nextSlicePool;
+
+        GpuBufferSlice[] slices = new GpuBufferSlice[this.capacity];
+
+        this.txoptimizations$sliceBuffers[pool] = buffer;
+        this.txoptimizations$slices[pool]       = slices;
+        this.txoptimizations$nextSlicePool      = (pool + 1) % SLICE_POOLS;
+
+        return slices;
+    }
+
+    @Unique
+    private int txoptimizations$poolOf(GpuBuffer buffer) {
+        for (int pool = 0; pool < SLICE_POOLS; pool ++) {
+            if (this.txoptimizations$sliceBuffers[pool] == buffer)
+                return pool;
+        }
+
+        return -1;
     }
 
     @Unique
