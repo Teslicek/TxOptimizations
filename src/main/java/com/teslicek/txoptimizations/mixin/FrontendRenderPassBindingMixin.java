@@ -3,6 +3,7 @@ package com.teslicek.txoptimizations.mixin;
 import com.mojang.renderpearl.api.buffers.GpuBuffer;
 import com.mojang.renderpearl.api.buffers.GpuBufferSlice;
 import com.mojang.renderpearl.api.commands.RenderPassDescriptor;
+import com.mojang.renderpearl.api.device.DeviceLimits;
 import com.mojang.renderpearl.api.pipeline.ColorTargetState;
 import com.mojang.renderpearl.api.pipeline.CompiledRenderPipeline;
 import com.mojang.renderpearl.api.pipeline.IndexType;
@@ -56,6 +57,10 @@ public abstract class FrontendRenderPassBindingMixin implements TextureUniformBi
     @Shadow
     private boolean constantsPushed;
 
+    @Shadow
+    @Final
+    private DeviceLimits deviceLimits;
+
     @Unique
     private static long txoptimizations$passes;
 
@@ -68,10 +73,19 @@ public abstract class FrontendRenderPassBindingMixin implements TextureUniformBi
     @Unique
     private long txoptimizations$pass;
 
+    @Unique
+    private long txoptimizations$uniformAlignmentMask;
+
     @Inject(method = "<init>", at = @At("RETURN"))
     private void txoptimizations$numberPass(CallbackInfo ci) {
+        int alignment = this.deviceLimits.minUniformOffsetAlignment();
+
+        if (Integer.bitCount(alignment) != 1)
+            throw new IllegalStateException("The device's minimum uniform buffer offset alignment " + alignment + " is not a power of two");
+
         txoptimizations$passes ++;
-        this.txoptimizations$pass = txoptimizations$passes;
+        this.txoptimizations$pass                 = txoptimizations$passes;
+        this.txoptimizations$uniformAlignmentMask = alignment - 1L;
     }
 
     @Overwrite
@@ -129,6 +143,16 @@ public abstract class FrontendRenderPassBindingMixin implements TextureUniformBi
             throw new IllegalArgumentException("textureView and sampler must both or neither be null");
 
         this.setUniform(name, (Object) null);
+    }
+
+    @Overwrite
+    public void setUniform(String name, GpuBufferSlice value) {
+        long offset = value.offset();
+
+        if (offset > 0L && (offset & this.txoptimizations$uniformAlignmentMask) != 0L)
+            throw new IllegalArgumentException("Uniform buffer offset must be aligned to " + (this.txoptimizations$uniformAlignmentMask + 1L));
+
+        this.setUniform(name, (Object) value);
     }
 
     @Overwrite
