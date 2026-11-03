@@ -25,9 +25,9 @@ public final class SectionSubset {
     private final AtomicLong finished = new AtomicLong();
     private final int        flag;
 
-    private ObjectArrayList<SectionRenderDispatcher.RenderSection> subset   = new ObjectArrayList<>();
-    private ObjectArrayList<SectionRenderDispatcher.RenderSection> recorded = new ObjectArrayList<>();
-    private long                                                   stamp    = UNSETTLED;
+    private SectionList subset   = new SectionList();
+    private SectionList recorded = new SectionList();
+    private long        stamp    = UNSETTLED;
 
     private SectionSubset(int flag) {
         this.flag = flag;
@@ -50,13 +50,13 @@ public final class SectionSubset {
         long    stamp = this.settledStamp();
         boolean reuse = this.isRecordedAt(stamp);
 
-        ObjectArrayList<SectionRenderDispatcher.RenderSection> previous = this.recorded;
+        SectionList previous = this.recorded;
 
         this.recorded = this.subset;
         this.subset   = previous;
         this.stamp    = stamp;
 
-        this.recorded.clear();
+        this.recorded.reset();
 
         if (reuse)
             return previous.iterator();
@@ -86,7 +86,7 @@ public final class SectionSubset {
     }
 
     private ObjectArrayList<SectionRenderDispatcher.RenderSection> beginCarry() {
-        this.recorded.clear();
+        this.recorded.reset();
 
         return this.recorded;
     }
@@ -185,5 +185,12 @@ public final class SectionSubset {
         generation ++;
 
         return generation;
+    }
+
+    private static final class SectionList extends ObjectArrayList<SectionRenderDispatcher.RenderSection> {
+
+        private void reset() {
+            this.size = 0;
+        }
     }
 }
