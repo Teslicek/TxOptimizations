@@ -373,6 +373,7 @@
     "TextCullingSlotMixin",
     "TextFeatureRendererLayoutCacheMixin",
     "TextContentLayoutsMixin",
+    "ClientPacketListenerChatSessionCacheMixin",
     "SubmitNodeCollectionNameWidthMixin",
     "TextureAtlasBatchedAnimationMixin",
     "TextureAtlasScratchViewMixin",
