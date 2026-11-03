@@ -176,7 +176,7 @@ public final class GpuCubes {
         return draw;
     }
 
-    public static boolean add(GpuCubeDraw draw, GpuCube cube, VertexConsumer builder) {
+    public static boolean add(GpuCubeDraw draw, GpuCube cube, VertexConsumer builder, int hiddenFaces) {
         int shape = cube.txoptimizations$gpuIndex();
 
         if (shape < 0) {
@@ -210,7 +210,7 @@ public final class GpuCubes {
 
         if (draw.txoptimizations$isSorted()) {
             CubeVertices.faceKeys(partPose.pose(), statics, shape * STATIC_FLOATS, FACE_KEYS, 0);
-            draw.txoptimizations$addSortedKeys(ref, FACE_KEYS);
+            draw.txoptimizations$addSortedKeys(ref, FACE_KEYS, hiddenFaces);
         }
 
         return true;

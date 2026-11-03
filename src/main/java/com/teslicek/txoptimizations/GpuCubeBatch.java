@@ -10,6 +10,7 @@ import com.teslicek.txoptimizations.mixin.ByteBufferBuilderAccessor;
 import com.teslicek.txoptimizations.mixin.ByteBufferResultAccessor;
 import com.teslicek.txoptimizations.mixin.StagedVertexBufferDrawAccessor;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import net.minecraft.client.renderer.StagedVertexBuffer;
 import org.joml.Matrix4f;
@@ -42,6 +43,7 @@ public final class GpuCubeBatch implements AutoCloseable {
     private @Nullable GpuBuffer current;
     private @Nullable GpuBuffer sortedBuffer;
     private long                half;
+    private boolean[]           hiddenQuads  = new boolean[0];
 
     public GpuCubeBatch(String label) {
         if (this.poses == MemoryUtil.NULL || this.refs == MemoryUtil.NULL)
@@ -185,31 +187,42 @@ public final class GpuCubeBatch implements AutoCloseable {
                 int raw   = draw.txoptimizations$rawVertices();
                 int cubes = draw.txoptimizations$sortedCubes();
                 int quads = cubes * FACES + raw / 4;
+                int visible;
 
                 if (raw == 0) {
-                    writeCubeIndices(base + (long) firstIndex * Integer.BYTES, QuadSort.sort(draw.txoptimizations$sortedKeys(), quads), draw.txoptimizations$sortedRefs());
-                    draw.txoptimizations$setSortedDraw(false, firstIndex, quads * QUAD_INDICES, 0L, 0L);
+                    visible = writeCubeIndices(base + (long) firstIndex * Integer.BYTES, QuadSort.sort(draw.txoptimizations$sortedKeys(), quads), draw.txoptimizations$sortedRefs(), draw.txoptimizations$sortedHiddenFaces());
+                    draw.txoptimizations$setSortedDraw(false, firstIndex, visible * QUAD_INDICES, 0L, 0L);
                 } else {
                     long bytes = ((long) cubes * GpuCubes.CUBE_VERTICES + raw) * STRIDE;
 
-                    this.expand(draw, base + vertexAt, base + (long) firstIndex * Integer.BYTES, quads);
-                    draw.txoptimizations$setSortedDraw(true, firstIndex, quads * QUAD_INDICES, vertexAt, bytes);
+                    visible = this.expand(draw, base + vertexAt, base + (long) firstIndex * Integer.BYTES, quads);
+                    draw.txoptimizations$setSortedDraw(true, firstIndex, visible * QUAD_INDICES, vertexAt, bytes);
                     vertexAt += bytes;
                 }
 
-                firstIndex += quads * QUAD_INDICES;
+                firstIndex += visible * QUAD_INDICES;
             }
         }
     }
 
-    private void expand(GpuCubeDraw draw, long target, long indices, int quads) {
+    private int expand(GpuCubeDraw draw, long target, long indices, int quads) {
+        if (this.hiddenQuads.length < quads)
+            this.hiddenQuads = new boolean[Math.max(quads, this.hiddenQuads.length * 2)];
+
+        boolean[] hiddenQuads = this.hiddenQuads;
+        int[]     sortedRefs  = draw.txoptimizations$sortedRefs();
+        byte[]    hiddenFaces = draw.txoptimizations$sortedHiddenFaces();
+
+        Arrays.fill(hiddenQuads, 0, quads, false);
+
         long vertices = MemoryUtil.nmemAlloc((long) quads * 4 * STRIDE);
 
         if (vertices == MemoryUtil.NULL)
             throw new OutOfMemoryError("Could not expand a sorted draw of " + quads + " quads");
 
         try {
-            long at = vertices;
+            long at   = vertices;
+            int  cube = 0;
 
             for (int segment = 0; segment < draw.txoptimizations$segments(); segment ++) {
                 int start  = draw.txoptimizations$segmentStart(segment);
@@ -227,10 +240,22 @@ public final class GpuCubeBatch implements AutoCloseable {
                 }
 
                 for (int ref = start; ref < start + length; ref ++) {
+                    if (sortedRefs[cube] != ref)
+                        throw new IllegalStateException("A sorted draw expanded GPU cube reference " + ref + " where its sorted cube " + cube + " is reference " + sortedRefs[cube]);
+
+                    int firstQuad = (int) ((at - vertices) / STRIDE / 4);
+
+                    for (int face = 0; face < FACES; face ++)
+                        hiddenQuads[firstQuad + face] = (hiddenFaces[cube] >> face & 1) != 0;
+
                     this.putCube(at, ref);
                     at += (long) GpuCubes.CUBE_VERTICES * STRIDE;
+                    cube ++;
                 }
             }
+
+            if (cube != draw.txoptimizations$sortedCubes())
+                throw new IllegalStateException("A sorted draw expanded " + cube + " GPU cubes instead of " + draw.txoptimizations$sortedCubes());
 
             if (at != vertices + (long) quads * 4 * STRIDE)
                 throw new IllegalStateException("A sorted draw expanded to " + (at - vertices) / STRIDE + " vertices instead of " + quads * 4);
@@ -238,8 +263,12 @@ public final class GpuCubeBatch implements AutoCloseable {
             int[] keys = QuadSort.keys(quads);
 
             DistanceSorting.fillOriginKeys(vertices, STRIDE, quads, keys, 0);
-            TwinQuads.writeIndices(indices, QuadSort.sort(keys, quads), false);
+
+            int visible = writeQuadIndices(indices, QuadSort.sort(keys, quads), hiddenQuads);
+
             MemoryUtil.memCopy(vertices, target, (long) quads * 4 * STRIDE);
+
+            return visible;
         } finally {
             MemoryUtil.nmemFree(vertices);
         }
@@ -256,18 +285,44 @@ public final class GpuCubeBatch implements AutoCloseable {
         CubeVertices.putShape(target, MATRIX, GpuCubes.shapes(), shape * GpuCubes.shapeFloats(), MemoryUtil.memGetInt(poseAt + 76L), MemoryUtil.memGetLong(poseAt + 68L), NORMALS);
     }
 
-    private static void writeCubeIndices(long pointer, int[] order, int[] refs) {
-        for (int quad : order) {
-            int first = refs[quad / FACES] * GpuCubes.CUBE_VERTICES + quad % FACES * 4;
+    private static int writeCubeIndices(long pointer, int[] order, int[] refs, byte[] hiddenFaces) {
+        int visible = 0;
 
-            MemoryUtil.memPutInt(pointer, first);
-            MemoryUtil.memPutInt(pointer + 4L, first + 1);
-            MemoryUtil.memPutInt(pointer + 8L, first + 2);
-            MemoryUtil.memPutInt(pointer + 12L, first + 2);
-            MemoryUtil.memPutInt(pointer + 16L, first + 3);
-            MemoryUtil.memPutInt(pointer + 20L, first);
-            pointer += QUAD_INDICES * Integer.BYTES;
+        for (int quad : order) {
+            int cube = quad / FACES;
+            int face = quad - cube * FACES;
+
+            if ((hiddenFaces[cube] >> face & 1) != 0)
+                continue;
+
+            putQuad(pointer + (long) visible * QUAD_INDICES * Integer.BYTES, refs[cube] * GpuCubes.CUBE_VERTICES + face * 4);
+            visible ++;
         }
+
+        return visible;
+    }
+
+    private static int writeQuadIndices(long pointer, int[] order, boolean[] hiddenQuads) {
+        int visible = 0;
+
+        for (int quad : order) {
+            if (hiddenQuads[quad])
+                continue;
+
+            putQuad(pointer + (long) visible * QUAD_INDICES * Integer.BYTES, quad * 4);
+            visible ++;
+        }
+
+        return visible;
+    }
+
+    private static void putQuad(long pointer, int first) {
+        MemoryUtil.memPutInt(pointer, first);
+        MemoryUtil.memPutInt(pointer + 4L, first + 1);
+        MemoryUtil.memPutInt(pointer + 8L, first + 2);
+        MemoryUtil.memPutInt(pointer + 12L, first + 2);
+        MemoryUtil.memPutInt(pointer + 16L, first + 3);
+        MemoryUtil.memPutInt(pointer + 20L, first);
     }
 
     private static void copyRaw(StagedVertexBuffer.Draw draw, int start, int length, long target) {

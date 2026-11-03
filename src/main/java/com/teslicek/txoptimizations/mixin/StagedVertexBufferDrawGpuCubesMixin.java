@@ -6,6 +6,7 @@ import com.mojang.renderpearl.api.vertex.VertexFormat;
 import com.teslicek.txoptimizations.GpuCubeBatch;
 import com.teslicek.txoptimizations.GpuCubeDraw;
 import com.teslicek.txoptimizations.GpuCubes;
+import com.teslicek.txoptimizations.SkinAlpha;
 import java.util.Arrays;
 import net.minecraft.client.renderer.StagedVertexBuffer;
 import net.minecraft.client.renderer.rendertype.PreparedRenderType;
@@ -55,6 +56,9 @@ public abstract class StagedVertexBufferDrawGpuCubesMixin implements GpuCubeDraw
     private @Nullable PreparedRenderType txoptimizations$prepared;
 
     @Unique
+    private @Nullable SkinAlpha txoptimizations$skin;
+
+    @Unique
     private int txoptimizations$accepts;
 
     @Unique
@@ -85,6 +89,9 @@ public abstract class StagedVertexBufferDrawGpuCubesMixin implements GpuCubeDraw
     private int[] txoptimizations$sortedKeys = new int[0];
 
     @Unique
+    private byte[] txoptimizations$sortedHiddenFaces = new byte[0];
+
+    @Unique
     private int txoptimizations$sortedCubes;
 
     @Unique
@@ -112,7 +119,16 @@ public abstract class StagedVertexBufferDrawGpuCubesMixin implements GpuCubeDraw
         if (this.txoptimizations$prepared != null && this.txoptimizations$prepared != prepared)
             throw new IllegalStateException("A staged draw was given a second render type " + prepared.name() + " after " + this.txoptimizations$prepared.name());
 
+        if (this.txoptimizations$prepared == prepared)
+            return;
+
         this.txoptimizations$prepared = prepared;
+        this.txoptimizations$skin     = SkinAlpha.of(prepared);
+    }
+
+    @Override
+    public @Nullable SkinAlpha txoptimizations$skin() {
+        return this.txoptimizations$skin;
     }
 
     @Override
@@ -211,18 +227,23 @@ public abstract class StagedVertexBufferDrawGpuCubesMixin implements GpuCubeDraw
     }
 
     @Override
-    public void txoptimizations$addSortedKeys(int ref, int[] keys) {
+    public void txoptimizations$addSortedKeys(int ref, int[] keys, int hiddenFaces) {
+        if ((hiddenFaces & ~((1 << FACES) - 1)) != 0)
+            throw new IllegalArgumentException("A sorted GPU cube has hidden faces " + Integer.toBinaryString(hiddenFaces) + " beyond its " + FACES + " faces");
+
         int cube = this.txoptimizations$sortedCubes;
 
         if (cube == this.txoptimizations$sortedRefs.length) {
-            this.txoptimizations$sortedRefs = Arrays.copyOf(this.txoptimizations$sortedRefs, Math.max(16, cube * 2));
-            this.txoptimizations$sortedKeys = Arrays.copyOf(this.txoptimizations$sortedKeys, this.txoptimizations$sortedRefs.length * FACES);
+            this.txoptimizations$sortedRefs        = Arrays.copyOf(this.txoptimizations$sortedRefs, Math.max(16, cube * 2));
+            this.txoptimizations$sortedKeys        = Arrays.copyOf(this.txoptimizations$sortedKeys, this.txoptimizations$sortedRefs.length * FACES);
+            this.txoptimizations$sortedHiddenFaces = Arrays.copyOf(this.txoptimizations$sortedHiddenFaces, this.txoptimizations$sortedRefs.length);
         }
 
         if (cube == 0)
             this.txoptimizations$batch().addSortedDraw(this);
 
-        this.txoptimizations$sortedRefs[cube] = ref;
+        this.txoptimizations$sortedRefs[cube]        = ref;
+        this.txoptimizations$sortedHiddenFaces[cube] = (byte) hiddenFaces;
         System.arraycopy(keys, 0, this.txoptimizations$sortedKeys, cube * FACES, FACES);
         this.txoptimizations$sortedCubes ++;
     }
@@ -240,6 +261,11 @@ public abstract class StagedVertexBufferDrawGpuCubesMixin implements GpuCubeDraw
     @Override
     public int[] txoptimizations$sortedKeys() {
         return this.txoptimizations$sortedKeys;
+    }
+
+    @Override
+    public byte[] txoptimizations$sortedHiddenFaces() {
+        return this.txoptimizations$sortedHiddenFaces;
     }
 
     @Override

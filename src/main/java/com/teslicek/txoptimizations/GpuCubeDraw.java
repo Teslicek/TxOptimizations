@@ -1,6 +1,7 @@
 package com.teslicek.txoptimizations;
 
 import net.minecraft.client.renderer.rendertype.PreparedRenderType;
+import org.jspecify.annotations.Nullable;
 
 public interface GpuCubeDraw {
 
@@ -11,6 +12,8 @@ public interface GpuCubeDraw {
     void txoptimizations$setBatch(GpuCubeBatch batch);
 
     void txoptimizations$setPrepared(PreparedRenderType prepared);
+
+    @Nullable SkinAlpha txoptimizations$skin();
 
     boolean txoptimizations$acceptsCubes();
 
@@ -32,13 +35,15 @@ public interface GpuCubeDraw {
 
     boolean txoptimizations$isSorted();
 
-    void txoptimizations$addSortedKeys(int ref, int[] keys);
+    void txoptimizations$addSortedKeys(int ref, int[] keys, int hiddenFaces);
 
     int txoptimizations$sortedCubes();
 
     int[] txoptimizations$sortedRefs();
 
     int[] txoptimizations$sortedKeys();
+
+    byte[] txoptimizations$sortedHiddenFaces();
 
     void txoptimizations$setSortedDraw(boolean expanded, int firstIndex, int indexCount, long vertexOffset, long vertexBytes);
 

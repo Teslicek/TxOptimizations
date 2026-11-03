@@ -9,6 +9,7 @@ import com.teslicek.txoptimizations.GpuCubes;
 import com.teslicek.txoptimizations.ModelPartTree;
 import com.teslicek.txoptimizations.ModelPoseTree;
 import com.teslicek.txoptimizations.ModelRotation;
+import com.teslicek.txoptimizations.SkinAlpha;
 import it.unimi.dsi.fastutil.objects.Object2ObjectArrayMap;
 import java.util.List;
 import java.util.Map;
@@ -76,11 +77,16 @@ public abstract class ModelPartIdentityMixin implements ModelPartTree {
     @Overwrite
     private void compile(PoseStack.Pose pose, VertexConsumer builder, int lightCoords, int overlayCoords, int color) {
         GpuCubeDraw draw = GpuCubes.beginPart(pose, builder, lightCoords, overlayCoords, color);
+        SkinAlpha   skin = draw == null ? null : draw.txoptimizations$skin();
 
         for (int index = 0; index < this.cubes.size(); index ++) {
-            ModelPart.Cube cube = this.cubes.get(index);
+            ModelPart.Cube cube   = this.cubes.get(index);
+            int            hidden = skin == null ? 0 : skin.hiddenFaces(cube);
 
-            if (draw == null || !GpuCubes.add(draw, (GpuCube) cube, builder))
+            if (skin != null && hidden == SkinAlpha.allFaces(cube))
+                continue;
+
+            if (draw == null || !GpuCubes.add(draw, (GpuCube) cube, builder, hidden))
                 cube.compile(pose, builder, lightCoords, overlayCoords, color);
         }
 
