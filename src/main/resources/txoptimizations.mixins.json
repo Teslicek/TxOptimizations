@@ -389,6 +389,7 @@
     "VertexSortingDistanceMixin",
     "VillagerProfessionLayerTextureMixin",
     "VulkanBackendCheckpointMixin",
+    "GuiRenderStateElementSortMixin",
     "VulkanCommandEncoderBackgroundDestroyMixin",
     "VulkanCommandEncoderDeferralMixin",
     "VulkanDeviceBackgroundDestroyMixin",

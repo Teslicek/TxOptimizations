@@ -14,33 +14,34 @@ import org.lwjgl.system.MemoryUtil;
 public final class GlyphVertexCache {
 
     private static final int                        FULL_BRIGHT   = 15728880;
-    private static final long                       UNUSED_FRAMES = 200L;
+    private static final long                       UNUSED_MILLIS = 1000L;
     private static final int                        MAX_ENTRIES   = 4096;
     private static final Map<TextRenderable, Entry> ENTRIES       = new IdentityHashMap<>();
+    private static final Matrix4f                   MATRIX        = new Matrix4f();
 
     private static long lastEviction;
 
     private GlyphVertexCache() {
     }
 
-    public static void build(TextRenderable[] glyphs, int count, boolean shared, Matrix3x2fc pose, Matrix4f matrix, VertexConsumer consumer) {
+    public static void build(TextRenderable[] glyphs, int count, boolean shared, Matrix3x2fc pose, VertexConsumer consumer) {
         if (count == 0)
             throw new IllegalArgumentException("A glyph run without glyphs cannot build vertices");
 
         if (!(consumer instanceof DirectVertexBuffer direct) || direct.txoptimizations$duplicatesVertices()) {
-            render(glyphs, count, matrix, consumer);
+            render(glyphs, count, pose, consumer);
             return;
         }
 
-        long frame = ClientClock.frame();
+        long millis = ClientClock.frameMillis();
 
-        evictUnused(frame);
+        evictUnused(millis);
 
         VertexFormat format = direct.txoptimizations$format();
         Entry        entry  = ENTRIES.get(glyphs[0]);
 
         if (entry == null || !entry.matches(glyphs, count, pose, format)) {
-            render(glyphs, count, matrix, consumer);
+            render(glyphs, count, pose, consumer);
 
             if (entry != null)
                 entry.free();
@@ -48,11 +49,11 @@ public final class GlyphVertexCache {
             if (ENTRIES.size() >= MAX_ENTRIES)
                 clear();
 
-            ENTRIES.put(glyphs[0], new Entry(shared ? glyphs : Arrays.copyOf(glyphs, count), pose, format, frame));
+            ENTRIES.put(glyphs[0], new Entry(shared ? glyphs : Arrays.copyOf(glyphs, count), pose, format, millis));
             return;
         }
 
-        entry.frame = frame;
+        entry.used = millis;
 
         if (entry.address != MemoryUtil.NULL) {
             long destination = direct.txoptimizations$tryReserveVertices(format, entry.vertices);
@@ -62,13 +63,13 @@ public final class GlyphVertexCache {
                 return;
             }
 
-            render(glyphs, count, matrix, consumer);
+            render(glyphs, count, pose, consumer);
             return;
         }
 
         int before = direct.txoptimizations$vertexCount();
 
-        render(glyphs, count, matrix, consumer);
+        render(glyphs, count, pose, consumer);
 
         int vertices = direct.txoptimizations$vertexCount() - before;
 
@@ -76,21 +77,23 @@ public final class GlyphVertexCache {
             entry.capture(direct.txoptimizations$endAddress(), vertices);
     }
 
-    private static void render(TextRenderable[] glyphs, int count, Matrix4f matrix, VertexConsumer consumer) {
+    private static void render(TextRenderable[] glyphs, int count, Matrix3x2fc pose, VertexConsumer consumer) {
+        Matrix4f matrix = MATRIX.identity().mul(pose);
+
         for (int index = 0; index < count; index ++)
             glyphs[index].render(matrix, consumer, FULL_BRIGHT, true);
     }
 
-    private static void evictUnused(long frame) {
-        if (frame - lastEviction < UNUSED_FRAMES)
+    private static void evictUnused(long millis) {
+        if (millis - lastEviction < UNUSED_MILLIS)
             return;
 
-        lastEviction = frame;
+        lastEviction = millis;
 
         for (Iterator<Entry> iterator = ENTRIES.values().iterator(); iterator.hasNext(); ) {
             Entry entry = iterator.next();
 
-            if (frame - entry.frame < UNUSED_FRAMES)
+            if (millis - entry.used < UNUSED_MILLIS)
                 continue;
 
             entry.free();
@@ -115,12 +118,12 @@ public final class GlyphVertexCache {
         private final float            m20;
         private final float            m21;
         private final VertexFormat     format;
-        private long                   frame;
+        private long                   used;
         private long                   address = MemoryUtil.NULL;
         private int                    vertices;
         private int                    bytes;
 
-        private Entry(TextRenderable[] glyphs, Matrix3x2fc pose, VertexFormat format, long frame) {
+        private Entry(TextRenderable[] glyphs, Matrix3x2fc pose, VertexFormat format, long millis) {
             this.glyphs = glyphs;
             this.m00    = pose.m00();
             this.m01    = pose.m01();
@@ -129,7 +132,7 @@ public final class GlyphVertexCache {
             this.m20    = pose.m20();
             this.m21    = pose.m21();
             this.format = format;
-            this.frame  = frame;
+            this.used   = millis;
         }
 
         private boolean matches(TextRenderable[] glyphs, int count, Matrix3x2fc pose, VertexFormat format) {

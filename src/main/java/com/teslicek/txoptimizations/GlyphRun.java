@@ -11,13 +11,11 @@ import net.minecraft.client.gui.navigation.ScreenRectangle;
 import net.minecraft.client.gui.render.TextureSetup;
 import net.minecraft.client.renderer.state.gui.GuiElementRenderState;
 import org.joml.Matrix3x2fc;
-import org.joml.Matrix4f;
 import org.jspecify.annotations.Nullable;
 
 public final class GlyphRun implements GuiElementRenderState {
 
-    private static final int      INITIAL_GLYPHS = 16;
-    private static final Matrix4f POSE           = new Matrix4f();
+    private static final int INITIAL_GLYPHS = 16;
 
     private final Matrix3x2fc     pose;
     private final ScreenRectangle scissor;
@@ -63,7 +61,7 @@ public final class GlyphRun implements GuiElementRenderState {
 
     @Override
     public void buildVertices(VertexConsumer vertexConsumer) {
-        GlyphVertexCache.build(this.glyphs, this.count, this.shared, this.pose, POSE.identity().mul(this.pose), vertexConsumer);
+        GlyphVertexCache.build(this.glyphs, this.count, this.shared, this.pose, vertexConsumer);
     }
 
     @Override
