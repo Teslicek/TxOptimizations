@@ -104,6 +104,8 @@
     "EntityRendererStateReuseMixin",
     "EnvironmentAttributeValueCacheMixin",
     "FeaturePreparedFrameIndexedMixin",
+    "FeatureRenderPhaseGroupsMixin",
+    "PhaseSubmitGrouperGroupsMixin",
     "FeatureRendererTypeLabelMixin",
     "FeaturePreparedGroupAccessor",
     "FeatureRenderDispatcherRenderersAccessor",

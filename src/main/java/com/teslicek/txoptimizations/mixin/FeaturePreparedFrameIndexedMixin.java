@@ -1,9 +1,12 @@
 package com.teslicek.txoptimizations.mixin;
 
 import com.mojang.renderpearl.api.commands.RenderPass;
+import com.teslicek.txoptimizations.PhaseGroups;
 import java.util.List;
-import java.util.Map;
+import java.util.Objects;
 import java.util.function.Supplier;
+import net.minecraft.client.renderer.SubmitNodeCollection;
+import net.minecraft.client.renderer.SubmitNodeStorage;
 import net.minecraft.client.renderer.feature.FeatureFrameContext;
 import net.minecraft.client.renderer.feature.FeatureRenderDispatcher;
 import net.minecraft.client.renderer.feature.FeatureRendererMap;
@@ -27,8 +30,7 @@ public abstract class FeaturePreparedFrameIndexedMixin {
     private List<SubmitNode> allSubmits;
 
     @Shadow
-    @Final
-    private Map<FeatureRenderPhase<?>, List<?>> groupsByPhase;
+    private @Nullable SubmitNodeStorage submitNodeStorage;
 
     @Shadow
     @Final
@@ -36,9 +38,9 @@ public abstract class FeaturePreparedFrameIndexedMixin {
 
     @Overwrite
     private void executePhase(FeatureRenderPhase<?> phase, FeatureFrameContext context, @Nullable OitStage stage, RenderPass renderPass) {
-        List<?> groups = this.groupsByPhase.get(phase);
+        List<?> groups = PhaseGroups.require(phase).txoptimizations$groups();
 
-        if (groups == null)
+        if (groups == null || groups.isEmpty())
             return;
 
         ProfilerFiller     profiler  = Profiler.get();
@@ -54,5 +56,30 @@ public abstract class FeaturePreparedFrameIndexedMixin {
             renderPass.popDebugGroup();
             profiler.pop();
         }
+    }
+
+    @Overwrite
+    public boolean hasAnyOutline() {
+        for (SubmitNodeCollection collection : Objects.requireNonNull(this.submitNodeStorage).getSubmitsPerOrder().values()) {
+            if (PhaseGroups.hasGroups(collection.outline))
+                return true;
+        }
+
+        return false;
+    }
+
+    @Overwrite
+    public boolean hasAnyWaterMask() {
+        for (SubmitNodeCollection collection : Objects.requireNonNull(this.submitNodeStorage).getSubmitsPerOrder().values()) {
+            if (PhaseGroups.hasGroups(collection.waterMask))
+                return true;
+        }
+
+        return false;
+    }
+
+    @Overwrite
+    public boolean hasAnySeeThrough() {
+        return PhaseGroups.hasGroups(Objects.requireNonNull(this.submitNodeStorage).seeThrough());
     }
 }
