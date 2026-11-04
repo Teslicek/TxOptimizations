@@ -371,6 +371,7 @@
     "TextDisplayRendererCullingMixin",
     "TextCullingSlotMixin",
     "TextFeatureRendererLayoutCacheMixin",
+    "TextFeatureRendererPoseCopyMixin",
     "TextContentLayoutsMixin",
     "ClientPacketListenerChatSessionCacheMixin",
     "SubmitNodeCollectionNameWidthMixin",
