@@ -433,33 +433,33 @@ public abstract class VulkanCommandEncoderDeferralMixin {
 
     @Unique
     private void txoptimizations$addPending(long buffer, long start, long end) {
+        LongArrayList ranges = this.txoptimizations$pendingRanges;
+        int           first  = this.txoptimizations$firstPendingAtOrAfter(buffer, start);
+        int           count  = ranges.size() / 3;
+        long          from   = start;
+        long          to     = end;
+
+        if (first > 0 && ranges.getLong((first - 1) * 3) == buffer && ranges.getLong((first - 1) * 3 + 2) >= start) {
+            first --;
+            from = ranges.getLong(first * 3 + 1);
+            to   = Math.max(to, ranges.getLong(first * 3 + 2));
+        }
+
+        int last = first;
+
+        while (last < count && ranges.getLong(last * 3) == buffer && ranges.getLong(last * 3 + 1) <= to) {
+            to = Math.max(to, ranges.getLong(last * 3 + 2));
+            last ++;
+        }
+
         long[] range = this.txoptimizations$rangeScratch;
 
         range[0] = buffer;
-        range[1] = start;
-        range[2] = end;
+        range[1] = from;
+        range[2] = to;
 
-        this.txoptimizations$pendingRanges.addElements(this.txoptimizations$pendingInsertion(buffer, start, end) * 3, range, 0, 3);
-    }
-
-    @Unique
-    private int txoptimizations$pendingInsertion(long buffer, long start, long end) {
-        LongArrayList ranges = this.txoptimizations$pendingRanges;
-        int           low    = 0;
-        int           high   = ranges.size() / 3;
-
-        while (low < high) {
-            int  middle       = low + high >>> 1;
-            long middleBuffer = ranges.getLong(middle * 3);
-            long middleStart  = ranges.getLong(middle * 3 + 1);
-
-            if (middleBuffer < buffer || middleBuffer == buffer && (middleStart < start || middleStart == start && ranges.getLong(middle * 3 + 2) <= end))
-                low = middle + 1;
-            else
-                high = middle;
-        }
-
-        return low;
+        ranges.removeElements(first * 3, last * 3);
+        ranges.addElements(first * 3, range, 0, 3);
     }
 
     @Unique
