@@ -108,10 +108,6 @@ Every frame, `EntityRenderDispatcher.getAvatarRenderer` reads each player's skin
 
 Translucent geometry such as entity translucency, text, see-through name tags and glints is sorted back to front every frame. Vanilla reads the center of every quad with six bounds-checked `ByteBuffer.getFloat` calls and writes the six sorted indices per quad through an `IntConsumer` lambda. TxOptimizations reads the same floats straight from native memory when the buffer is direct and in native byte order (one bounds check for the whole range up front), computes the centers with the same arithmetic, and writes the same index values straight to the buffer's memory when it is direct and in native byte order, with one bounds check for the whole range, and through a short or int view of the buffer otherwise. The bytes written and the final buffer position are identical.
 
-### Glow check spectator state
-
-Entity extraction asks `Minecraft.shouldEntityAppearGlowing` for every entity every frame, and for every entity that is not glowing vanilla checks whether the local player is a spectator. TxOptimizations computes that once per frame and reuses it for the other entities.
-
 ### Frame clock
 
 `Util.getMillis` reads the time through a native call into SDL, and vanilla called it once for every entity checked for visibility (to see whether its chunk section has faded in far enough), once for every visible section holding block entities, and every time an enchantment glint render type was prepared, every frame. Over four profiles of BedWars games these calls took 0.90 to 1.31% of the render thread. The time is now read once at the start of each frame, and those three places use that value. It is earlier than vanilla's by the time the frame had been running at that point, less than one frame, so an entity or block entity in a section that is fading in can appear one frame later, and every glint of a frame scrolls by the same time.
