@@ -248,7 +248,7 @@ public abstract class QuadParticleGroupPositionsMixin extends ParticleGroup<Sing
 
                 int flags = this.txoptimizations$ints[index * ParticleSnapshot.INTS + ParticleSnapshot.FLAGS];
 
-                if ((flags & ParticleSnapshot.OWN_LIGHT) != 0 && txoptimizations$isVanilla(particle))
+                if ((flags & (ParticleSnapshot.OWN_LIGHT | ParticleSnapshot.OWN_QUAD)) != 0 && txoptimizations$isVanilla(particle))
                     ((ParticleBaseLight) particle).txoptimizations$warmBaseLight();
 
                 if (blocker == null)
@@ -269,6 +269,9 @@ public abstract class QuadParticleGroupPositionsMixin extends ParticleGroup<Sing
 
     @Unique
     private static @Nullable String txoptimizations$blocker(SingleQuadParticle particle, int flags, Object facing) {
+        if ((flags & ParticleSnapshot.OWN_QUAD) != 0)
+            return null;
+
         if ((flags & ParticleSnapshot.STORED) == 0)
             return particle.getClass().getName() + " extracts itself";
 

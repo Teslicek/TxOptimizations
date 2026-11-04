@@ -31,6 +31,16 @@ public interface ParticleSnapshot {
     int STORED    = 1;
     int OWN_SIZE  = 2;
     int OWN_LIGHT = 4;
+    int OWN_QUAD  = 8;
+
+    Set<String> WORKER_SAFE_QUADS = Set.of(
+        "net.minecraft.client.particle.DustColorTransitionParticle",
+        "net.minecraft.client.particle.FireworkParticles$OverlayParticle",
+        "net.minecraft.client.particle.FireworkParticles$SparkParticle",
+        "net.minecraft.client.particle.FlyTowardsPositionParticle",
+        "net.minecraft.client.particle.ShriekParticle",
+        "net.minecraft.client.particle.VibrationSignalParticle"
+    );
 
     Set<String> TICK_LIGHT = Set.of(
         "net.minecraft.client.particle.AttackSweepParticle",
@@ -54,7 +64,7 @@ public interface ParticleSnapshot {
         @Override
         protected Integer computeValue(Class<?> type) {
             if (overrides(type, SingleQuadParticle.class, "extract", QuadParticleRenderState.class, Camera.class, float.class) || overrides(type, SingleQuadParticle.class, "extractRotatedQuad", QuadParticleRenderState.class, Camera.class, Quaternionf.class, float.class) || overrides(type, SingleQuadParticle.class, "extractRotatedQuad", QuadParticleRenderState.class, Quaternionf.class, float.class, float.class, float.class, float.class))
-                return 0;
+                return WORKER_SAFE_QUADS.contains(type.getName()) ? OWN_QUAD : 0;
 
             int flags = STORED;
 
