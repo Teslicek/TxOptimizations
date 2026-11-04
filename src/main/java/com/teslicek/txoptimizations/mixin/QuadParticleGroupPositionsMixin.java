@@ -106,6 +106,9 @@ public abstract class QuadParticleGroupPositionsMixin extends ParticleGroup<Sing
     private long txoptimizations$snapshotTick = -1L;
 
     @Unique
+    private int txoptimizations$snapshotWorldChanges = -1;
+
+    @Unique
     private @Nullable String txoptimizations$blocker;
 
     @Unique
@@ -202,10 +205,11 @@ public abstract class QuadParticleGroupPositionsMixin extends ParticleGroup<Sing
 
     @Unique
     private void txoptimizations$snapshot() {
-        int  changes = ((ParticleGroupChanges) (Object) this).txoptimizations$changes();
-        long tick    = ClientClock.tick();
+        int  changes      = ((ParticleGroupChanges) (Object) this).txoptimizations$changes();
+        long tick         = ClientClock.tick();
+        int  worldChanges = ClientClock.worldChanges();
 
-        if (changes == this.txoptimizations$snapshotChanges && tick == this.txoptimizations$snapshotTick)
+        if (changes == this.txoptimizations$snapshotChanges && tick == this.txoptimizations$snapshotTick && worldChanges == this.txoptimizations$snapshotWorldChanges)
             return;
 
         int count = this.particles.size();
@@ -256,10 +260,11 @@ public abstract class QuadParticleGroupPositionsMixin extends ParticleGroup<Sing
             ParticleLightShare.end();
         }
 
-        this.txoptimizations$count           = index;
-        this.txoptimizations$blocker         = blocker;
-        this.txoptimizations$snapshotChanges = changes;
-        this.txoptimizations$snapshotTick    = tick;
+        this.txoptimizations$count                = index;
+        this.txoptimizations$blocker              = blocker;
+        this.txoptimizations$snapshotChanges      = changes;
+        this.txoptimizations$snapshotTick         = tick;
+        this.txoptimizations$snapshotWorldChanges = worldChanges;
     }
 
     @Unique

@@ -20,7 +20,7 @@ public abstract class AtmosphericFogTickCacheMixin {
     private static final int UNKNOWN_SKY_LIGHT = -1;
 
     @Unique
-    private long txoptimizations$cachedTick = -1L;
+    private int txoptimizations$cachedChanges = -1;
 
     @Unique
     private long txoptimizations$cachedPos;
@@ -35,24 +35,24 @@ public abstract class AtmosphericFogTickCacheMixin {
     private int txoptimizations$skyLight = UNKNOWN_SKY_LIGHT;
 
     @WrapOperation(method = "updateRainFogState", at = @At(value = "INVOKE", target = "Lnet/minecraft/client/multiplayer/ClientLevel;getBiome(Lnet/minecraft/core/BlockPos;)Lnet/minecraft/core/Holder;"))
-    private Holder<Biome> txoptimizations$reuseTickBiome(ClientLevel level, BlockPos cameraPos, Operation<Holder<Biome>> original) {
-        long tick = ClientClock.tick();
-        long pos  = cameraPos.asLong();
+    private Holder<Biome> txoptimizations$reuseBiome(ClientLevel level, BlockPos cameraPos, Operation<Holder<Biome>> original) {
+        int  changes = ClientClock.worldChanges();
+        long pos     = cameraPos.asLong();
 
-        if (tick == this.txoptimizations$cachedTick && pos == this.txoptimizations$cachedPos && level == this.txoptimizations$cachedLevel)
+        if (changes == this.txoptimizations$cachedChanges && pos == this.txoptimizations$cachedPos && level == this.txoptimizations$cachedLevel)
             return this.txoptimizations$biome;
 
-        this.txoptimizations$cachedTick  = tick;
-        this.txoptimizations$cachedPos   = pos;
-        this.txoptimizations$cachedLevel = level;
-        this.txoptimizations$biome       = original.call(level, cameraPos);
-        this.txoptimizations$skyLight    = UNKNOWN_SKY_LIGHT;
+        this.txoptimizations$cachedChanges = changes;
+        this.txoptimizations$cachedPos     = pos;
+        this.txoptimizations$cachedLevel   = level;
+        this.txoptimizations$biome         = original.call(level, cameraPos);
+        this.txoptimizations$skyLight      = UNKNOWN_SKY_LIGHT;
 
         return this.txoptimizations$biome;
     }
 
     @WrapOperation(method = "updateRainFogState", at = @At(value = "INVOKE", target = "Lnet/minecraft/world/level/lighting/LayerLightEventListener;getLightValue(Lnet/minecraft/core/BlockPos;)I"))
-    private int txoptimizations$reuseTickSkyLight(LayerLightEventListener skyLight, BlockPos cameraPos, Operation<Integer> original) {
+    private int txoptimizations$reuseSkyLight(LayerLightEventListener skyLight, BlockPos cameraPos, Operation<Integer> original) {
         if (this.txoptimizations$skyLight == UNKNOWN_SKY_LIGHT)
             this.txoptimizations$skyLight = original.call(skyLight, cameraPos);
 

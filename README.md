@@ -12,11 +12,11 @@ The game always starts on Vulkan. Vanilla switches to OpenGL after a startup tha
 
 ### Rain fog
 
-Every frame, `AtmosphericFogEnvironment.updateRainFogState` looks up the biome and the sky light at the camera position to fade in rain fog. A spark profile showed the sky light lookup alone taking about 2.8% of the render thread. TxOptimizations looks both up once per client tick and reuses them for the other frames of that tick, as long as the camera stays in the same block of the same level. The values only feed a slowly fading fog multiplier, so the result is visually identical.
+Every frame, `AtmosphericFogEnvironment.updateRainFogState` looks up the biome and the sky light at the camera position to fade in rain fog. A spark profile showed the sky light lookup alone taking about 2.8% of the render thread. TxOptimizations reuses both values while the camera stays in the same block of the same level and nothing near the camera has changed: every block, light, chunk or biome change near the camera marks its section dirty for the terrain mesher, and that same signal drops the cached values, so each frame sees what vanilla's lookup would return.
 
 ### Particle light
 
-Every frame, each visible particle looks up the light level at its position again (`Particle.getLightCoords`). Particles only move once per tick, so at high frame rates the same lookup repeats many times per tick. TxOptimizations caches the result per particle for the current client tick and position. A light change reaches particles at most one tick (50 ms) later. Particle types that compute their own light without calling the base method are unaffected.
+Every frame, each visible particle looks up the light level at its position again (`Particle.getLightCoords`). Particles only move once per tick, so at high frame rates the same lookup repeats many times per tick. TxOptimizations caches the result per particle for its position until a block, light, chunk or biome change near the camera marks a section dirty for the terrain mesher, so a light change reaches particles on the same frame as in vanilla. Particle types that compute their own light without calling the base method are unaffected.
 
 When a particle does look its light up again, the block position is now written into one reused mutable position instead of a new `BlockPos` (3.7 MB/s with 13,000 particles). The light lookup only reads the position, so it sees the same block.
 

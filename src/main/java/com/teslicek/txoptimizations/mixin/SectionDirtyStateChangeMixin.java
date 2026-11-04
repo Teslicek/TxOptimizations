@@ -1,7 +1,7 @@
 package com.teslicek.txoptimizations.mixin;
 
+import com.teslicek.txoptimizations.ClientClock;
 import com.teslicek.txoptimizations.SectionSubset;
-import com.teslicek.txoptimizations.ShadowBlockCache;
 import net.minecraft.client.SectionUpdateTracker;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Overwrite;
@@ -20,7 +20,7 @@ public abstract class SectionDirtyStateChangeMixin {
     public void setDirty(boolean fromPlayer) {
         boolean wasDirty = this.isDirty;
 
-        ShadowBlockCache.worldChanged();
+        ClientClock.worldChanged();
 
         if (!wasDirty)
             SectionSubset.DIRTY.beginChange();

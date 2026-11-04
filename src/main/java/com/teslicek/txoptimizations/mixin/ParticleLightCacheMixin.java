@@ -37,7 +37,7 @@ public abstract class ParticleLightCacheMixin implements ParticleBaseLight {
     private static final BlockPos.MutableBlockPos LIGHT_POS = new BlockPos.MutableBlockPos();
 
     @Unique
-    private long txoptimizations$lightTick = -1L;
+    private int txoptimizations$lightChanges = -1;
 
     @Unique
     private double txoptimizations$lightX;
@@ -63,9 +63,9 @@ public abstract class ParticleLightCacheMixin implements ParticleBaseLight {
 
     @Unique
     private int txoptimizations$baseLight() {
-        long tick = ClientClock.tick();
+        int changes = ClientClock.worldChanges();
 
-        if (this.txoptimizations$lightTick == tick && this.txoptimizations$lightX == this.x && this.txoptimizations$lightY == this.y && this.txoptimizations$lightZ == this.z)
+        if (this.txoptimizations$lightChanges == changes && this.txoptimizations$lightX == this.x && this.txoptimizations$lightY == this.y && this.txoptimizations$lightZ == this.z)
             return this.txoptimizations$light;
 
         if (!RenderThreadStack.isMain())
@@ -73,11 +73,11 @@ public abstract class ParticleLightCacheMixin implements ParticleBaseLight {
 
         BlockPos pos = LIGHT_POS.set(this.x, this.y, this.z);
 
-        this.txoptimizations$lightTick = tick;
-        this.txoptimizations$lightX    = this.x;
-        this.txoptimizations$lightY    = this.y;
-        this.txoptimizations$lightZ    = this.z;
-        this.txoptimizations$light     = ParticleLightShare.isActive() ? this.txoptimizations$sharedLight(pos) : this.txoptimizations$lookUpLight(pos);
+        this.txoptimizations$lightChanges = changes;
+        this.txoptimizations$lightX       = this.x;
+        this.txoptimizations$lightY       = this.y;
+        this.txoptimizations$lightZ       = this.z;
+        this.txoptimizations$light        = ParticleLightShare.isActive() ? this.txoptimizations$sharedLight(pos) : this.txoptimizations$lookUpLight(pos);
 
         return this.txoptimizations$light;
     }
