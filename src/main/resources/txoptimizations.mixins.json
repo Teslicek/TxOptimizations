@@ -119,6 +119,7 @@
     "FrontendRenderPipelineUniformsMixin",
     "FrustumBoxTestMixin",
     "GameRendererLevelClearMixin",
+    "GameRendererPostEffectSetMixin",
     "GizmoLineIdentityPoseMixin",
     "GizmoPointsPackedMixin",
     "GlSurfaceDiscardMixin",
