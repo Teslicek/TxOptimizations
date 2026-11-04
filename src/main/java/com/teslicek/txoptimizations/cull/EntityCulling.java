@@ -343,12 +343,16 @@ public final class EntityCulling {
     }
 
     private static boolean hasOpenLid(BlockEntity blockEntity) {
-        return switch (blockEntity) {
-            case ChestBlockEntity chest -> chest.getOpenNess(0.0F) > 0.0F || chest.getOpenNess(1.0F) > 0.0F;
-            case EnderChestBlockEntity chest -> chest.getOpenNess(0.0F) > 0.0F || chest.getOpenNess(1.0F) > 0.0F;
-            case ShulkerBoxBlockEntity box -> box.getProgress(0.0F) > 0.0F || box.getProgress(1.0F) > 0.0F;
-            default -> false;
-        };
+        if (blockEntity instanceof ChestBlockEntity chest)
+            return chest.getOpenNess(0.0F) > 0.0F || chest.getOpenNess(1.0F) > 0.0F;
+
+        if (blockEntity instanceof EnderChestBlockEntity chest)
+            return chest.getOpenNess(0.0F) > 0.0F || chest.getOpenNess(1.0F) > 0.0F;
+
+        if (blockEntity instanceof ShulkerBoxBlockEntity box)
+            return box.getProgress(0.0F) > 0.0F || box.getProgress(1.0F) > 0.0F;
+
+        return false;
     }
 
     private record Snapshot(ClientLevel level, List<Cullable> pinned, List<EntityTarget> entities, List<BlockEntity> blockEntities) {
