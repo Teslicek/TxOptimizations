@@ -1,5 +1,6 @@
 package com.teslicek.txoptimizations;
 
+import it.unimi.dsi.fastutil.HashCommon;
 import java.util.HashMap;
 import java.util.IdentityHashMap;
 import java.util.Map;
@@ -328,7 +329,7 @@ public final class TextLayoutCache {
             value = 31 * value + Boolean.hashCode(outline);
             value = 31 * value + Boolean.hashCode(includeEmpty);
 
-            this.hash = 31 * value + Boolean.hashCode(dropShadow);
+            this.hash = HashCommon.mix(31 * value + Boolean.hashCode(dropShadow));
         }
 
         @Override
