@@ -158,48 +158,52 @@ public final class ModelRotation {
 
     private static void rotate(Matrix4f target, Matrix4f source, float m30, float m31, float m32, float m33, int properties, float rm00, float rm01, float rm02, float rm10, float rm11, float rm12, float rm20, float rm21, float rm22) {
         if ((properties & Matrix4fc.PROPERTY_IDENTITY) != 0) {
-            target.set(
+            MatrixFields.set(
+                target,
                 rm00, rm01, rm02, source.m03(),
                 rm10, rm11, rm12, source.m13(),
                 rm20, rm21, rm22, source.m23(),
-                m30, m31, m32, m33
+                m30, m31, m32, m33,
+                ROTATION_PROPERTIES
             );
-            target.assume(ROTATION_PROPERTIES);
 
             return;
         }
 
         if ((properties & Matrix4fc.PROPERTY_TRANSLATION) != 0) {
-            target.set(
+            MatrixFields.set(
+                target,
                 rm00, rm01, rm02, 0.0F,
                 rm10, rm11, rm12, 0.0F,
                 rm20, rm21, rm22, 0.0F,
-                m30, m31, m32, m33
+                m30, m31, m32, m33,
+                properties & ROTATED_PROPERTIES
             );
-            target.assume(properties & ROTATED_PROPERTIES);
 
             return;
         }
 
         if ((properties & Matrix4fc.PROPERTY_AFFINE) != 0) {
-            target.set(
+            MatrixFields.set(
+                target,
                 source.m00() * rm00 + source.m10() * rm01 + source.m20() * rm02, source.m01() * rm00 + source.m11() * rm01 + source.m21() * rm02, source.m02() * rm00 + source.m12() * rm01 + source.m22() * rm02, 0.0F,
                 source.m00() * rm10 + source.m10() * rm11 + source.m20() * rm12, source.m01() * rm10 + source.m11() * rm11 + source.m21() * rm12, source.m02() * rm10 + source.m12() * rm11 + source.m22() * rm12, 0.0F,
                 source.m00() * rm20 + source.m10() * rm21 + source.m20() * rm22, source.m01() * rm20 + source.m11() * rm21 + source.m21() * rm22, source.m02() * rm20 + source.m12() * rm21 + source.m22() * rm22, 0.0F,
-                m30, m31, m32, m33
+                m30, m31, m32, m33,
+                properties & ROTATED_PROPERTIES
             );
-            target.assume(properties & ROTATED_PROPERTIES);
 
             return;
         }
 
-        target.set(
+        MatrixFields.set(
+            target,
             Math.fma(source.m00(), rm00, Math.fma(source.m10(), rm01, source.m20() * rm02)), Math.fma(source.m01(), rm00, Math.fma(source.m11(), rm01, source.m21() * rm02)), Math.fma(source.m02(), rm00, Math.fma(source.m12(), rm01, source.m22() * rm02)), Math.fma(source.m03(), rm00, Math.fma(source.m13(), rm01, source.m23() * rm02)),
             Math.fma(source.m00(), rm10, Math.fma(source.m10(), rm11, source.m20() * rm12)), Math.fma(source.m01(), rm10, Math.fma(source.m11(), rm11, source.m21() * rm12)), Math.fma(source.m02(), rm10, Math.fma(source.m12(), rm11, source.m22() * rm12)), Math.fma(source.m03(), rm10, Math.fma(source.m13(), rm11, source.m23() * rm12)),
             Math.fma(source.m00(), rm20, Math.fma(source.m10(), rm21, source.m20() * rm22)), Math.fma(source.m01(), rm20, Math.fma(source.m11(), rm21, source.m21() * rm22)), Math.fma(source.m02(), rm20, Math.fma(source.m12(), rm21, source.m22() * rm22)), Math.fma(source.m03(), rm20, Math.fma(source.m13(), rm21, source.m23() * rm22)),
-            m30, m31, m32, m33
+            m30, m31, m32, m33,
+            properties & ROTATED_PROPERTIES
         );
-        target.assume(properties & ROTATED_PROPERTIES);
     }
 
     private static void rotate(Matrix3f target, Matrix3f source, float rm00, float rm01, float rm02, float rm10, float rm11, float rm12, float rm20, float rm21, float rm22) {

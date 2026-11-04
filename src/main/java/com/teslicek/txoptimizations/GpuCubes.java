@@ -36,7 +36,6 @@ import net.minecraft.client.renderer.oit.OitStage;
 import net.minecraft.client.renderer.rendertype.PreparedRenderType;
 import net.minecraft.client.resources.model.geometry.BakedQuad;
 import net.minecraft.resources.Identifier;
-import org.joml.Matrix3f;
 import org.joml.Matrix4f;
 import org.joml.Matrix4fc;
 import org.joml.Vector3fc;
@@ -381,38 +380,13 @@ public final class GpuCubes {
     public static void writePose(long address, PoseStack.Pose pose, int light, int overlay, int color) {
         Matrix4f matrix = pose.pose();
 
-        MemoryUtil.memPutFloat(address, matrix.m00());
-        MemoryUtil.memPutFloat(address + 4L, matrix.m01());
-        MemoryUtil.memPutFloat(address + 8L, matrix.m02());
-        MemoryUtil.memPutFloat(address + 12L, matrix.m03());
-        MemoryUtil.memPutFloat(address + 16L, matrix.m10());
-        MemoryUtil.memPutFloat(address + 20L, matrix.m11());
-        MemoryUtil.memPutFloat(address + 24L, matrix.m12());
-        MemoryUtil.memPutFloat(address + 28L, matrix.m13());
-        MemoryUtil.memPutFloat(address + 32L, matrix.m20());
-        MemoryUtil.memPutFloat(address + 36L, matrix.m21());
-        MemoryUtil.memPutFloat(address + 40L, matrix.m22());
-        MemoryUtil.memPutFloat(address + 44L, matrix.m23());
-        MemoryUtil.memPutFloat(address + 48L, matrix.m30());
-        MemoryUtil.memPutFloat(address + 52L, matrix.m31());
-        MemoryUtil.memPutFloat(address + 56L, matrix.m32());
-        MemoryUtil.memPutFloat(address + 60L, matrix.m33());
+        matrix.getToAddress(address);
         MemoryUtil.memPutInt(address + 64L, matrix.properties());
         MemoryUtil.memPutLong(address + 68L, VertexBytes.pairBits(overlay, light));
         MemoryUtil.memPutInt(address + 76L, VertexBytes.colorBits(color));
 
         if (pose.trustedNormals) {
-            Matrix3f normal = pose.normal();
-
-            MemoryUtil.memPutFloat(address + NORMALS_AT, normal.m00);
-            MemoryUtil.memPutFloat(address + NORMALS_AT + 4L, normal.m01);
-            MemoryUtil.memPutFloat(address + NORMALS_AT + 8L, normal.m02);
-            MemoryUtil.memPutFloat(address + NORMALS_AT + 12L, normal.m10);
-            MemoryUtil.memPutFloat(address + NORMALS_AT + 16L, normal.m11);
-            MemoryUtil.memPutFloat(address + NORMALS_AT + 20L, normal.m12);
-            MemoryUtil.memPutFloat(address + NORMALS_AT + 24L, normal.m20);
-            MemoryUtil.memPutFloat(address + NORMALS_AT + 28L, normal.m21);
-            MemoryUtil.memPutFloat(address + NORMALS_AT + 32L, normal.m22);
+            pose.normal().getToAddress(address + NORMALS_AT);
             MemoryUtil.memPutInt(address + TRUSTED_AT, 1);
 
             return;
