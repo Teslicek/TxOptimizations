@@ -611,7 +611,7 @@ public final class GpuCubes {
             + "    } else if ((properties & " + Matrix4fc.PROPERTY_TRANSLATION + "u) != 0u) {\n"
             + "        position = vec3(x + c3.x, y + c3.y, z + c3.z);\n"
             + "    } else {\n"
-            + "        position = vec3(fma(c0.x, x, fma(c1.x, y, fma(c2.x, z, c3.x))), fma(c0.y, x, fma(c1.y, y, fma(c2.y, z, c3.y))), fma(c0.z, x, fma(c1.z, y, fma(c2.z, z, c3.z))));\n"
+            + "        position = vec3(c0.x * x + (c1.x * y + (c2.x * z + c3.x)), c0.y * x + (c1.y * y + (c2.y * z + c3.y)), c0.z * x + (c1.z * y + (c2.z * z + c3.z)));\n"
             + "    }\n"
             + "    Position = position;\n"
             + "    UV1 = texelFetch(TxPoseCoords, pose * 32 + 17).xy;\n"
