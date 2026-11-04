@@ -297,6 +297,7 @@
     "RotatingSectionStorageLookupMixin",
     "RotatingSectionStorageRepositionMixin",
     "ScissorStateEqualityMixin",
+    "ScreenEffectRendererPoseStackMixin",
     "SectionRenderDispatcherCameraMixin",
     "SectionRenderDispatcherCompactTerrainMixin",
     "SectionTaskDynamicQueueInboxMixin",
