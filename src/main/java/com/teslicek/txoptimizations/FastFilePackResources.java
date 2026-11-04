@@ -67,8 +67,10 @@ public class FastFilePackResources extends AbstractPackMetadataResources impleme
                 ZipEntry entry = entries.nextElement();
                 String path = entry.getName();
 
-                if (entry.isDirectory())
-                    path = path.substring(0, path.length() - 1);
+                if (entry.isDirectory()) {
+                    this.indexNamespace(path.substring(0, path.length() - 1));
+                    continue;
+                }
 
                 this.indexNamespace(path);
                 paths.add(path);
@@ -225,7 +227,7 @@ public class FastFilePackResources extends AbstractPackMetadataResources impleme
 
             ZipEntry entry = zf.getEntry(filePath);
 
-            if (entry == null || entry.isDirectory())
+            if (entry == null)
                 continue;
 
             resourceOutput.accept(location, IoSupplier.create(zf, entry));
