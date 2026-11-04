@@ -22,7 +22,7 @@ public abstract class LevelExtractorParticleAheadMixin {
     @Final
     private Minecraft minecraft;
 
-    @Inject(method = "extract", at = @At(value = "INVOKE", target = "Lnet/minecraft/client/renderer/extract/LevelExtractor;extractVisibleEntities(Lnet/minecraft/client/Camera;Lnet/minecraft/client/renderer/culling/Frustum;Lnet/minecraft/client/DeltaTracker;Lnet/minecraft/client/renderer/state/level/LevelRenderState;)V"))
+    @Inject(method = "extract", at = @At(value = "INVOKE", target = "Lnet/minecraft/client/renderer/extract/LevelExtractor;extractPlayerState(Lnet/minecraft/client/Camera;Lnet/minecraft/client/DeltaTracker;FLnet/minecraft/client/renderer/state/level/PlayerRenderState;)V"), require = 1)
     private void txoptimizations$extractParticlesAhead(DeltaTracker deltaTracker, Camera camera, float worldPartialTicks, CallbackInfo ci) {
         ParticleGroup<?> group = ((ParticleEngineAccessor) this.minecraft.particleEngine).txoptimizations$particles().get(ParticleRenderType.SINGLE_QUADS);
 
