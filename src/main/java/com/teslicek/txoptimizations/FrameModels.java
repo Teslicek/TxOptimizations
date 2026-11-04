@@ -40,6 +40,15 @@ public final class FrameModels {
         return STATES[variant];
     }
 
+    public static boolean isShared(BlockModelRenderState state) {
+        for (int variant = 0; variant < VARIANTS; variant ++) {
+            if (STATES[variant] == state)
+                return state != null;
+        }
+
+        return false;
+    }
+
     public static FrameModelSubmission submission(BlockModelRenderState state) {
         for (int variant = 0; variant < VARIANTS; variant ++) {
             if (STATES[variant] == state)
