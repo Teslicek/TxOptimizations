@@ -1,5 +1,6 @@
 package com.teslicek.txoptimizations;
 
+import it.unimi.dsi.fastutil.HashCommon;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.function.Supplier;
@@ -82,7 +83,7 @@ public final class ItemBoundsCache {
             for (float element : this.transform)
                 value = 31 * value + Float.floatToRawIntBits(element);
 
-            this.hash = value;
+            this.hash = HashCommon.mix(value);
         }
 
         @Override
