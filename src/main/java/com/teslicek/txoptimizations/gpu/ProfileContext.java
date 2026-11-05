@@ -71,9 +71,6 @@ final class ProfileContext {
     }
 
     private static String cpu() {
-        if (!System.getProperty("os.name").startsWith("Windows"))
-            return System.getProperty("os.arch");
-
         String identifier = System.getenv("PROCESSOR_IDENTIFIER");
 
         if (identifier == null)

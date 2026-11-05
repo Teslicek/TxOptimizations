@@ -1,7 +1,6 @@
 {
   "required": true,
   "package": "com.teslicek.txoptimizations.mixin",
-  "plugin": "com.teslicek.txoptimizations.TxOptimizationsMixinPlugin",
   "compatibilityLevel": "JAVA_25",
   "client": [
     "ClientLevelCushionTrackingMixin",

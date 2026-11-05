@@ -24,15 +24,5 @@
       "com.teslicek.txoptimizations.TxOptimizationsClient"
     ]
   },
-  "accessWidener": "txoptimizations.classtweaker",
-  "breaks": {
-    "immediatelyfast": "*",
-    "obe": "*",
-    "entityculling": "*",
-    "ferritecore": "*",
-    "gnetum": "*",
-    "iris": "*",
-    "moreculling": "*",
-    "sodium": "*"
-  }
+  "accessWidener": "txoptimizations.classtweaker"
 }

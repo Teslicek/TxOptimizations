@@ -61,10 +61,6 @@ public final class RenderStateBuffers {
         extractionHandedOff = true;
     }
 
-    public static int renderParity() {
-        return renderParity;
-    }
-
     public static SubmitNodeStorage storageForRole() {
         if (storages == null)
             throw new IllegalStateException("Feature submissions were stored before the first render state swap");

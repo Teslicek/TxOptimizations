@@ -19,16 +19,12 @@ import net.minecraft.world.flag.FeatureFlagSet;
 
 public final class ModResourcePack {
 
-    private static final String MOD_ID           = "txoptimizations";
-    private static final String FABRIC_RESOURCES = "fabric-resource-loader-v1";
+    private static final String MOD_ID = "txoptimizations";
 
     private ModResourcePack() {
     }
 
     public static RepositorySource[] withSource(RepositorySource[] vanilla) {
-        if (FabricLoader.getInstance().isModLoaded(FABRIC_RESOURCES))
-            return vanilla;
-
         RepositorySource[] sources = new RepositorySource[vanilla.length + 1];
 
         sources[0] = ModResourcePack::loadPacks;
