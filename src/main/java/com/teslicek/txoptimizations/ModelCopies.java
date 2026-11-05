@@ -227,20 +227,7 @@ public final class ModelCopies {
         }
     }
 
-    private static final class Pair {
-
-        private final Model<?>    original;
-        private final Model<?>    copy;
-        private final ModelPart[] originals;
-        private final ModelPart[] copies;
-
-        private Pair(Model<?> original, Model<?> copy, ModelPart[] originals, ModelPart[] copies) {
-            this.original  = original;
-            this.copy      = copy;
-            this.originals = originals;
-            this.copies    = copies;
-        }
-
+    private record Pair(Model<?> original, Model<?> copy, ModelPart[] originals, ModelPart[] copies) {
     }
 
     private static final class Walk {
