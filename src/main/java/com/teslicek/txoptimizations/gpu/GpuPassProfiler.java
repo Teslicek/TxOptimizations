@@ -11,6 +11,7 @@ import com.teslicek.txoptimizations.RenderThreadStack;
 import com.teslicek.txoptimizations.mixin.gpu.VulkanQueryPoolAccessor;
 import java.lang.management.CompilationMXBean;
 import java.lang.management.ManagementFactory;
+import java.nio.LongBuffer;
 import java.nio.file.Path;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -21,7 +22,9 @@ import java.util.Map;
 import java.util.OptionalLong;
 import net.minecraft.client.Minecraft;
 import net.minecraft.network.chat.MutableComponent;
+import org.lwjgl.system.MemoryUtil;
 import org.lwjgl.vulkan.KHRSynchronization2;
+import org.lwjgl.vulkan.VK10;
 import org.lwjgl.vulkan.VK12;
 import org.lwjgl.vulkan.VK13;
 import org.lwjgl.vulkan.VkCommandBuffer;
@@ -33,6 +36,7 @@ public final class GpuPassProfiler {
 
     private static final int                                 SLOTS           = 3;
     private static final int                                 CAPACITY        = 4096;
+    private static final LongBuffer                          AWAITED         = MemoryUtil.memAllocLong(CAPACITY);
     private static final long                                DURATION        = 10_000_000_000L;
     private static final long                                WARMUP          = 1_000_000_000L;
     private static final long                                WARMUP_LIMIT    = 10_000_000_000L;
@@ -356,8 +360,10 @@ public final class GpuPassProfiler {
         long[]         ticks  = new long[count];
 
         for (int index = 0; index < count; index ++) {
-            if (values[index].isEmpty())
-                throw new IllegalStateException("GPU timestamp " + index + " of " + LABELS[frameSlot][index] + " is not available after its frame completed");
+            if (values[index].isEmpty()) {
+                awaitTimestamps(frameSlot, count, ticks);
+                break;
+            }
 
             ticks[index] = values[index].getAsLong();
         }
@@ -370,6 +376,16 @@ public final class GpuPassProfiler {
         gpuNanos          += nanos(ticks[count - 1] - ticks[0]);
         framesRead        ++;
         COUNTS[frameSlot]  = 0;
+    }
+
+    private static void awaitTimestamps(int frameSlot, int count, long[] ticks) {
+        long pool   = ((VulkanQueryPoolAccessor) (VulkanQueryPool) POOLS[frameSlot]).txoptimizations$vkQueryPool();
+        int  result = VK10.vkGetQueryPoolResults(device.vkDevice(), pool, 0, count, AWAITED.clear().limit(count), Long.BYTES, VK10.VK_QUERY_RESULT_64_BIT | VK10.VK_QUERY_RESULT_WAIT_BIT);
+
+        if (result != VK10.VK_SUCCESS)
+            throw new IllegalStateException("Waiting for " + count + " GPU timestamps of a profiled frame failed with Vulkan result " + result);
+
+        AWAITED.get(0, ticks, 0, count);
     }
 
     private static void recordSlowFrame(int frameSlot, long[] ticks, int count, long frameNanos) {
