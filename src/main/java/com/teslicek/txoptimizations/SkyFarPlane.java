@@ -30,14 +30,8 @@ public final class SkyFarPlane {
     private static final DepthStencilState BEHIND_TERRAIN = new DepthStencilState(CompareOp.GREATER_THAN_OR_EQUAL, false);
     private static final DepthStencilState FAR_BOUNDS     = new DepthStencilState(CompareOp.ALWAYS_PASS, false);
 
-    public static final RenderPipeline SKY = RenderPipeline.builder()
-        .withBindGroupLayout(BindGroupLayouts.GLOBALS)
-        .withBindGroupLayout(BindGroupLayouts.PROJECTION)
-        .withBindGroupLayout(BindGroupLayouts.DYNAMIC_TRANSFORMS)
+    public static final RenderPipeline SKY = farPipeline("sky", "sky")
         .withBindGroupLayout(BindGroupLayouts.FOG)
-        .withLocation(Identifier.fromNamespaceAndPath("txoptimizations", "pipeline/sky_far"))
-        .withVertexShader("core/sky")
-        .withFragmentShader("core/sky")
         .withShaderDefine(DEFINE)
         .withVertexBinding(0, DefaultVertexFormat.POSITION)
         .withPrimitiveTopology(PrimitiveTopology.TRIANGLE_FAN)
@@ -45,13 +39,7 @@ public final class SkyFarPlane {
         .withDepthStencilState(BEHIND_TERRAIN)
         .build();
 
-    public static final RenderPipeline SUNRISE_SUNSET = RenderPipeline.builder()
-        .withBindGroupLayout(BindGroupLayouts.GLOBALS)
-        .withBindGroupLayout(BindGroupLayouts.PROJECTION)
-        .withBindGroupLayout(BindGroupLayouts.DYNAMIC_TRANSFORMS)
-        .withLocation(Identifier.fromNamespaceAndPath("txoptimizations", "pipeline/sunrise_sunset_far"))
-        .withVertexShader("core/position_color")
-        .withFragmentShader("core/position_color")
+    public static final RenderPipeline SUNRISE_SUNSET = farPipeline("sunrise_sunset", "position_color")
         .withShaderDefine(DEFINE)
         .withColorTargetState(new ColorTargetState(BlendFunction.TRANSLUCENT))
         .withVertexBinding(0, DefaultVertexFormat.POSITION_COLOR)
@@ -59,13 +47,7 @@ public final class SkyFarPlane {
         .withDepthStencilState(BEHIND_TERRAIN)
         .build();
 
-    public static final RenderPipeline STARS = RenderPipeline.builder()
-        .withBindGroupLayout(BindGroupLayouts.GLOBALS)
-        .withBindGroupLayout(BindGroupLayouts.PROJECTION)
-        .withBindGroupLayout(BindGroupLayouts.DYNAMIC_TRANSFORMS)
-        .withLocation(Identifier.fromNamespaceAndPath("txoptimizations", "pipeline/stars_far"))
-        .withVertexShader("core/stars")
-        .withFragmentShader("core/stars")
+    public static final RenderPipeline STARS = farPipeline("stars", "stars")
         .withShaderDefine(DEFINE)
         .withColorTargetState(new ColorTargetState(BlendFunction.OVERLAY))
         .withVertexBinding(0, DefaultVertexFormat.POSITION)
@@ -73,13 +55,7 @@ public final class SkyFarPlane {
         .withDepthStencilState(BEHIND_TERRAIN)
         .build();
 
-    public static final RenderPipeline CELESTIAL = RenderPipeline.builder()
-        .withBindGroupLayout(BindGroupLayouts.GLOBALS)
-        .withBindGroupLayout(BindGroupLayouts.PROJECTION)
-        .withBindGroupLayout(BindGroupLayouts.DYNAMIC_TRANSFORMS)
-        .withLocation(Identifier.fromNamespaceAndPath("txoptimizations", "pipeline/celestial_far"))
-        .withVertexShader("core/position_tex")
-        .withFragmentShader("core/position_tex")
+    public static final RenderPipeline CELESTIAL = farPipeline("celestial", "position_tex")
         .withShaderDefine(DEFINE)
         .withBindGroupLayout(BindGroupLayouts.SAMPLER0)
         .withColorTargetState(new ColorTargetState(BlendFunction.OVERLAY))
@@ -88,13 +64,7 @@ public final class SkyFarPlane {
         .withDepthStencilState(BEHIND_TERRAIN)
         .build();
 
-    public static final RenderPipeline END_SKY = RenderPipeline.builder()
-        .withBindGroupLayout(BindGroupLayouts.GLOBALS)
-        .withBindGroupLayout(BindGroupLayouts.PROJECTION)
-        .withBindGroupLayout(BindGroupLayouts.DYNAMIC_TRANSFORMS)
-        .withLocation(Identifier.fromNamespaceAndPath("txoptimizations", "pipeline/end_sky_far"))
-        .withVertexShader("core/position_tex_color")
-        .withFragmentShader("core/position_tex_color")
+    public static final RenderPipeline END_SKY = farPipeline("end_sky", "position_tex_color")
         .withBindGroupLayout(BindGroupLayouts.SAMPLER0)
         .withColorTargetState(new ColorTargetState(BlendFunction.TRANSLUCENT))
         .withVertexBinding(0, DefaultVertexFormat.POSITION_TEX_COLOR)
@@ -102,13 +72,7 @@ public final class SkyFarPlane {
         .withDepthStencilState(FAR_BOUNDS)
         .build();
 
-    public static final RenderPipeline END_FLASH = RenderPipeline.builder()
-        .withBindGroupLayout(BindGroupLayouts.GLOBALS)
-        .withBindGroupLayout(BindGroupLayouts.PROJECTION)
-        .withBindGroupLayout(BindGroupLayouts.DYNAMIC_TRANSFORMS)
-        .withLocation(Identifier.fromNamespaceAndPath("txoptimizations", "pipeline/end_flash_far"))
-        .withVertexShader("core/position_tex")
-        .withFragmentShader("core/position_tex")
+    public static final RenderPipeline END_FLASH = farPipeline("end_flash", "position_tex")
         .withBindGroupLayout(BindGroupLayouts.SAMPLER0)
         .withColorTargetState(new ColorTargetState(BlendFunction.OVERLAY))
         .withVertexBinding(0, DefaultVertexFormat.POSITION_TEX)
@@ -208,5 +172,15 @@ public final class SkyFarPlane {
 
     public static RenderPipeline celestial() {
         return drawingEnd ? END_FLASH : CELESTIAL;
+    }
+
+    private static RenderPipeline.Builder farPipeline(String name, String shader) {
+        return RenderPipeline.builder()
+            .withBindGroupLayout(BindGroupLayouts.GLOBALS)
+            .withBindGroupLayout(BindGroupLayouts.PROJECTION)
+            .withBindGroupLayout(BindGroupLayouts.DYNAMIC_TRANSFORMS)
+            .withLocation(Identifier.fromNamespaceAndPath("txoptimizations", "pipeline/" + name + "_far"))
+            .withVertexShader("core/" + shader)
+            .withFragmentShader("core/" + shader);
     }
 }
