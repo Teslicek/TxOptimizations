@@ -16,28 +16,27 @@ public final class SectionDrawList {
     public static final int COMMAND_BYTES = 5 * Integer.BYTES;
     public static final int SECTION_BYTES = 3 * Integer.BYTES + Float.BYTES;
 
-    private static final int GROUP_HASH_SEED = 173;
-    private static final int NONE            = -1;
-    private static final int INSTANCE_COUNT  = 1;
-    private static final int DRAW_INTS       = 5;
-    private static final int GROUP           = 0;
-    private static final int INDEX_COUNT     = 1;
-    private static final int FIRST_INDEX     = 2;
-    private static final int BASE_VERTEX     = 3;
-    private static final int BASE_INSTANCE   = 4;
-    private static final int SECTION_INTS    = 4;
+    private static final int NONE           = -1;
+    private static final int ID_BITS        = 14;
+    private static final int INSTANCE_COUNT = 1;
+    private static final int DRAW_INTS      = 5;
+    private static final int GROUP          = 0;
+    private static final int INDEX_COUNT    = 1;
+    private static final int FIRST_INDEX    = 2;
+    private static final int BASE_VERTEX    = 3;
+    private static final int BASE_INSTANCE  = 4;
+    private static final int SECTION_INTS   = 4;
 
     private static final int COMMAND_INDEX_COUNT    = 0;
     private static final int COMMAND_INSTANCE_COUNT = 1;
     private static final int COMMAND_FIRST_INDEX    = 2;
     private static final int COMMAND_BASE_VERTEX    = 3;
     private static final int COMMAND_BASE_INSTANCE  = 4;
-    private static final int INITIAL_GROUPS      = 16;
-    private static final int INITIAL_DRAWS       = 4096;
-    private static final int INITIAL_GROUP_DRAWS = 256;
+    private static final int INITIAL_GROUPS         = 16;
+    private static final int INITIAL_DRAWS          = 4096;
+    private static final int INITIAL_GROUP_DRAWS    = 256;
 
-    private static final IndexType[] INDEX_TYPES       = IndexType.values();
-    private static final int[]       INDEX_TYPE_HASHES = indexTypeHashes();
+    private static final IndexType[] INDEX_TYPES = IndexType.values();
 
     private GpuBuffer[]           vertexBuffers = new GpuBuffer[INITIAL_GROUPS];
     private @Nullable GpuBuffer[] indexBuffers  = new GpuBuffer[INITIAL_GROUPS];
@@ -56,10 +55,7 @@ public final class SectionDrawList {
     private int[]                 layerCounts   = new int[0];
     private int[]                 layerEnds     = new int[0];
     private boolean[]             reversed      = new boolean[0];
-    private int[]                 memoHashes    = new int[0];
-    private int[]                 memoVertices  = new int[0];
-    private int[]                 memoIndices   = new int[0];
-    private int[]                 memoTypes     = new int[0];
+    private int[]                 memoKeys      = new int[0];
     private int[]                 memoGroups    = new int[0];
     private long                  build;
     private int                   groups;
@@ -68,7 +64,7 @@ public final class SectionDrawList {
     private int                   drawCount;
     private int                   sectionInts;
     private int                   largestIndexCount;
-    private int                   lastTranslucentHash;
+    private int                   lastTranslucentKey;
     private boolean               respectTranslucentOrder;
     private boolean               fading;
     private boolean               perGroup;
@@ -79,10 +75,7 @@ public final class SectionDrawList {
             this.layerCounts  = new int[layers];
             this.layerEnds    = new int[layers];
             this.reversed     = new boolean[layers];
-            this.memoHashes   = new int[layers];
-            this.memoVertices = new int[layers];
-            this.memoIndices  = new int[layers];
-            this.memoTypes    = new int[layers];
+            this.memoKeys     = new int[layers];
             this.memoGroups   = new int[layers];
         }
 
@@ -100,7 +93,7 @@ public final class SectionDrawList {
         this.perGroup                = FramePath.frameUsesWorker();
         this.sectionInts             = 0;
         this.largestIndexCount       = 0;
-        this.lastTranslucentHash     = 0;
+        this.lastTranslucentKey      = NONE;
         this.respectTranslucentOrder = respectTranslucentOrder;
         this.fading                  = false;
     }
@@ -128,36 +121,27 @@ public final class SectionDrawList {
 
     public int group(int layer, boolean translucent, int vertexBuffer, int indexBuffer, int indexType) {
         boolean ordered = translucent && this.respectTranslucentOrder;
+        int     key     = groupKey(vertexBuffer, indexBuffer, indexType);
 
-        if (!ordered && this.memoGroups[layer] != NONE && this.memoVertices[layer] == vertexBuffer && this.memoIndices[layer] == indexBuffer && this.memoTypes[layer] == indexType)
+        if (!ordered && this.memoGroups[layer] != NONE && this.memoKeys[layer] == key)
             return this.memoGroups[layer];
 
-        int hash = 31 * GROUP_HASH_SEED + SectionBuffers.hash(vertexBuffer);
-
-        if (indexBuffer != DrawRecords.NO_BUFFER) {
-            hash = 31 * hash + SectionBuffers.hash(indexBuffer);
-            hash = 31 * hash + INDEX_TYPE_HASHES[indexType];
-        }
-
         if (ordered) {
-            boolean sameAsLast = hash == this.lastTranslucentHash;
+            boolean sameAsLast = key == this.lastTranslucentKey;
 
-            this.lastTranslucentHash = hash;
+            this.lastTranslucentKey = key;
 
             if (sameAsLast)
                 return this.lastGroup(layer);
 
-            return this.addGroup(layer, true, hash, vertexBuffer, indexBuffer, indexType);
+            return this.addGroup(layer, true, key, vertexBuffer, indexBuffer, indexType);
         }
 
-        int cached = this.cachedGroup(hash);
-        int group  = cached != NONE ? cached : this.addGroup(layer, translucent, hash, vertexBuffer, indexBuffer, indexType);
+        int cached = this.cachedGroup(key);
+        int group  = cached != NONE ? cached : this.addGroup(layer, translucent, key, vertexBuffer, indexBuffer, indexType);
 
-        this.memoHashes[layer]   = hash;
-        this.memoVertices[layer] = vertexBuffer;
-        this.memoIndices[layer]  = indexBuffer;
-        this.memoTypes[layer]    = indexType;
-        this.memoGroups[layer]   = group;
+        this.memoKeys[layer]   = key;
+        this.memoGroups[layer] = group;
 
         return group;
     }
@@ -410,7 +394,7 @@ public final class SectionDrawList {
         return this.layerGroups[layer][count - 1];
     }
 
-    private int addGroup(int layer, boolean translucent, int hash, int vertexBuffer, int indexBuffer, int indexType) {
+    private int addGroup(int layer, boolean translucent, int key, int vertexBuffer, int indexBuffer, int indexType) {
         int     group       = this.groups;
         boolean customIndex = indexBuffer != DrawRecords.NO_BUFFER;
 
@@ -436,7 +420,7 @@ public final class SectionDrawList {
         this.layerGroups[layer][count] = group;
         this.layerCounts[layer]        = count + 1;
 
-        this.cacheGroup(hash, group);
+        this.cacheGroup(key, group);
 
         return group;
     }
@@ -453,32 +437,32 @@ public final class SectionDrawList {
         this.order         = Arrays.copyOf(this.order, capacity);
     }
 
-    private int cachedGroup(int hash) {
+    private int cachedGroup(int key) {
         int mask = this.cacheValues.length - 1;
 
-        for (int slot = HashCommon.mix(hash) & mask; this.cacheValues[slot] != 0; slot = slot + 1 & mask) {
-            if (this.cacheKeys[slot] == hash)
+        for (int slot = HashCommon.mix(key) & mask; this.cacheValues[slot] != 0; slot = slot + 1 & mask) {
+            if (this.cacheKeys[slot] == key)
                 return this.cacheValues[slot] - 1;
         }
 
         return NONE;
     }
 
-    private void cacheGroup(int hash, int group) {
+    private void cacheGroup(int key, int group) {
         int mask = this.cacheValues.length - 1;
-        int slot = HashCommon.mix(hash) & mask;
+        int slot = HashCommon.mix(key) & mask;
 
         while (this.cacheValues[slot] != 0) {
-            if (this.cacheKeys[slot] == hash) {
+            if (this.cacheKeys[slot] == key) {
                 this.cacheValues[slot] = group + 1;
-                this.forgetMemos(hash);
+                this.forgetMemos(key);
                 return;
             }
 
             slot = slot + 1 & mask;
         }
 
-        this.cacheKeys[slot]   = hash;
+        this.cacheKeys[slot]   = key;
         this.cacheValues[slot] = group + 1;
         this.cacheSize ++;
 
@@ -486,9 +470,9 @@ public final class SectionDrawList {
             this.rehash(this.cacheValues.length * 2);
     }
 
-    private void forgetMemos(int hash) {
+    private void forgetMemos(int key) {
         for (int layer = 0; layer < this.memoGroups.length; layer ++) {
-            if (this.memoHashes[layer] == hash)
+            if (this.memoKeys[layer] == key)
                 this.memoGroups[layer] = NONE;
         }
     }
@@ -515,12 +499,12 @@ public final class SectionDrawList {
         draws[command + COMMAND_BASE_INSTANCE]  = baseInstance;
     }
 
-    private static int[] indexTypeHashes() {
-        int[] hashes = new int[INDEX_TYPES.length];
+    private static int groupKey(int vertexBuffer, int indexBuffer, int indexType) {
+        int index = indexBuffer == DrawRecords.NO_BUFFER ? 0 : indexBuffer + 1;
 
-        for (IndexType type : INDEX_TYPES)
-            hashes[type.ordinal()] = type.hashCode();
+        if (vertexBuffer >= 1 << ID_BITS || index >= 1 << ID_BITS)
+            throw new IllegalStateException("Section buffer id " + Math.max(vertexBuffer, index) + " does not fit a " + ID_BITS + "-bit draw group key");
 
-        return hashes;
+        return vertexBuffer << ID_BITS + 2 | index << 2 | (index == 0 ? 0 : indexType);
     }
 }

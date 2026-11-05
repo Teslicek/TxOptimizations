@@ -9,7 +9,6 @@ public final class SectionBuffers {
     private static final int INITIAL_CAPACITY = 8;
 
     private static @Nullable GpuBuffer[] buffers = new GpuBuffer[INITIAL_CAPACITY];
-    private static int[]                 hashes  = new int[INITIAL_CAPACITY];
 
     private SectionBuffers() {
     }
@@ -20,13 +19,10 @@ public final class SectionBuffers {
         while (id < buffers.length && buffers[id] != null)
             id ++;
 
-        if (id == buffers.length) {
+        if (id == buffers.length)
             buffers = Arrays.copyOf(buffers, buffers.length * 2);
-            hashes  = Arrays.copyOf(hashes, hashes.length * 2);
-        }
 
         buffers[id] = buffer;
-        hashes[id]  = buffer.hashCode();
         DrawRecords.changed();
 
         return id;
@@ -51,9 +47,5 @@ public final class SectionBuffers {
             throw new IllegalStateException("Section buffer " + id + " was already released");
 
         return buffer;
-    }
-
-    public static int hash(int id) {
-        return hashes[id];
     }
 }
