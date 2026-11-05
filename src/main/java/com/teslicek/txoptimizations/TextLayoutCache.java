@@ -4,6 +4,7 @@ import it.unimi.dsi.fastutil.HashCommon;
 import java.util.HashMap;
 import java.util.IdentityHashMap;
 import java.util.Map;
+import java.util.function.ToIntBiFunction;
 import net.minecraft.client.gui.Font;
 import net.minecraft.locale.Language;
 import net.minecraft.network.chat.FontDescription;
@@ -158,57 +159,23 @@ public final class TextLayoutCache {
         }
 
         private int width(Font font, MutableComponent component) {
-            long frame = ClientClock.frame();
-
-            this.evictUnused(frame);
-
-            Width cached = this.widths.get(component);
-
-            if (cached != null && cached.font == font) {
-                cached.frame = frame;
-
-                return cached.width;
-            }
-
-            if (this.widths.size() >= MAX_ENTRIES)
-                this.widths.clear();
-
-            int width = font.width(component);
-
-            this.widths.put(component, new Width(font, width, frame));
-
-            return width;
+            return this.cachedWidth(this.widths, MAX_ENTRIES, font, component, Font::width);
         }
 
         private int width(Font font, FormattedCharSequence text) {
-            long frame = ClientClock.frame();
-
-            this.evictUnused(frame);
-
-            Width cached = this.sequenceWidths.get(text);
-
-            if (cached != null && cached.font == font) {
-                cached.frame = frame;
-
-                return cached.width;
-            }
-
-            if (this.sequenceWidths.size() >= MAX_SEQUENCE_WIDTHS)
-                this.sequenceWidths.clear();
-
-            int width = font.width(text);
-
-            this.sequenceWidths.put(text, new Width(font, width, frame));
-
-            return width;
+            return this.cachedWidth(this.sequenceWidths, MAX_SEQUENCE_WIDTHS, font, text, Font::width);
         }
 
         private int width(Font font, String text) {
+            return this.cachedWidth(this.stringWidths, MAX_ENTRIES, font, text, Font::width);
+        }
+
+        private <T> int cachedWidth(Map<T, Width> widths, int limit, Font font, T text, ToIntBiFunction<Font, T> measure) {
             long frame = ClientClock.frame();
 
             this.evictUnused(frame);
 
-            Width cached = this.stringWidths.get(text);
+            Width cached = widths.get(text);
 
             if (cached != null && cached.font == font) {
                 cached.frame = frame;
@@ -216,12 +183,12 @@ public final class TextLayoutCache {
                 return cached.width;
             }
 
-            if (this.stringWidths.size() >= MAX_ENTRIES)
-                this.stringWidths.clear();
+            if (widths.size() >= limit)
+                widths.clear();
 
-            int width = font.width(text);
+            int width = measure.applyAsInt(font, text);
 
-            this.stringWidths.put(text, new Width(font, width, frame));
+            widths.put(text, new Width(font, width, frame));
 
             return width;
         }
