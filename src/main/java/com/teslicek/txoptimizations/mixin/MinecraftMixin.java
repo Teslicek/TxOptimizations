@@ -1,0 +1,497 @@
+package com.teslicek.txoptimizations.mixin;
+
+import com.llamalad7.mixinextras.injector.ModifyExpressionValue;
+import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
+import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
+import com.mojang.blaze3d.platform.Window;
+import com.mojang.blaze3d.systems.RenderSystem;
+import com.mojang.blaze3d.systems.TimerQuery;
+import com.mojang.renderpearl.api.commands.CommandEncoder;
+import com.mojang.renderpearl.api.device.GpuBackend;
+import com.mojang.renderpearl.api.device.GpuDevice;
+import com.mojang.renderpearl.api.device.GpuSurface;
+import com.mojang.renderpearl.api.device.SurfaceException;
+import com.mojang.renderpearl.api.textures.GpuTextureView;
+import com.teslicek.txoptimizations.AcquiredImageDiscard;
+import com.teslicek.txoptimizations.AnimationUploads;
+import com.teslicek.txoptimizations.AtlasFeatures;
+import com.teslicek.txoptimizations.ClientClock;
+import com.teslicek.txoptimizations.FpsCounter;
+import com.teslicek.txoptimizations.FramePath;
+import com.teslicek.txoptimizations.GpuTimerRelay;
+import com.teslicek.txoptimizations.InventoryClassPreload;
+import com.teslicek.txoptimizations.ModResourcePack;
+import com.teslicek.txoptimizations.PresentThread;
+import com.teslicek.txoptimizations.RenderStateBuffers;
+import com.teslicek.txoptimizations.RenderThreadStack;
+import com.teslicek.txoptimizations.RenderWorker;
+import com.teslicek.txoptimizations.VisibleSectionBinding;
+import com.teslicek.txoptimizations.VisibleSectionBuffers;
+import com.teslicek.txoptimizations.cull.EntityCulling;
+import com.teslicek.txoptimizations.hud.HudFrameOps;
+import java.util.List;
+import java.util.concurrent.locks.LockSupport;
+import net.minecraft.client.GameLoadCookie;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.Options;
+import net.minecraft.client.PreferredGraphicsApi;
+import net.minecraft.client.gui.Gui;
+import net.minecraft.client.gui.font.FontManager;
+import net.minecraft.client.gui.screens.LevelLoadingScreen;
+import net.minecraft.client.gui.screens.TitleScreen;
+import net.minecraft.client.gui.screens.multiplayer.ServerReconfigScreen;
+import net.minecraft.client.multiplayer.ClientLevel;
+import net.minecraft.client.renderer.DynamicGpuData;
+import net.minecraft.client.renderer.GameRenderer;
+import net.minecraft.client.renderer.LevelRenderer;
+import net.minecraft.client.resources.MapTextureManager;
+import net.minecraft.server.packs.VanillaPackResources;
+import net.minecraft.server.packs.repository.RepositorySource;
+import net.minecraft.server.packs.resources.ReloadableResourceManager;
+import net.minecraft.util.Util;
+import org.objectweb.asm.Opcodes;
+import org.slf4j.Logger;
+import org.spongepowered.asm.mixin.Final;
+import org.spongepowered.asm.mixin.Mixin;
+import org.spongepowered.asm.mixin.Shadow;
+import org.spongepowered.asm.mixin.Unique;
+import org.spongepowered.asm.mixin.injection.At;
+import org.spongepowered.asm.mixin.injection.Inject;
+import org.spongepowered.asm.mixin.injection.ModifyArg;
+import org.spongepowered.asm.mixin.injection.Redirect;
+import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
+
+@Mixin(Minecraft.class)
+public abstract class MinecraftMixin {
+
+    @Inject(method = "tick", at = @At("HEAD"))
+    private void txoptimizations$startTick(CallbackInfo ci) {
+        EntityCulling.tick((Minecraft) (Object) this);
+    }
+
+    @Inject(method = "tick", at = @At("RETURN"))
+    private void txoptimizations$endTick(CallbackInfo ci) {
+        FpsCounter.onEndClientTick((Minecraft) (Object) this);
+    }
+
+    @ModifyArg(method = "<init>", at = @At(value = "INVOKE", target = "Lnet/minecraft/server/packs/repository/PackRepository;<init>([Lnet/minecraft/server/packs/repository/RepositorySource;)V"))
+    private RepositorySource[] txoptimizations$addModResources(RepositorySource[] sources) {
+        return ModResourcePack.withSource(sources);
+    }
+
+    @Inject(method = "onGameLoadFinished", at = @At("TAIL"))
+    private void txoptimizations$preloadInventoryClasses(GameLoadCookie cookie, CallbackInfo ci) {
+        InventoryClassPreload.start();
+    }
+
+    @Shadow
+    @Final
+    private ReloadableResourceManager resourceManager;
+
+    @Shadow
+    @Final
+    private FontManager fontManager;
+
+    @Shadow
+    @Final
+    public Options options;
+
+    @Shadow
+    public abstract VanillaPackResources getVanillaPackResources();
+
+    @Shadow
+    public abstract MapTextureManager getMapTextureManager();
+
+    @Inject(method = "onResourceLoadFinished", at = @At("RETURN"))
+    private void txoptimizations$applyResourcePackAtlasFeatures(CallbackInfo ci) {
+        boolean fontAtlasResizing  = AtlasFeatures.isFontAtlasResizing();
+        boolean mapAtlasGeneration = AtlasFeatures.isMapAtlasGeneration();
+
+        AtlasFeatures.updateFromResourcePacks(this.resourceManager, this.getVanillaPackResources().fullResources());
+
+        if (fontAtlasResizing != AtlasFeatures.isFontAtlasResizing())
+            this.fontManager.updateOptions(this.options);
+
+        if (mapAtlasGeneration != AtlasFeatures.isMapAtlasGeneration())
+            this.getMapTextureManager().resetData();
+    }
+
+    @Inject(method = "tick", at = @At("HEAD"))
+    private void txoptimizations$advanceTick(CallbackInfo ci) {
+        ClientClock.advanceTick();
+    }
+
+    @Inject(method = "renderFrame", at = @At("HEAD"))
+    private void txoptimizations$advanceFrame(boolean advanceGameTime, CallbackInfo ci) {
+        ClientClock.advanceFrame(Util.getMillis());
+        FpsCounter.countFrame();
+    }
+
+    @Unique
+    private static final long FREEZE_TIMEOUT_MS = 5_000L;
+
+    @Unique
+    private static final long FREEZE_POLL_NANOS = 1_000_000L;
+
+    @Unique
+    private static long startMs = 0L;
+
+    @Unique
+    private static boolean abandoned = false;
+
+    @Inject(method = "renderFrame(Z)V", at = @At("HEAD"), cancellable = true)
+    private void txoptimizations$freezeDuringReconfig(boolean advanceGameTime, CallbackInfo ci) {
+        if (!txoptimizations$shouldFreeze())
+            return;
+
+        ci.cancel();
+        LockSupport.parkNanos(FREEZE_POLL_NANOS);
+    }
+
+    @Unique
+    private static boolean txoptimizations$shouldFreeze() {
+        Minecraft mc        = Minecraft.getInstance();
+        boolean   inReconfig = mc.gui.screen() instanceof ServerReconfigScreen;
+
+        if ((mc.level != null && !inReconfig) || mc.gui.screen() instanceof TitleScreen) {
+            startMs    = 0L;
+            abandoned  = false;
+            return false;
+        }
+
+        if (!inReconfig) {
+            if (startMs != 0L)
+                abandoned = true;
+
+            return false;
+        }
+
+        if (abandoned)
+            return false;
+
+        if (mc.gui.overlay() != null) {
+            abandoned = true;
+            return false;
+        }
+
+        long now = System.currentTimeMillis();
+
+        if (startMs == 0L)
+            startMs = now;
+
+        return now - startMs < FREEZE_TIMEOUT_MS;
+    }
+
+    @Shadow
+    @Final
+    private static Logger LOGGER;
+
+    @Shadow
+    @Final
+    private Window window;
+
+    @Shadow
+    @Final
+    private GpuSurface windowSurface;
+
+    @Shadow
+    private boolean windowSurfaceNeedsReconfiguring;
+
+    @Shadow
+    private boolean surfaceIsInvalid;
+
+    @Shadow
+    public ClientLevel level;
+
+    @Shadow
+    @Final
+    public Gui gui;
+
+    @Shadow
+    @Final
+    public LevelRenderer levelRenderer;
+
+    @Shadow
+    @Final
+    public GameRenderer gameRenderer;
+
+    @Shadow
+    @Final
+    private TimerQuery timerQuery;
+
+    @Unique
+    private boolean txoptimizations$timerRequested;
+
+    @Unique
+    private boolean txoptimizations$acquireDeferred;
+
+    @Unique
+    private boolean txoptimizations$holdFrame;
+
+    @Unique
+    private boolean txoptimizations$worldShown;
+
+    @Unique
+    private boolean txoptimizations$imageAcquiredEarly;
+
+    @Unique
+    private SurfaceException txoptimizations$earlyAcquireFailure;
+
+    @Unique
+    private boolean txoptimizations$frameAcquiredEarly;
+
+    @Redirect(method = "renderFrame", at = @At(value = "INVOKE", target = "Lcom/mojang/renderpearl/api/device/GpuSurface;isAcquired()Z", ordinal = 0))
+    private boolean txoptimizations$startWithEarlyImage(GpuSurface surface) {
+        return false;
+    }
+
+    @ModifyExpressionValue(method = "renderFrame", at = @At(value = "FIELD", target = "Lnet/minecraft/client/Minecraft;windowSurfaceNeedsReconfiguring:Z", opcode = Opcodes.GETFIELD))
+    private boolean txoptimizations$deferAcquire(boolean needsReconfiguring) {
+        if (needsReconfiguring)
+            RenderWorker.awaitFrame();
+
+        this.txoptimizations$acquireDeferred    = !needsReconfiguring;
+        this.txoptimizations$holdFrame          = !this.txoptimizations$worldShown && this.level != null && this.gui.screen() instanceof LevelLoadingScreen;
+        this.txoptimizations$frameAcquiredEarly = false;
+
+        if (this.level != null && !this.txoptimizations$holdFrame)
+            this.txoptimizations$worldShown = true;
+
+        return needsReconfiguring;
+    }
+
+    @Redirect(method = "renderFrame", at = @At(value = "INVOKE", target = "Lcom/mojang/renderpearl/api/device/GpuSurface;isSuboptimal()Z"))
+    private boolean txoptimizations$skipDeferredSuboptimal(GpuSurface surface) {
+        if (this.txoptimizations$acquireDeferred || this.txoptimizations$frameAcquiredEarly)
+            return false;
+
+        return surface.isSuboptimal();
+    }
+
+    @Redirect(method = "renderFrame", at = @At(value = "INVOKE", target = "Lcom/mojang/renderpearl/api/device/GpuSurface;configure(Lcom/mojang/renderpearl/api/device/GpuSurface$Configuration;)V"))
+    private void txoptimizations$dropEarlyBeforeConfigure(GpuSurface surface, GpuSurface.Configuration config) throws SurfaceException {
+        this.txoptimizations$dropEarlyAcquire(surface);
+        surface.configure(config);
+    }
+
+    @Redirect(method = "renderFrame", at = @At(value = "INVOKE", target = "Lcom/mojang/renderpearl/api/device/GpuSurface;acquireNextTexture()V"))
+    private void txoptimizations$useEarlyAcquire(GpuSurface surface) throws SurfaceException {
+        if (!this.txoptimizations$frameAcquiredEarly) {
+            surface.acquireNextTexture();
+
+            return;
+        }
+
+        SurfaceException failure = this.txoptimizations$earlyAcquireFailure;
+
+        this.txoptimizations$frameAcquiredEarly  = false;
+        this.txoptimizations$imageAcquiredEarly  = false;
+        this.txoptimizations$earlyAcquireFailure = null;
+
+        if (failure != null)
+            throw failure;
+    }
+
+    @ModifyExpressionValue(method = "renderFrame", at = @At(value = "FIELD", target = "Lnet/minecraft/client/Minecraft;surfaceIsInvalid:Z", opcode = Opcodes.GETFIELD))
+    private boolean txoptimizations$skipDeferredAcquire(boolean invalid) {
+        return invalid || this.txoptimizations$acquireDeferred || this.txoptimizations$holdFrame;
+    }
+
+    @Redirect(method = "renderFrame", at = @At(value = "INVOKE", target = "Lcom/mojang/renderpearl/api/device/GpuSurface;isAcquired()Z", ordinal = 1))
+    private boolean txoptimizations$acquireBeforeBlit(GpuSurface surface) {
+        return false;
+    }
+
+    @Redirect(method = "renderFrame", at = @At(value = "INVOKE", target = "Lcom/mojang/blaze3d/systems/TimerQuery;getStatus()Lcom/mojang/blaze3d/systems/TimerQuery$Status;"), require = 1)
+    private TimerQuery.Status txoptimizations$publishedTimerStatus(TimerQuery query) {
+        return GpuTimerRelay.status();
+    }
+
+    @Redirect(method = "renderFrame", at = @At(value = "INVOKE", target = "Lcom/mojang/blaze3d/systems/TimerQuery;beginProfile()V"), require = 1)
+    private void txoptimizations$beginTimerInRenderJob(TimerQuery query) {
+        this.txoptimizations$timerRequested = true;
+    }
+
+    @Redirect(method = "renderFrame", at = @At(value = "INVOKE", target = "Lcom/mojang/blaze3d/systems/TimerQuery;endProfile()V"), require = 1)
+    private void txoptimizations$endTimerInRenderJob(TimerQuery query) {
+    }
+
+    @Redirect(method = "renderFrame", at = @At(value = "INVOKE", target = "Lcom/mojang/blaze3d/systems/TimerQuery;get()J"), require = 1)
+    private long txoptimizations$publishedTimerNanos(TimerQuery query) {
+        return GpuTimerRelay.nanos();
+    }
+
+    @Redirect(method = "renderFrame", at = @At(value = "INVOKE", target = "Lcom/mojang/renderpearl/api/device/GpuDevice;createCommandEncoder()Lcom/mojang/renderpearl/api/commands/CommandEncoder;", ordinal = 1), require = 1)
+    private CommandEncoder txoptimizations$submitInRenderJob(GpuDevice device) {
+        return null;
+    }
+
+    @Redirect(method = "renderFrame", at = @At(value = "INVOKE", target = "Lcom/mojang/renderpearl/api/commands/CommandEncoder;submit()V"))
+    private void txoptimizations$presentOnPresentThread(CommandEncoder encoder) {
+    }
+
+    @Redirect(method = "renderFrame", at = @At(value = "INVOKE", target = "Lcom/mojang/renderpearl/api/device/GpuSurface;isAcquired()Z", ordinal = 2))
+    private boolean txoptimizations$presentInRenderJob(GpuSurface surface) {
+        return false;
+    }
+
+    @WrapOperation(method = "renderFrame", at = @At(value = "INVOKE", target = "Lcom/mojang/blaze3d/systems/RenderSystem;executePendingTasks()V"), require = 1)
+    private void txoptimizations$pendingTasksInRenderJob(Operation<Void> original) {
+    }
+
+    @WrapOperation(method = "renderFrame", at = @At(value = "INVOKE", target = "Lnet/minecraft/client/renderer/DynamicGpuData;reset()V"), require = 1)
+    private void txoptimizations$uniformResetInRenderJob(DynamicGpuData uniforms, Operation<Void> original) {
+    }
+
+    @WrapOperation(method = "renderFrame", at = @At(value = "INVOKE", target = "Lnet/minecraft/client/renderer/LevelRenderer;endFrame()V"), require = 1)
+    private void txoptimizations$endFrameInRenderJob(LevelRenderer renderer, Operation<Void> original) {
+    }
+
+    @WrapOperation(method = "renderFrame", at = @At(value = "INVOKE", target = "Lnet/minecraft/client/renderer/GameRenderer;render()V"), require = 1)
+    private void txoptimizations$renderInRenderJob(GameRenderer renderer, Operation<Void> original) {
+        boolean                       acquire = this.txoptimizations$acquireDeferred && !this.txoptimizations$holdFrame;
+        int                           width   = this.window.getWidth();
+        int                           height  = this.window.getHeight();
+        boolean                       vsync   = this.options.enableVsync().get();
+        List<AnimationUploads.Upload> uploads = AnimationUploads.takeForFrame();
+        List<HudFrameOps.Op>          hud     = HudFrameOps.takeForFrame();
+        boolean                       timer   = this.txoptimizations$timerRequested;
+
+        this.txoptimizations$acquireDeferred = false;
+        this.txoptimizations$timerRequested  = false;
+
+        RenderWorker.start(() -> txoptimizations$handOff(), () -> this.txoptimizations$renderJob(renderer, original, acquire, width, height, vsync, uploads, hud, timer));
+    }
+
+    @Unique
+    private static void txoptimizations$handOff() {
+        VisibleSectionBuffers.handOff();
+        RenderStateBuffers.handOff();
+        ClientClock.handOff();
+    }
+
+    @Unique
+    private void txoptimizations$renderJob(GameRenderer renderer, Operation<Void> original, boolean acquire, int width, int height, boolean vsync, List<AnimationUploads.Upload> uploads, List<HudFrameOps.Op> hud, boolean timer) {
+        FramePath.beginFrame(PresentThread.canDeferAcquire(this.windowSurface));
+
+        boolean timed = timer && this.timerQuery.getStatus() == TimerQuery.Status.NOT_RECORDING;
+
+        if (timed)
+            this.timerQuery.beginProfile();
+
+        ((VisibleSectionBinding) this.levelRenderer).txoptimizations$bindRenderSections();
+        AnimationUploads.submit(uploads);
+        HudFrameOps.run(hud);
+        RenderStateBuffers.bindRender((Minecraft) (Object) this);
+        RenderSystem.executePendingTasks();
+
+        original.call(renderer);
+
+        if (acquire)
+            this.txoptimizations$configureAndAcquire(width, height, vsync);
+
+        if (this.windowSurface.isAcquired()) {
+            GpuTextureView colorTexture = this.gameRenderer.mainRenderTarget().getColorTextureView();
+
+            if (colorTexture == null)
+                throw new IllegalStateException("Can't blit to screen, color texture doesn't exist yet");
+
+            this.windowSurface.blitFromTexture(RenderSystem.getDevice().createCommandEncoder(), colorTexture);
+            PresentThread.arm(this.windowSurface);
+        }
+
+        if (timed)
+            this.timerQuery.endProfile();
+
+        try {
+            RenderSystem.getDevice().createCommandEncoder().submit();
+        } finally {
+            PresentThread.disarm();
+        }
+
+        FramePath.frameSubmitted();
+        GpuTimerRelay.publish(this.timerQuery);
+        RenderSystem.getDynamicUniforms().reset();
+        this.levelRenderer.endFrame();
+    }
+
+    @Inject(method = "renderFrame", at = @At("TAIL"))
+    private void txoptimizations$acquireNextEarly(boolean advanceGameTime, CallbackInfo ci) {
+        if (this.txoptimizations$frameAcquiredEarly)
+            throw new IllegalStateException("The screen image acquired early was not used by its frame");
+    }
+
+    @WrapOperation(method = "close", at = @At(value = "INVOKE", target = "Lcom/mojang/renderpearl/api/device/GpuSurface;close()V"))
+    private void txoptimizations$dropEarlyBeforeClose(GpuSurface surface, Operation<Void> original) {
+        this.txoptimizations$dropEarlyAcquire(surface);
+        original.call(surface);
+    }
+
+    @Unique
+    private void txoptimizations$dropEarlyAcquire(GpuSurface surface) {
+        if (this.txoptimizations$imageAcquiredEarly)
+            ((AcquiredImageDiscard) surface).txoptimizations$discardAcquired();
+
+        this.txoptimizations$imageAcquiredEarly  = false;
+        this.txoptimizations$earlyAcquireFailure = null;
+        this.txoptimizations$frameAcquiredEarly  = false;
+    }
+
+    @Unique
+    private void txoptimizations$configureAndAcquire(int width, int height, boolean vsync) {
+        if ((this.windowSurfaceNeedsReconfiguring || this.windowSurface.isSuboptimal() && !this.surfaceIsInvalid) && !this.window.isIconified()) {
+            GpuSurface.PresentMode   presentMode = GpuSurface.PresentMode.getSupportedVsyncMode(this.windowSurface.supportedPresentModes(), vsync);
+            GpuSurface.Configuration config      = new GpuSurface.Configuration(width, height, presentMode);
+
+            try {
+                this.windowSurface.configure(config);
+                this.surfaceIsInvalid                = false;
+                this.windowSurfaceNeedsReconfiguring = false;
+            } catch (SurfaceException exception) {
+                LOGGER.warn("Couldn't configure surface to {}", config, exception);
+                this.surfaceIsInvalid = true;
+            }
+        }
+
+        if (this.surfaceIsInvalid)
+            return;
+
+        long acquireStart = System.nanoTime();
+
+        try {
+            this.windowSurface.acquireNextTexture();
+        } catch (SurfaceException ex) {
+            LOGGER.warn("Couldn't acquire next surface texture with config {}", this.windowSurface.currentConfiguration(), ex);
+            this.surfaceIsInvalid                = true;
+            this.windowSurfaceNeedsReconfiguring = true;
+        }
+
+        FramePath.recordAcquire(System.nanoTime() - acquireStart);
+    }
+
+    @ModifyExpressionValue(method = "<init>(Lnet/minecraft/client/main/GameConfig;)V", at = @At(value = "INVOKE", target = "Lnet/minecraft/client/PreferredGraphicsApi;getBackendsToTry()[Lcom/mojang/renderpearl/api/device/GpuBackend;"), require = 1)
+    private GpuBackend[] txoptimizations$forceVulkan(GpuBackend[] backends) {
+        return PreferredGraphicsApi.VULKAN.getBackendsToTry();
+    }
+
+    @Inject(method = "<init>", at = @At("RETURN"))
+    private void txoptimizations$captureRenderThreadStack(CallbackInfo ci) {
+        RenderThreadStack.ensureCaptured();
+    }
+
+    @Inject(method = "renderFrame", at = @At("HEAD"))
+    private void txoptimizations$swapRenderStates(boolean advanceGameTime, CallbackInfo ci) {
+        RenderStateBuffers.swap((Minecraft) (Object) this);
+    }
+
+    @Inject(method = {"close", "setLevel", "disconnect(Lnet/minecraft/client/gui/screens/Screen;Z)V", "disconnect(Lnet/minecraft/client/gui/screens/Screen;ZZ)V", "clearClientLevel", "updateLevelInEngines(Lnet/minecraft/client/multiplayer/ClientLevel;)V", "updateLevelInEngines(Lnet/minecraft/client/multiplayer/ClientLevel;Z)V", "invalidateSurfaceConfiguration", "setCameraEntity"}, at = @At("HEAD"), require = 9)
+    private void txoptimizations$waitBeforeLevelChange(CallbackInfo ci) {
+        RenderWorker.awaitFromMain();
+    }
+
+    @Inject(method = "runTick", at = @At("HEAD"), require = 1)
+    private void txoptimizations$waitWhileReloading(boolean advanceGameTime, CallbackInfo ci) {
+        if (this.gui.overlay() != null)
+            RenderWorker.awaitFromMain();
+    }
+}
