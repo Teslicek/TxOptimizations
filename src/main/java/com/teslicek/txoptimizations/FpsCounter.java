@@ -1,8 +1,7 @@
 package com.teslicek.txoptimizations;
 
 import com.mojang.blaze3d.platform.InputConstants;
-import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
-import net.fabricmc.fabric.api.client.keymapping.v1.KeyMappingHelper;
+import java.util.Arrays;
 import net.minecraft.ChatFormatting;
 import net.minecraft.client.KeyMapping;
 import net.minecraft.client.Minecraft;
@@ -32,8 +31,22 @@ public final class FpsCounter {
 
     public static void register() {
         toggleKey = new KeyMapping("key.txoptimizations.fps_counter", InputConstants.KEY_K, CATEGORY);
-        KeyMappingHelper.registerKeyMapping(toggleKey);
-        ClientTickEvents.END_CLIENT_TICK.register(FpsCounter::onEndClientTick);
+    }
+
+    public static KeyMapping[] withToggleKey(KeyMapping[] vanilla) {
+        if (toggleKey == null)
+            throw new IllegalStateException("The FPS counter key is not created before the options load");
+
+        for (KeyMapping key : vanilla) {
+            if (key == toggleKey)
+                return vanilla;
+        }
+
+        KeyMapping[] keys = Arrays.copyOf(vanilla, vanilla.length + 1);
+
+        keys[vanilla.length] = toggleKey;
+
+        return keys;
     }
 
     public static void countFrame() {
@@ -65,7 +78,7 @@ public final class FpsCounter {
         graphics.text(minecraft.font, text, TEXT_X, TEXT_Y, TEXT_COLOR, false);
     }
 
-    private static void onEndClientTick(Minecraft minecraft) {
+    public static void onEndClientTick(Minecraft minecraft) {
         while (toggleKey.consumeClick()) {
             boolean enabled = !TxOptimizationsConfig.fpsCounter();
 

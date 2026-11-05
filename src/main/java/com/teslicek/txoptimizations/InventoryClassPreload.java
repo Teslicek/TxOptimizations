@@ -7,7 +7,6 @@ public final class InventoryClassPreload {
 
     private static final List<String> CLASSES = List.of(
         "net.minecraft.client.gui.ItemSlotMouseAction",
-        "net.fabricmc.fabric.api.client.creativetab.v1.FabricCreativeModeInventoryScreen",
         "net.minecraft.client.gui.screens.inventory.CreativeModeInventoryScreen",
         "net.minecraft.client.gui.screens.recipebook.RecipeBookComponent",
         "net.minecraft.client.gui.screens.recipebook.CraftingRecipeBookComponent",
@@ -24,9 +23,7 @@ public final class InventoryClassPreload {
         "net.minecraft.stats.RecipeBookSettings$1",
         "net.minecraft.client.gui.screens.recipebook.GhostSlots$GhostSlot",
         "net.minecraft.client.renderer.entity.state.ArmedEntityRenderState$1",
-        "net.minecraft.client.model.AnimationUtils",
-        "net.fabricmc.fabric.api.client.rendering.v1.LivingEntityFeatureRenderEvents",
-        "net.fabricmc.fabric.api.client.rendering.v1.LivingEntityFeatureRenderEvents$AllowCapeRender"
+        "net.minecraft.client.model.AnimationUtils"
     );
 
     private InventoryClassPreload() {

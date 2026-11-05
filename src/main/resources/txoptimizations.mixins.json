@@ -4,6 +4,11 @@
   "plugin": "com.teslicek.txoptimizations.TxOptimizationsMixinPlugin",
   "compatibilityLevel": "JAVA_25",
   "client": [
+    "ClientLevelCushionTrackingMixin",
+    "ClientPacketListenerProfileCommandsMixin",
+    "MinecraftClientTickMixin",
+    "MinecraftModResourcesMixin",
+    "OptionsFpsKeyMixin",
     "AbstractSelectionListAppendMixin",
     "UtilPairMemoizeMixin",
     "BlocksParallelCacheMixin",
@@ -17,7 +22,6 @@
     "RenderTypeGroupParallelMixin",
     "StagedVertexBufferListAccessor",
     "TextureManagerParallelMixin",
-    "compat.FabricLevelRenderContextMixin",
     "LevelExtractorFrameMillisMixin",
     "LevelRendererFrameMillisMixin",
     "MainStartupBackgroundMixin",
@@ -455,10 +459,8 @@
     "hud.GuiRendererHudFlushMixin",
     "hud.GuiRenderStateHudCacheMixin",
     "hud.HudCacheMixin",
-    "hud.HudElementRegistryAccessor",
     "hud.MappableRingBufferHudCacheMixin",
     "hud.MinecraftHudCacheMixin",
-    "hud.RootLayerHudCacheMixin",
     "hud.TimerHudCacheMixin"
   ],
   "injectors": {

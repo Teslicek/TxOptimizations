@@ -12,16 +12,14 @@ import com.teslicek.txoptimizations.bake.ChunkTasks;
 import com.teslicek.txoptimizations.bake.Cushions;
 import com.teslicek.txoptimizations.bake.SectionTasks;
 import java.util.Map;
-import net.fabricmc.fabric.api.client.renderer.v1.Renderer;
-import net.fabricmc.fabric.api.client.renderer.v1.mesh.QuadEmitter;
-import net.fabricmc.fabric.api.client.renderer.v1.render.AltModelBlockRenderer;
 import net.minecraft.client.color.block.BlockColors;
 import net.minecraft.client.renderer.SectionBufferBuilderPack;
+import net.minecraft.client.renderer.block.BlockQuadOutput;
+import net.minecraft.client.renderer.block.ModelBlockRenderer;
 import net.minecraft.client.renderer.block.dispatch.BlockStateModel;
 import net.minecraft.client.renderer.chunk.ChunkSectionLayer;
 import net.minecraft.client.renderer.chunk.RenderSectionRegion;
 import net.minecraft.client.renderer.chunk.SectionCompiler;
-import net.minecraft.client.renderer.texture.OverlayTexture;
 import net.minecraft.core.SectionPos;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.RenderShape;
@@ -92,10 +90,10 @@ public abstract class SectionCompilerBakeMixin {
         if (!Cushions.hasCushions(section))
             return;
 
-        AltModelBlockRenderer renderer = Renderer.get().altModelBlockRenderer(this.ambientOcclusion, true, this.blockColors);
-        QuadEmitter           emitter  = Renderer.get().quadEmitter(quad -> quad.buffer(OverlayTexture.NO_OVERLAY, this.getOrBeginLayer(startedLayers, builders, quad.chunkLayer())));
-        BlockState            air      = Blocks.AIR.defaultBlockState();
+        ModelBlockRenderer renderer = new ModelBlockRenderer(this.ambientOcclusion, true, this.blockColors);
+        BlockQuadOutput    output   = (x, y, z, quad, instance) -> this.getOrBeginLayer(startedLayers, builders, quad.materialInfo().layer()).putBlockBakedQuad(x, y, z, quad, instance);
+        BlockState         air      = Blocks.AIR.defaultBlockState();
 
-        Cushions.forEachMeshed(section, ((SectionTasks) (Object) results).txoptimizations$getSectionTasks(), (pos, model) -> renderer.tesselateBlock(emitter, SectionPos.sectionRelative(pos.getX()), SectionPos.sectionRelative(pos.getY()), SectionPos.sectionRelative(pos.getZ()), region, pos, air, model, air.getSeed(pos)));
+        Cushions.forEachMeshed(section, ((SectionTasks) (Object) results).txoptimizations$getSectionTasks(), (pos, model) -> renderer.tesselateBlock(output, SectionPos.sectionRelative(pos.getX()), SectionPos.sectionRelative(pos.getY()), SectionPos.sectionRelative(pos.getZ()), region, pos, air, model, air.getSeed(pos)));
     }
 }

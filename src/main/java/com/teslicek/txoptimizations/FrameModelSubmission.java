@@ -6,19 +6,16 @@ import java.lang.reflect.Method;
 import java.lang.reflect.Proxy;
 import java.util.Arrays;
 import java.util.List;
-import java.util.function.Function;
-import net.fabricmc.fabric.api.client.renderer.v1.mesh.Mesh;
 import net.minecraft.client.renderer.SubmitNodeCollector;
 import net.minecraft.client.renderer.block.BlockModelRenderState;
 import net.minecraft.client.renderer.block.dispatch.BlockStateModelPart;
-import net.minecraft.client.renderer.chunk.ChunkSectionLayer;
 import net.minecraft.client.renderer.rendertype.RenderType;
 import net.minecraft.util.LightCoordsUtil;
 import org.joml.Matrix4f;
 
-public record FrameModelSubmission(Function<ChunkSectionLayer, RenderType> renderTypes, boolean translucent, List<BlockStateModelPart> parts, Mesh mesh, int[] tints, int blockLightCoords) {
+public record FrameModelSubmission(RenderType renderType, List<BlockStateModelPart> parts, int[] tints, int blockLightCoords) {
 
-    private static final int SUBMIT_ARGUMENTS = 9;
+    private static final int SUBMIT_ARGUMENTS = 7;
     private static final int FIRST_LIGHT      = LightCoordsUtil.pack(3, 11);
     private static final int SECOND_LIGHT     = LightCoordsUtil.pack(14, 2);
     private static final int FIRST_OVERLAY    = 0x000A0003;
@@ -27,7 +24,7 @@ public record FrameModelSubmission(Function<ChunkSectionLayer, RenderType> rende
     private static final int SECOND_OUTLINE   = 0;
 
     public void submit(PoseStack poseStack, SubmitNodeCollector collector, int lightCoords, int overlayCoords, int outlineColor) {
-        collector.submitBlockModel(poseStack, this.renderTypes, this.translucent, this.parts, this.mesh, this.tints, LightCoordsUtil.max(lightCoords, this.blockLightCoords), overlayCoords, outlineColor);
+        collector.submitBlockModel(poseStack, this.renderType, this.parts, this.tints, LightCoordsUtil.max(lightCoords, this.blockLightCoords), overlayCoords, outlineColor);
     }
 
     public static FrameModelSubmission capture(BlockModelRenderState state) {
@@ -40,7 +37,7 @@ public record FrameModelSubmission(Function<ChunkSectionLayer, RenderType> rende
         if (!first.passes(state, FIRST_LIGHT, FIRST_OVERLAY, FIRST_OUTLINE) || !second.passes(state, SECOND_LIGHT, SECOND_OVERLAY, SECOND_OUTLINE))
             return null;
 
-        return new FrameModelSubmission(first.renderTypes, first.translucent, first.parts, first.mesh, first.tints, state.blockLightCoords);
+        return new FrameModelSubmission(first.renderType, first.parts, first.tints, state.blockLightCoords);
     }
 
     private static Call record(BlockModelRenderState state, int lightCoords, int overlayCoords, int outlineColor) {
@@ -52,18 +49,10 @@ public record FrameModelSubmission(Function<ChunkSectionLayer, RenderType> rende
         return recorder.single();
     }
 
-    private record Call(Function<ChunkSectionLayer, RenderType> renderTypes, boolean translucent, List<BlockStateModelPart> parts, Mesh mesh, int[] tints, int lightCoords, int overlayCoords, int outlineColor) {
+    private record Call(RenderType renderType, List<BlockStateModelPart> parts, int[] tints, int lightCoords, int overlayCoords, int outlineColor) {
 
         private boolean sameAs(Call other) {
-            if (this.translucent != other.translucent || !this.parts.equals(other.parts) || !Arrays.equals(this.tints, other.tints))
-                return false;
-
-            for (ChunkSectionLayer layer : ChunkSectionLayer.values()) {
-                if (this.renderTypes.apply(layer) != other.renderTypes.apply(layer))
-                    return false;
-            }
-
-            return true;
+            return this.renderType == other.renderType && this.parts.equals(other.parts) && Arrays.equals(this.tints, other.tints);
         }
 
         private boolean passes(BlockModelRenderState state, int lightCoords, int overlayCoords, int outlineColor) {
@@ -91,10 +80,10 @@ public record FrameModelSubmission(Function<ChunkSectionLayer, RenderType> rende
             if (!method.getName().equals("submitBlockModel") || args == null || args.length != SUBMIT_ARGUMENTS || args[0] != this.poseStack || !this.poseStack.last().pose().equals(this.pose))
                 return null;
 
-            if (args[1] == null || args[4] == null)
+            if (args[1] == null)
                 return null;
 
-            this.call = new Call((Function<ChunkSectionLayer, RenderType>) args[1], (Boolean) args[2], (List<BlockStateModelPart>) args[3], (Mesh) args[4], (int[]) args[5], (Integer) args[6], (Integer) args[7], (Integer) args[8]);
+            this.call = new Call((RenderType) args[1], (List<BlockStateModelPart>) args[2], (int[]) args[3], (Integer) args[4], (Integer) args[5], (Integer) args[6]);
 
             return null;
         }

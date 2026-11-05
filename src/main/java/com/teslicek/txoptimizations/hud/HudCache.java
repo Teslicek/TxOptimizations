@@ -22,10 +22,12 @@ import net.minecraft.client.renderer.state.gui.ScreenArea;
 import net.minecraft.client.renderer.state.gui.pip.PictureInPictureRenderState;
 import net.minecraft.resources.Identifier;
 import org.joml.Matrix3x2f;
+import org.jspecify.annotations.Nullable;
 
 public final class HudCache {
 
-    public static final int PASSES = 3;
+    public static final int           PASSES  = 3;
+    public static final HudLayerTimer SKIPPED = new HudLayerTimer(false);
 
     private static final int   MAX_FPS        = 60;
     private static final int   SCREEN_MAX_FPS = 20;
@@ -81,6 +83,25 @@ public final class HudCache {
             LAYERS.put(id, layer);
             ORDER.add(layer);
         }
+    }
+
+    public static @Nullable HudLayerTimer beginLayer(Identifier id) {
+        if (!isRendering())
+            return null;
+
+        HudLayerTimer layer = layer(id);
+
+        if (!layer.shouldRender(pass))
+            return SKIPPED;
+
+        begin(layer);
+
+        return layer;
+    }
+
+    public static void endLayer(@Nullable HudLayerTimer layer) {
+        if (layer != null)
+            end(layer);
     }
 
     public static void begin(HudLayerTimer layer) {

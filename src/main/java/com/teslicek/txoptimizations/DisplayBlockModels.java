@@ -61,6 +61,6 @@ public final class DisplayBlockModels {
             preparing = false;
         }
 
-        return ((BlockModelCopy) state).txoptimizations$hasAttachedData() ? NOT_PLAIN : state;
+        return state;
     }
 }

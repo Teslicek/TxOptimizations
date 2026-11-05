@@ -5,8 +5,6 @@ import com.teslicek.txoptimizations.ItemBoundsCache;
 import com.teslicek.txoptimizations.ItemCullingBounds;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
-import net.fabricmc.fabric.api.client.renderer.v1.mesh.MutableMesh;
-import net.fabricmc.fabric.impl.client.renderer.LayerRenderStateExtension;
 import net.minecraft.client.renderer.item.ItemStackRenderState;
 import net.minecraft.client.resources.model.cuboid.ItemTransform;
 import net.minecraft.world.item.ItemDisplayContext;
@@ -54,7 +52,7 @@ public abstract class ItemStackRenderStateBoundsMixin implements ItemCullingBoun
         if (this.cachedModelBoundingBox != null)
             return this.cachedModelBoundingBox;
 
-        this.cachedModelBoundingBox = this.activeLayerCount == 1 && txoptimizations$hasNoMeshQuads(this.layers[0]) ? this.txoptimizations$cachedBounds((ItemLayerRenderStateAccessor) this.layers[0]) : this.txoptimizations$computeBounds();
+        this.cachedModelBoundingBox = this.activeLayerCount == 1 ? this.txoptimizations$cachedBounds((ItemLayerRenderStateAccessor) this.layers[0]) : this.txoptimizations$computeBounds();
 
         return this.cachedModelBoundingBox;
     }
@@ -85,7 +83,7 @@ public abstract class ItemStackRenderStateBoundsMixin implements ItemCullingBoun
         for (int index = 0; index < this.activeLayerCount; index ++) {
             ItemLayerRenderStateAccessor layer = (ItemLayerRenderStateAccessor) this.layers[index];
 
-            if (layer.txoptimizations$extents().get().length == 0 || !txoptimizations$hasNoMeshQuads(this.layers[index]) || layer.txoptimizations$specialRenderer() != null && !DisplayCulling.isVanilla(layer.txoptimizations$specialRenderer()))
+            if (layer.txoptimizations$extents().get().length == 0 || layer.txoptimizations$specialRenderer() != null && !DisplayCulling.isVanilla(layer.txoptimizations$specialRenderer()))
                 return false;
         }
 
@@ -120,12 +118,5 @@ public abstract class ItemStackRenderStateBoundsMixin implements ItemCullingBoun
         this.visitExtents(collector::include);
 
         return collector.isDefined() ? collector.build() : AABB.ofSize(Vec3.ZERO, 0.0, 0.0, 0.0);
-    }
-
-    @Unique
-    private static boolean txoptimizations$hasNoMeshQuads(ItemStackRenderState.LayerRenderState layer) {
-        MutableMesh mesh = ((LayerRenderStateExtension) layer).fabric_getMutableMesh();
-
-        return mesh == null || mesh.size() == 0;
     }
 }

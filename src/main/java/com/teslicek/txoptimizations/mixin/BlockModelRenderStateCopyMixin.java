@@ -3,13 +3,9 @@ package com.teslicek.txoptimizations.mixin;
 import com.teslicek.txoptimizations.BlockModelCopy;
 import it.unimi.dsi.fastutil.ints.IntList;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
-import java.lang.invoke.MethodHandles;
-import java.lang.invoke.VarHandle;
-import java.lang.reflect.Field;
 import java.lang.reflect.Modifier;
 import java.util.Arrays;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
 import net.minecraft.client.renderer.block.BlockModelRenderState;
 import net.minecraft.client.renderer.block.dispatch.BlockStateModelPart;
@@ -25,13 +21,7 @@ import org.spongepowered.asm.mixin.Unique;
 public abstract class BlockModelRenderStateCopyMixin implements BlockModelCopy {
 
     @Unique
-    private static final Set<String> KNOWN_FIELDS = Set.of("modelParts", "transformation", "renderType", "specialRenderer", "specialRendererTransformation", "tintLayers", "blockLightCoords", "randomSource", "mesh", "renderStateData");
-
-    @Unique
-    private static final @Nullable VarHandle MESH = txoptimizations$field("mesh");
-
-    @Unique
-    private static final @Nullable VarHandle DATA = txoptimizations$field("renderStateData");
+    private static final Set<String> KNOWN_FIELDS = Set.of("modelParts", "transformation", "renderType", "specialRenderer", "specialRendererTransformation", "tintLayers", "blockLightCoords", "randomSource");
 
     @Unique
     private static final boolean COPYABLE = txoptimizations$knownFieldsOnly();
@@ -69,11 +59,6 @@ public abstract class BlockModelRenderStateCopyMixin implements BlockModelCopy {
     }
 
     @Override
-    public boolean txoptimizations$hasAttachedData() {
-        return DATA != null && DATA.get((BlockModelRenderState) (Object) this) instanceof Map<?, ?> data && !data.isEmpty();
-    }
-
-    @Override
     public void txoptimizations$copyFrom(BlockModelRenderState prepared) {
         BlockModelRenderStateCopyMixin source = (BlockModelRenderStateCopyMixin) (Object) prepared;
 
@@ -81,9 +66,6 @@ public abstract class BlockModelRenderStateCopyMixin implements BlockModelCopy {
 
         if (source.modelParts != null)
             this.modelParts = new ObjectArrayList<>(source.modelParts);
-
-        if (MESH != null)
-            MESH.set((BlockModelRenderState) (Object) this, MESH.get(prepared));
 
         this.transformation                = source.transformation;
         this.renderType                    = source.renderType;
@@ -93,20 +75,6 @@ public abstract class BlockModelRenderStateCopyMixin implements BlockModelCopy {
 
         if (source.tintLayers != null && !source.tintLayers.isEmpty())
             this.tintLayers().addAll(source.tintLayers);
-    }
-
-    @Unique
-    private static @Nullable VarHandle txoptimizations$field(String name) {
-        Field field = Arrays.stream(BlockModelRenderState.class.getDeclaredFields()).filter(candidate -> candidate.getName().equals(name)).findFirst().orElse(null);
-
-        if (field == null)
-            return null;
-
-        try {
-            return MethodHandles.privateLookupIn(BlockModelRenderState.class, MethodHandles.lookup()).unreflectVarHandle(field);
-        } catch (IllegalAccessException exception) {
-            throw new IllegalStateException("Cannot access " + name + " of block model render states", exception);
-        }
     }
 
     @Unique
