@@ -21,6 +21,7 @@ import java.util.Optional;
 import java.util.OptionalDouble;
 import java.util.function.Supplier;
 import org.joml.Vector4fc;
+import org.jspecify.annotations.Nullable;
 import org.lwjgl.system.MemoryStack;
 import org.lwjgl.vulkan.KHRDynamicRendering;
 import org.lwjgl.vulkan.VK10;
@@ -176,6 +177,7 @@ public abstract class VulkanCommandEncoderDeferralMixin {
         VkCommandBuffer  commandBuffer = this.currentCommandBuffer;
         Supplier<String> previousLabel = this.txoptimizations$suspendedPass.getLabel();
         VulkanDebug      debug         = this.device.instance().debug();
+        GpuTextureView   output        = txoptimizations$outputView(descriptor);
 
         debug.endDebugGroup(commandBuffer);
         this.checkpointStorage.recordCheckpoint(commandBuffer, CheckpointExtension.CheckpointType.END_RENDER_PASS, previousLabel);
@@ -185,7 +187,7 @@ public abstract class VulkanCommandEncoderDeferralMixin {
         this.txoptimizations$suspendedPass       = null;
         this.txoptimizations$suspendedDescriptor = null;
         this.txoptimizations$openDescriptor      = descriptor;
-        this.currentRenderPass                   = new VulkanRenderPass(this.device, (VulkanCommandEncoder) (Object) this, commandBuffer, this.checkpointStorage, descriptor.renderArea(), txoptimizations$outputWidth(descriptor), txoptimizations$outputHeight(descriptor), descriptor.depthAttachment() != null, descriptor.label());
+        this.currentRenderPass                   = new VulkanRenderPass(this.device, (VulkanCommandEncoder) (Object) this, commandBuffer, this.checkpointStorage, descriptor.renderArea(), output == null ? 0 : output.getWidth(0), output == null ? 0 : output.getHeight(0), descriptor.depthAttachment() != null, descriptor.label());
 
         if (this.txoptimizations$clearDepthTexture != null)
             this.txoptimizations$clearDepthInPass(commandBuffer, descriptor.renderArea());
@@ -482,33 +484,18 @@ public abstract class VulkanCommandEncoderDeferralMixin {
     }
 
     @Unique
-    private static int txoptimizations$outputWidth(RenderPassDescriptor descriptor) {
-        int width = 0;
+    private static @Nullable GpuTextureView txoptimizations$outputView(RenderPassDescriptor descriptor) {
+        GpuTextureView view = null;
 
         for (RenderPassDescriptor.Attachment<Optional<Vector4fc>> color : descriptor.colorAttachments()) {
             if (color != null)
-                width = color.textureView().getWidth(0);
+                view = color.textureView();
         }
 
         if (descriptor.colorAttachments().isEmpty() && descriptor.depthAttachment() != null)
-            width = descriptor.depthAttachment().textureView().getWidth(0);
+            view = descriptor.depthAttachment().textureView();
 
-        return width;
-    }
-
-    @Unique
-    private static int txoptimizations$outputHeight(RenderPassDescriptor descriptor) {
-        int height = 0;
-
-        for (RenderPassDescriptor.Attachment<Optional<Vector4fc>> color : descriptor.colorAttachments()) {
-            if (color != null)
-                height = color.textureView().getHeight(0);
-        }
-
-        if (descriptor.colorAttachments().isEmpty() && descriptor.depthAttachment() != null)
-            height = descriptor.depthAttachment().textureView().getHeight(0);
-
-        return height;
+        return view;
     }
 
     @Unique
