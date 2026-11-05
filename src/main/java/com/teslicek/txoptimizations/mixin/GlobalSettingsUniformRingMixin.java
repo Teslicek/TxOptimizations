@@ -3,8 +3,6 @@ package com.teslicek.txoptimizations.mixin;
 import com.mojang.blaze3d.buffers.Std140Builder;
 import com.mojang.blaze3d.systems.RenderSystem;
 import com.mojang.renderpearl.api.buffers.GpuBuffer;
-import com.mojang.renderpearl.api.buffers.GpuBufferSlice;
-import com.mojang.renderpearl.backend.vulkan.VulkanGpuBuffer;
 import com.teslicek.txoptimizations.PersistentRingBuffer;
 import java.nio.ByteBuffer;
 import net.minecraft.client.renderer.GlobalSettingsUniform;
@@ -34,13 +32,7 @@ public abstract class GlobalSettingsUniformRingMixin {
 
         GpuBuffer target = this.txoptimizations$ring.currentBuffer();
 
-        if (target instanceof VulkanGpuBuffer.Direct) {
-            txoptimizations$write(((PersistentRingBuffer) this.txoptimizations$ring).txoptimizations$mapCurrent().clear(), width, height, glintAlpha, gameTime, worldPartialTicks, menuBlurRadius, cameraPos, useRgss, cameraX, cameraY, cameraZ);
-        } else {
-            try (GpuBufferSlice.MappedView view = target.map(false, true)) {
-                txoptimizations$write(view.data(), width, height, glintAlpha, gameTime, worldPartialTicks, menuBlurRadius, cameraPos, useRgss, cameraX, cameraY, cameraZ);
-            }
-        }
+        txoptimizations$write(((PersistentRingBuffer) this.txoptimizations$ring).txoptimizations$mapCurrent().clear(), width, height, glintAlpha, gameTime, worldPartialTicks, menuBlurRadius, cameraPos, useRgss, cameraX, cameraY, cameraZ);
 
         RenderSystem.setGlobalSettingsUniform(target);
     }

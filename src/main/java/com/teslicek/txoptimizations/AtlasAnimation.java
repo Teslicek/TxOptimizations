@@ -18,7 +18,6 @@ import com.mojang.renderpearl.api.textures.FilterMode;
 import com.mojang.renderpearl.api.textures.GpuSampler;
 import com.mojang.renderpearl.api.textures.GpuTexture;
 import com.mojang.renderpearl.api.textures.GpuTextureView;
-import com.mojang.renderpearl.backend.vulkan.VulkanGpuBuffer;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.List;
@@ -124,13 +123,7 @@ public final class AtlasAnimation implements AutoCloseable {
 
         GpuBuffer target = this.uniforms.currentBuffer();
 
-        if (target instanceof VulkanGpuBuffer.Direct) {
-            pending.copyTo(((PersistentRingBuffer) this.uniforms).txoptimizations$mapCurrent());
-        } else {
-            try (GpuBufferSlice.MappedView view = target.map(false, true)) {
-                pending.copyTo(view.data());
-            }
-        }
+        pending.copyTo(((PersistentRingBuffer) this.uniforms).txoptimizations$mapCurrent());
 
         for (int chunk = 0; chunk < pending.chunks; chunk ++)
             this.chunkSlices[chunk] = target.slice(pending.chunkOffsets[chunk], pending.chunkBytes[chunk]);

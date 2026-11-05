@@ -107,7 +107,6 @@
     "FrustumBoxTestMixin",
     "GizmoLineIdentityPoseMixin",
     "GizmoPointsPackedMixin",
-    "GlSurfaceDiscardMixin",
     "GizmosAccessor",
     "GizmosCollectorCacheMixin",
     "GizmosTemporaryCollectionCacheMixin",

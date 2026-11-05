@@ -12,6 +12,7 @@ import com.mojang.renderpearl.api.device.GpuDevice;
 import com.mojang.renderpearl.api.device.GpuSurface;
 import com.mojang.renderpearl.api.device.SurfaceException;
 import com.mojang.renderpearl.api.textures.GpuTextureView;
+import com.mojang.renderpearl.backend.vulkan.VulkanBackend;
 import com.teslicek.txoptimizations.AcquiredImageDiscard;
 import com.teslicek.txoptimizations.AnimationUploads;
 import com.teslicek.txoptimizations.AtlasFeatures;
@@ -34,7 +35,6 @@ import java.util.concurrent.locks.LockSupport;
 import net.minecraft.client.GameLoadCookie;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.Options;
-import net.minecraft.client.PreferredGraphicsApi;
 import net.minecraft.client.gui.Gui;
 import net.minecraft.client.gui.font.FontManager;
 import net.minecraft.client.gui.screens.LevelLoadingScreen;
@@ -471,7 +471,7 @@ public abstract class MinecraftMixin {
 
     @ModifyExpressionValue(method = "<init>(Lnet/minecraft/client/main/GameConfig;)V", at = @At(value = "INVOKE", target = "Lnet/minecraft/client/PreferredGraphicsApi;getBackendsToTry()[Lcom/mojang/renderpearl/api/device/GpuBackend;"), require = 1)
     private GpuBackend[] txoptimizations$forceVulkan(GpuBackend[] backends) {
-        return PreferredGraphicsApi.VULKAN.getBackendsToTry();
+        return new GpuBackend[] {new VulkanBackend()};
     }
 
     @Inject(method = "<init>", at = @At("RETURN"))

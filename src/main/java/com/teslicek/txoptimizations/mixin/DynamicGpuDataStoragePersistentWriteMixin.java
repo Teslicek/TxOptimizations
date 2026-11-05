@@ -2,7 +2,6 @@ package com.teslicek.txoptimizations.mixin;
 
 import com.mojang.renderpearl.api.buffers.GpuBuffer;
 import com.mojang.renderpearl.api.buffers.GpuBufferSlice;
-import com.mojang.renderpearl.backend.vulkan.VulkanGpuBuffer;
 import com.teslicek.txoptimizations.LastWrittenData;
 import com.teslicek.txoptimizations.NativeWrites;
 import com.teslicek.txoptimizations.PersistentRingBuffer;
@@ -103,16 +102,10 @@ public abstract class DynamicGpuDataStoragePersistentWriteMixin<T extends Dynami
         int       offset = this.nextBlock * this.blockSize;
         GpuBuffer buffer = this.ringBuffer.currentBuffer();
 
-        if (buffer instanceof VulkanGpuBuffer.Direct) {
-            ByteBuffer data = ((PersistentRingBuffer) this.ringBuffer).txoptimizations$mapCurrent();
+        ByteBuffer data = ((PersistentRingBuffer) this.ringBuffer).txoptimizations$mapCurrent();
 
-            data.limit(offset + this.blockSize).position(offset);
-            gpuData.write(data);
-        } else {
-            try (GpuBufferSlice.MappedView view = buffer.slice(offset, this.blockSize).map(false, true)) {
-                gpuData.write(view.data());
-            }
-        }
+        data.limit(offset + this.blockSize).position(offset);
+        gpuData.write(data);
 
         GpuBufferSlice slice = this.txoptimizations$blockSlice(buffer, this.nextBlock);
 
@@ -199,7 +192,7 @@ public abstract class DynamicGpuDataStoragePersistentWriteMixin<T extends Dynami
                 free = slot;
         }
 
-        this.txoptimizations$write(buffer, offset, bytes, writer);
+        writer.accept(NativeWrites.at(((PersistentRingBuffer) this.ringBuffer).txoptimizations$mapCurrent(), offset, bytes));
 
         if (free == -1) {
             this.txoptimizations$forgetHeldDraws();
@@ -264,18 +257,5 @@ public abstract class DynamicGpuDataStoragePersistentWriteMixin<T extends Dynami
     private void txoptimizations$forgetHeldDraws() {
         if (this.txoptimizations$heldBuffers[0] != null)
             Arrays.fill(this.txoptimizations$heldBuffers, null);
-    }
-
-    @Unique
-    private void txoptimizations$write(GpuBuffer buffer, int offset, int bytes, LongConsumer writer) {
-        if (buffer instanceof VulkanGpuBuffer.Direct) {
-            writer.accept(NativeWrites.at(((PersistentRingBuffer) this.ringBuffer).txoptimizations$mapCurrent(), offset, bytes));
-
-            return;
-        }
-
-        try (GpuBufferSlice.MappedView view = buffer.slice(offset, bytes).map(false, true)) {
-            writer.accept(NativeWrites.at(view.data(), 0, bytes));
-        }
     }
 }

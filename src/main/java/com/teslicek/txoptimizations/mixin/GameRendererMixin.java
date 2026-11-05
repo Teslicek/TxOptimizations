@@ -8,7 +8,6 @@ import com.mojang.renderpearl.api.buffers.GpuBuffer;
 import com.mojang.renderpearl.api.buffers.GpuBufferSlice;
 import com.mojang.renderpearl.api.commands.CommandEncoder;
 import com.mojang.renderpearl.api.textures.GpuTexture;
-import com.mojang.renderpearl.backend.vulkan.VulkanGpuBuffer;
 import com.teslicek.txoptimizations.EmptyHashSet;
 import com.teslicek.txoptimizations.LevelProjection;
 import com.teslicek.txoptimizations.PersistentRingBuffer;
@@ -51,13 +50,7 @@ public abstract class GameRendererMixin {
 
         GpuBuffer target = this.txoptimizations$levelProjection.currentBuffer();
 
-        if (target instanceof VulkanGpuBuffer.Direct) {
-            Std140Builder.intoBuffer(((PersistentRingBuffer) this.txoptimizations$levelProjection).txoptimizations$mapCurrent().clear()).putMat4f(projectionMatrix);
-        } else {
-            try (GpuBufferSlice.MappedView view = target.map(false, true)) {
-                Std140Builder.intoBuffer(view.data()).putMat4f(projectionMatrix);
-            }
-        }
+        Std140Builder.intoBuffer(((PersistentRingBuffer) this.txoptimizations$levelProjection).txoptimizations$mapCurrent().clear()).putMat4f(projectionMatrix);
 
         GpuBufferSlice slice = target.slice(0L, RenderSystem.PROJECTION_MATRIX_UBO_SIZE);
 
