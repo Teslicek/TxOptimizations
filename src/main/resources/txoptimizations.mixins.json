@@ -330,7 +330,7 @@
     "SkyRendererFarPlaneMixin",
     "SoundEngineChannelSpinMixin",
     "SubmitNodeCollectionTextPoseMixin",
-    "SystemReportMissingProcessMixin",
+    "SystemReportBrokenCountersMixin",
     "FeatureRenderDispatcherStateAccessor",
     "GameRendererStateAccessor",
     "GuiRendererStateAccessor",
