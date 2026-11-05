@@ -136,6 +136,11 @@ public abstract class QuadParticleGroupPositionsMixin extends ParticleGroup<Sing
             if (this.txoptimizations$aheadState != this.txoptimizations$frameState())
                 throw new IllegalStateException("Particles were extracted ahead into another frame's render state");
 
+            if (ClientClock.worldChanges() != this.txoptimizations$snapshotWorldChanges) {
+                this.txoptimizations$snapshot();
+                this.txoptimizations$extractVisible(this.txoptimizations$aheadState, frustum, camera, partialTickTime);
+            }
+
             return this.txoptimizations$aheadState;
         }
 

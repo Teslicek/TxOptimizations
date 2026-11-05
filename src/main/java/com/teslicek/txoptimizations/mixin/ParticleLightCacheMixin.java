@@ -63,13 +63,18 @@ public abstract class ParticleLightCacheMixin implements ParticleBaseLight {
 
     @Unique
     private int txoptimizations$baseLight() {
-        int changes = ClientClock.worldChanges();
+        int     changes = ClientClock.worldChanges();
+        boolean warmed  = this.txoptimizations$lightChanges != -1 && this.txoptimizations$lightX == this.x && this.txoptimizations$lightY == this.y && this.txoptimizations$lightZ == this.z;
 
-        if (this.txoptimizations$lightChanges == changes && this.txoptimizations$lightX == this.x && this.txoptimizations$lightY == this.y && this.txoptimizations$lightZ == this.z)
+        if (warmed && this.txoptimizations$lightChanges == changes)
             return this.txoptimizations$light;
 
-        if (!RenderThreadStack.isMain())
-            throw new IllegalStateException("Particle light for " + this + " was not warmed on the main thread before it was read on " + Thread.currentThread().getName());
+        if (!RenderThreadStack.isMain()) {
+            if (!warmed)
+                throw new IllegalStateException("Particle light for " + this + " was not warmed on the main thread before it was read on " + Thread.currentThread().getName());
+
+            return this.txoptimizations$light;
+        }
 
         BlockPos pos = LIGHT_POS.set(this.x, this.y, this.z);
 
