@@ -12,17 +12,12 @@ public final class DepthBounds {
 
     private static final Set<String> FAR_ONLY = Set.of("txoptimizations:pipeline/end_sky_far", "txoptimizations:pipeline/end_flash_far");
 
-    private static boolean enabled;
-
     private DepthBounds() {
     }
 
     public static void deviceCreated(FeatureSet enabledFeatures) {
-        enabled = enabledFeatures.contains(FEATURES);
-    }
-
-    public static boolean enabled() {
-        return enabled;
+        if (!enabledFeatures.contains(FEATURES))
+            throw new IllegalStateException("TxOptimizations needs the Vulkan depthBounds device feature, which this GPU did not enable");
     }
 
     public static boolean farOnly(String pipeline) {

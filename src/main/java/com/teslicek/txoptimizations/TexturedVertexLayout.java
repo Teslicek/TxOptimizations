@@ -42,7 +42,7 @@ public record TexturedVertexLayout(VertexFormat format, int stride, int position
         return new TexturedVertexLayout(format, format.getVertexSize(), offset(format, DefaultVertexFormat.POSITION_SEMANTIC_NAME), offset(format, DefaultVertexFormat.COLOR_SEMANTIC_NAME), offset(format, DefaultVertexFormat.UV0_SEMANTIC_NAME), optionalOffset(format, DefaultVertexFormat.UV2_SEMANTIC_NAME));
     }
 
-    private static int offset(VertexFormat format, String name) {
+    static int offset(VertexFormat format, String name) {
         VertexFormatElement element = format.getElement(name);
 
         if (element == null)

@@ -113,7 +113,6 @@ public final class GpuCubes {
     private static boolean                 reloaded;
     private static @Nullable GpuCubeDraw   pending;
     private static @Nullable PipelineCache checkedCache;
-    private static boolean                 firstInstances;
 
     private GpuCubes() {
     }
@@ -220,7 +219,7 @@ public final class GpuCubes {
     public static @Nullable GpuCubeDraw beginItem(VertexConsumer builder, int overlay) {
         GpuCubeDraw draw = acceptingDraw(builder);
 
-        if (draw == null || !firstInstances || draw.txoptimizations$isSorted())
+        if (draw == null || draw.txoptimizations$isSorted())
             return null;
 
         itemOverlay = overlay;
@@ -491,9 +490,11 @@ public final class GpuCubes {
         if (cache == checkedCache)
             return;
 
-        reloaded       = reloaded || checkedCache != null;
-        checkedCache   = cache;
-        firstInstances = RenderSystem.getDevice().getDeviceInfo().features().nonZeroFirstInstance();
+        if (!RenderSystem.getDevice().getDeviceInfo().features().nonZeroFirstInstance())
+            throw new IllegalStateException("TxOptimizations needs GPU support for a non-zero first instance to draw item quads on the GPU");
+
+        reloaded     = reloaded || checkedCache != null;
+        checkedCache = cache;
         PATCHED.clear();
         markPatched(cache, ENTITY_SHADER);
         markPatched(cache, ITEM_SHADER);

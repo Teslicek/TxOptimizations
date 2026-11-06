@@ -3,7 +3,6 @@ package com.teslicek.txoptimizations;
 import com.mojang.blaze3d.vertex.DefaultVertexFormat;
 import com.mojang.blaze3d.vertex.VertexConsumer;
 import com.mojang.renderpearl.api.vertex.VertexFormat;
-import com.mojang.renderpearl.api.vertex.VertexFormatElement;
 import org.joml.Matrix3x2fc;
 import org.lwjgl.system.MemoryUtil;
 
@@ -12,7 +11,7 @@ public final class GuiQuads {
     private static final int          VERTICES       = 4;
     private static final VertexFormat COLORED        = DefaultVertexFormat.POSITION_COLOR;
     private static final int          COLORED_STRIDE = COLORED.getVertexSize();
-    private static final int          COLORED_COLOR  = offset(COLORED, DefaultVertexFormat.COLOR_SEMANTIC_NAME);
+    private static final int          COLORED_COLOR  = TexturedVertexLayout.offset(COLORED, DefaultVertexFormat.COLOR_SEMANTIC_NAME);
 
     private GuiQuads() {
     }
@@ -65,14 +64,5 @@ public final class GuiQuads {
 
     private static float y(Matrix3x2fc pose, float x, float y) {
         return pose.m01() * x + pose.m11() * y + pose.m21();
-    }
-
-    private static int offset(VertexFormat format, String name) {
-        VertexFormatElement element = format.getElement(name);
-
-        if (element == null)
-            throw new IllegalStateException("Vertex format " + format + " has no " + name + " element");
-
-        return element.offset();
     }
 }

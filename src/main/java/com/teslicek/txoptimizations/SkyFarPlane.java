@@ -109,10 +109,7 @@ public final class SkyFarPlane {
         if (improvedTransparency)
             return false;
 
-        if (state.skybox == DimensionType.Skybox.END)
-            return DepthBounds.enabled();
-
-        return state.skybox == DimensionType.Skybox.OVERWORLD && PATCHED.size() == SHADERS.size();
+        return state.skybox == DimensionType.Skybox.END || state.skybox == DimensionType.Skybox.OVERWORLD && PATCHED.size() == SHADERS.size();
     }
 
     public static void defer(SkyRenderer renderer, GpuBufferSlice fog, SkyRenderState state) {

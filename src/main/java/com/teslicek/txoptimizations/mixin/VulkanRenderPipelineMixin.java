@@ -26,9 +26,6 @@ public abstract class VulkanRenderPipelineMixin implements PipelineLayoutKey {
         if (!DepthBounds.farOnly(info.name()))
             return result;
 
-        if (!DepthBounds.enabled())
-            throw new IllegalStateException(info.name() + " needs the depth bounds test, which the device did not enable");
-
         return result.depthBoundsTestEnable(true).minDepthBounds(DepthBounds.FAR).maxDepthBounds(DepthBounds.FAR);
     }
 
