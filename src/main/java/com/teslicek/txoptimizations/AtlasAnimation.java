@@ -29,6 +29,7 @@ import net.minecraft.client.renderer.texture.SpriteContents;
 import net.minecraft.client.renderer.texture.TextureAtlasSprite;
 import net.minecraft.resources.Identifier;
 import net.minecraft.util.Mth;
+import org.jspecify.annotations.Nullable;
 import org.lwjgl.system.MemoryUtil;
 
 public final class AtlasAnimation implements AutoCloseable {
@@ -61,6 +62,7 @@ public final class AtlasAnimation implements AutoCloseable {
     private final GpuBufferSlice[]                   chunkSlices;
     private final List<PendingDraw>                  allocated = new ArrayList<>();
     private final ConcurrentLinkedQueue<PendingDraw> free      = new ConcurrentLinkedQueue<>();
+    private @Nullable PendingDraw                    queued;
 
     private AtlasAnimation(Identifier location, int atlasWidth, int atlasHeight, int levels, FrameSheet[] sheets) {
         int alignment = RenderSystem.getDevice().getDeviceInfo().limits().minUniformOffsetAlignment();
@@ -94,15 +96,23 @@ public final class AtlasAnimation implements AutoCloseable {
         if (mipViews.length != this.levels)
             throw new IllegalStateException("Animated sprites were uploaded for " + this.levels + " mip levels but the atlas has " + mipViews.length);
 
-        int drawn = 0;
+        int     changed = 0;
+        boolean merge   = this.queued != null;
 
         for (int sheet = 0; sheet < this.sheets.length; sheet ++) {
-            this.drawn[sheet] = this.sheets[sheet].drawnSprites();
-            drawn            += this.drawn[sheet];
+            int sheetChanged = this.sheets[sheet].drawnSprites();
+
+            this.drawn[sheet] = merge ? this.sheets[sheet].sprites.length : sheetChanged;
+            changed          += sheetChanged;
         }
 
-        if (drawn == 0)
+        if (changed == 0)
             return;
+
+        if (merge) {
+            this.write(this.queued, true);
+            return;
+        }
 
         PendingDraw pending = this.free.poll();
 
@@ -111,7 +121,8 @@ public final class AtlasAnimation implements AutoCloseable {
             this.allocated.add(pending);
         }
 
-        this.write(pending);
+        this.write(pending, false);
+        this.queued = pending;
         AnimationUploads.add(this, pending, mipViews);
     }
 
@@ -147,7 +158,11 @@ public final class AtlasAnimation implements AutoCloseable {
         this.free.add(pending);
     }
 
-    private void write(PendingDraw pending) {
+    void taken() {
+        this.queued = null;
+    }
+
+    private void write(PendingDraw pending, boolean all) {
         int chunks = 0;
         int offset = 0;
         int end    = 0;
@@ -170,7 +185,7 @@ public final class AtlasAnimation implements AutoCloseable {
                 while (written < count) {
                     AnimatedSprite sprite = sheet.sprites[next ++];
 
-                    if (!sprite.state.needsToDraw())
+                    if (!all && !sprite.state.needsToDraw())
                         continue;
 
                     sprite.write(address + HEADER_BYTES + (long) written * SPRITE_BYTES);

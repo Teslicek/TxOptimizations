@@ -26,6 +26,9 @@ public final class AnimationUploads {
 
         pending = new ArrayList<>();
 
+        for (Upload upload : frame)
+            upload.animation.taken();
+
         return frame;
     }
 
@@ -39,6 +42,7 @@ public final class AnimationUploads {
             throw new IllegalStateException("Animation uploads were dropped on the render worker");
 
         pending.removeIf(upload -> upload.animation == animation);
+        animation.taken();
     }
 
     public record Upload(AtlasAnimation animation, AtlasAnimation.PendingDraw draw, GpuTextureView[] mipViews) {
