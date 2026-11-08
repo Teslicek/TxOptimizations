@@ -3,6 +3,8 @@ package com.teslicek.txoptimizations.mixin;
 import com.llamalad7.mixinextras.injector.wrapmethod.WrapMethod;
 import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
 import com.teslicek.txoptimizations.ParallelFeatures;
+import com.teslicek.txoptimizations.RenderThreadStack;
+import com.teslicek.txoptimizations.RenderWorker;
 import com.teslicek.txoptimizations.TextureManagerVersion;
 import com.teslicek.txoptimizations.WorkerTextureLoads;
 import java.util.Map;
@@ -30,13 +32,20 @@ public abstract class TextureManagerMixin implements TextureManagerVersion {
             return original.call(location);
 
         try {
-            if (!ParallelFeatures.isWorkerThread() || this.byPath.containsKey(location))
-                return original.call(location);
+            boolean loaded = this.byPath.containsKey(location);
 
-            return WorkerTextureLoads.await((TextureManager) (Object) this, location);
+            if (!loaded && ParallelFeatures.isWorkerThread())
+                return WorkerTextureLoads.await((TextureManager) (Object) this, location);
+
+            if (loaded || !RenderThreadStack.isMain())
+                return original.call(location);
         } finally {
             ParallelFeatures.unlock();
         }
+
+        RenderWorker.awaitFromMain();
+
+        return original.call(location);
     }
 
     @Unique
