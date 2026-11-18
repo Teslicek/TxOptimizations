@@ -171,6 +171,16 @@ public final class GpuCubes {
         return draw;
     }
 
+    public static @Nullable GpuCubeDraw modelDraw(VertexConsumer builder) {
+        GpuCubeDraw draw = acceptingDraw(builder);
+
+        return draw == null || draw.txoptimizations$isSorted() || draw.txoptimizations$skin() != null ? null : draw;
+    }
+
+    public static int rawVertices(GpuCubeDraw draw, VertexConsumer builder) {
+        return draw.txoptimizations$rawVertices() + ((DirectVertexBuffer) builder).txoptimizations$vertexCount();
+    }
+
     public static boolean add(GpuCubeDraw draw, GpuCube cube, VertexConsumer builder, int hiddenFaces) {
         int shape = cube.txoptimizations$gpuIndex();
 
@@ -209,6 +219,15 @@ public final class GpuCubes {
         }
 
         return true;
+    }
+
+    public static void addShapes(GpuCubeDraw draw, int[] shapes, VertexConsumer builder) {
+        GpuCubeBatch batch = draw.txoptimizations$batch();
+
+        partSlot        = batch.pose(partPose, partLight, partOverlay, partColor);
+        partFirstRef    = batch.addRefs(shapes, partSlot);
+        partRefs        = shapes.length;
+        partRawVertices = draw.txoptimizations$rawVertices() + ((DirectVertexBuffer) builder).txoptimizations$vertexCount();
     }
 
     public static void endPart(GpuCubeDraw draw) {

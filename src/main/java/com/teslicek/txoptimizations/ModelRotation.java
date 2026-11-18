@@ -49,6 +49,26 @@ public final class ModelRotation {
         child.trustedNormals = parent.trustedNormals;
     }
 
+    public static float[] newRotation() {
+        return new float[ROTATION_VALUES];
+    }
+
+    public static void fill(float[] rotation, float angleZ, float angleY, float angleX) {
+        fillRotation(rotation, 0, angleZ, angleY, angleX);
+    }
+
+    public static void translateRotate(PoseStack.Pose child, PoseStack.Pose parent, float x, float y, float z, float[] rotation) {
+        Matrix4f matrix     = parent.pose();
+        int      properties = matrix.properties();
+
+        if ((properties & Matrix4fc.PROPERTY_IDENTITY) != 0)
+            apply(child, parent, x, y, z, matrix.m33(), TRANSLATION_PROPERTIES, rotation, 0);
+        else
+            apply(child, parent, Math.fma(matrix.m00(), x, Math.fma(matrix.m10(), y, Math.fma(matrix.m20(), z, matrix.m30()))), Math.fma(matrix.m01(), x, Math.fma(matrix.m11(), y, Math.fma(matrix.m21(), z, matrix.m31()))), Math.fma(matrix.m02(), x, Math.fma(matrix.m12(), y, Math.fma(matrix.m22(), z, matrix.m32()))), Math.fma(matrix.m03(), x, Math.fma(matrix.m13(), y, Math.fma(matrix.m23(), z, matrix.m33()))), properties & TRANSLATED_PROPERTIES, rotation, 0);
+
+        child.trustedNormals = parent.trustedNormals;
+    }
+
     private static void rotateZYX(PoseStack.Pose target, PoseStack.Pose source, float m30, float m31, float m32, float m33, int properties, float angleZ, float angleY, float angleX) {
         float[] rotation;
         int     base;
@@ -62,6 +82,10 @@ public final class ModelRotation {
             fillRotation(rotation, base, angleZ, angleY, angleX);
         }
 
+        apply(target, source, m30, m31, m32, m33, properties, rotation, base);
+    }
+
+    private static void apply(PoseStack.Pose target, PoseStack.Pose source, float m30, float m31, float m32, float m33, int properties, float[] rotation, int base) {
         float rm00 = rotation[base];
         float rm01 = rotation[base + 1];
         float rm02 = rotation[base + 2];

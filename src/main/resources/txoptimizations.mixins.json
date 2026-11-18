@@ -1,6 +1,7 @@
 {
   "required": true,
   "package": "com.teslicek.txoptimizations.mixin",
+  "plugin": "com.teslicek.txoptimizations.TxOptimizationsMixinPlugin",
   "compatibilityLevel": "JAVA_25",
   "client": [
     "ClientLevelCushionTrackingMixin",
@@ -168,6 +169,8 @@
     "VulkanDeviceMixin",
     "VulkanRenderPipelineMixin",
     "ModelEarlyMixin",
+    "ModelFeatureRendererPoseMixin",
+    "SimpleFeaturePhasePipelineOrderMixin",
     "ParticleCollisionScanMixin",
     "ItemModelResolverLookupMixin",
     "ItemModelSlotMixin",
@@ -213,6 +216,7 @@
     "SectionRenderDispatcherRenderSectionMixin",
     "ClientChunkStorageNeighborsMixin",
     "RenderSetupTextureCacheMixin",
+    "RenderSetupTransformAccessor",
     "RenderPipelineFormatArrayMixin",
     "RenderPipelineGpuCubesMixin",
     "EnvironmentAttributeSamplerLayersMixin",

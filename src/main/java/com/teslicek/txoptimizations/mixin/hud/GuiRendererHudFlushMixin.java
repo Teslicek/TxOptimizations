@@ -1,7 +1,11 @@
 package com.teslicek.txoptimizations.mixin.hud;
 
+import com.llamalad7.mixinextras.injector.ModifyExpressionValue;
 import com.mojang.blaze3d.systems.RenderSystem;
+import com.mojang.renderpearl.api.pipeline.RenderPipeline;
+import com.teslicek.txoptimizations.hud.HudCache;
 import com.teslicek.txoptimizations.hud.HudCacheRenderer;
+import com.teslicek.txoptimizations.hud.HudShaderOverrides;
 import com.teslicek.txoptimizations.mixin.GuiRendererStateAccessor;
 import java.util.List;
 import net.minecraft.client.gui.render.GuiRenderer;
@@ -13,6 +17,7 @@ import net.minecraft.util.profiling.ProfilerFiller;
 import org.spongepowered.asm.mixin.Final;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
+import org.spongepowered.asm.mixin.injection.At;
 
 @Mixin(GuiRenderer.class)
 public abstract class GuiRendererHudFlushMixin implements HudCacheRenderer {
@@ -49,6 +54,14 @@ public abstract class GuiRendererHudFlushMixin implements HudCacheRenderer {
     @Shadow
     private void clearUnusedOversizedItemRenderers() {
         throw new AssertionError();
+    }
+
+    @ModifyExpressionValue(method = "executeDraw", at = @At(value = "INVOKE", target = "Lnet/minecraft/client/gui/render/GuiRenderer$Draw;pipeline()Lcom/mojang/renderpearl/api/pipeline/RenderPipeline;"))
+    private RenderPipeline txoptimizations$checkMovedHud(RenderPipeline pipeline) {
+        if (HudCache.isFlushing())
+            HudShaderOverrides.check(pipeline);
+
+        return pipeline;
     }
 
     @Override

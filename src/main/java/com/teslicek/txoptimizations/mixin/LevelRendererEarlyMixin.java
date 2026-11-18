@@ -153,6 +153,8 @@ public abstract class LevelRendererEarlyMixin implements VisibleSectionBinding {
         DynamicGpuData      dynamicUniforms    = RenderSystem.getDynamicUniforms();
         GpuBufferSlice[]    commandBuffers     = ((SectionDrawUniforms) dynamicUniforms).txoptimizations$writeSectionCommands(draws);
         ChunkSectionLayer[] layers             = SectionLayers.VALUES;
+
+
         int                 index              = 0;
 
         EnumMap<ChunkSectionLayer, List<ChunkSectionsToRender.GpuMultiDrawIndexedIndirect>> indirectDraws = new EnumMap<>(ChunkSectionLayer.class);

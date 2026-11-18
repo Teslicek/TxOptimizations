@@ -17,6 +17,7 @@ import java.util.Collection;
 import java.util.HashSet;
 import net.minecraft.client.DeltaTracker;
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.components.BossHealthOverlay;
 import net.minecraft.client.renderer.GameRenderer;
 import net.minecraft.client.renderer.LevelRenderer;
 import net.minecraft.client.renderer.MappableRingBuffer;
@@ -95,9 +96,21 @@ public abstract class GameRendererMixin {
         throw new AssertionError();
     }
 
+    @WrapOperation(method = "renderLevel", at = @At(value = "INVOKE", target = "Lnet/minecraft/client/renderer/GameRenderer;shouldRenderBlockOutline()Z"), require = 1)
+    private boolean txoptimizations$outlineDecidedDuringExtraction(GameRenderer renderer, Operation<Boolean> original) {
+        return false;
+    }
+
+    @WrapOperation(method = "renderLevel", at = @At(value = "INVOKE", target = "Lnet/minecraft/client/gui/components/BossHealthOverlay;shouldCreateWorldFog()Z"), require = 1)
+    private boolean txoptimizations$bossFogFromExtraction(BossHealthOverlay overlay, Operation<Boolean> original) {
+        return RenderStateBuffers.renderBossFog();
+    }
+
     @Inject(method = "extract", at = @At("TAIL"), require = 1)
     private void txoptimizations$updateSectionOcclusion(DeltaTracker deltaTracker, boolean advanceGameTime, CallbackInfo ci) {
         GameRenderState state = this.gameRenderState();
+
+        RenderStateBuffers.setBossFog(this.minecraft.gui.hud.getBossOverlay().shouldCreateWorldFog());
 
         if (!state.shouldRenderLevel)
             return;

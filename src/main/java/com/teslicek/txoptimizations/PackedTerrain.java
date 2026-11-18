@@ -10,6 +10,7 @@ import com.mojang.renderpearl.api.vertex.VertexFormatElement;
 import com.teslicek.txoptimizations.mixin.PipelineCacheAccessor;
 import com.teslicek.txoptimizations.mixin.RenderSystemPipelineCacheAccessor;
 import java.util.IdentityHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import net.minecraft.resources.Identifier;
@@ -23,17 +24,23 @@ public final class PackedTerrain {
     private static final String     FILE           = "shaders/core/terrain.vsh";
     private static final String     FRAGMENT_FILE  = "shaders/core/terrain.fsh";
     private static final String     FADE           = "    chunkVisibility = mix(1.0, ChunkVisibility, clamp((dist - chunkFullyVisibleRange) / chunkFullyVisibleRange, 0.0, 1.0));\n";
-    private static final String     FADE_OR_NONE   = "#ifdef " + VISIBLE + "\n    chunkVisibility = 1.0;\n#else\n" + FADE + "#endif\n";
+    private static final String     FADE_OR_NONE   = "#ifdef " + VISIBLE + "\n#ifndef TX_NO_VISIBILITY\n    chunkVisibility = 1.0;\n#endif\n#else\n" + FADE + "#endif\n";
     private static final String     FADE_FOG       = "    color = mix(FogColor * vec4(1, 1, 1, color.a), color, chunkVisibility);\n";
     private static final String     FADE_FOG_SKIP  = "#ifndef " + VISIBLE + "\n" + FADE_FOG + "#endif\n";
     private static final String     INPUTS         = "layout(location = 0) in vec3 Position;\nlayout(location = 1) in vec4 Color;\nlayout(location = 2) in vec2 UV0;\nlayout(location = 3) in ivec2 UV2;\n#ifdef MULTIDRAW_TERRAIN\nlayout(location = 4) in ivec3 ChunkPosition;\nlayout(location = 5) in float ChunkVisibility;\n#endif\n";
     private static final String     PACKED         = "#ifdef " + DEFINE + "\nlayout(location = 0) in uvec2 PositionData;\nlayout(location = 1) in vec4 Color;\nlayout(location = 2) in uvec2 UVLight;\n#define Position (vec3(uvec3(PositionData.x & 0xFFFFFu, PositionData.x >> 20u | (PositionData.y & 0xFFu) << 12u, PositionData.y >> 8u & 0xFFFFFu)) * (1.0 / 32768.0) - 8.0)\n#define UV0 (vec2(UVLight & 0xFFFFFFu) * (1.0 / 8388608.0))\n#define UV2 ivec2(UVLight >> 24u)\n#ifdef MULTIDRAW_TERRAIN\nlayout(location = 3) in ivec4 ChunkData;\n#define ChunkPosition ChunkData.xyz\n#define ChunkVisibility intBitsToFloat(ChunkData.w)\n#endif\n#else\n" + INPUTS + "#endif\n";
+    private static final String     SPLIT_MVP      = "TX_SPLIT_MVP";
+    private static final String     NO_VISIBILITY  = "TX_NO_VISIBILITY";
+    private static final String     MVP            = "    gl_Position = ProjMat * ModelViewMat * vec4(pos, 1.0);\n";
+    private static final String     MVP_CHOICE     = "#ifdef " + SPLIT_MVP + "\n    gl_Position = ProjMat * (ModelViewMat * vec4(pos, 1.0));\n#else\n" + MVP + "#endif\n";
+    private static final String     VARYING_OUT    = "layout(location = 4) out float chunkVisibility;\n";
+    private static final String     VARYING_IN     = "layout(location = 4) in float chunkVisibility;\n";
     private static final int        SLOTS          = 16;
     private static final int        BLOCK_ELEMENTS = 4;
     private static final int        CHUNK_ELEMENTS = 2;
 
     private static final Map<RenderPipeline, RenderPipeline> COMPACT         = new IdentityHashMap<>();
-    private static final Map<RenderPipeline, RenderPipeline> VISIBLE_COMPACT = new IdentityHashMap<>();
+    private static final List<Map<RenderPipeline, RenderPipeline>> VARIANTS = List.of(new IdentityHashMap<>(), new IdentityHashMap<>(), new IdentityHashMap<>(), new IdentityHashMap<>());
 
     private static @Nullable PipelineCache checkedCache;
     private static boolean                 packedSource;
@@ -48,12 +55,12 @@ public final class PackedTerrain {
             return source;
 
         if (location.getPath().equals(FRAGMENT_FILE))
-            return source.replace(FADE_FOG, FADE_FOG_SKIP);
+            return source.replace(FADE_FOG, FADE_FOG_SKIP).replace(VARYING_IN, "#ifndef " + NO_VISIBILITY + "\n" + VARYING_IN + "#endif\n");
 
         if (!location.getPath().equals(FILE) || !source.contains(INPUTS))
             return source;
 
-        return source.replace(INPUTS, PACKED).replace(FADE, FADE_OR_NONE);
+        return source.replace(INPUTS, PACKED).replace(FADE, FADE_OR_NONE).replace(MVP, MVP_CHOICE).replace(VARYING_OUT, "#ifndef " + NO_VISIBILITY + "\n" + VARYING_OUT + "#endif\n");
     }
 
     public static RenderPipeline terrainPipeline(RenderPipeline vanilla) {
@@ -61,9 +68,11 @@ public final class PackedTerrain {
             return vanilla;
 
         if (sectionsFading || !isVisibleSource())
-            return COMPACT.computeIfAbsent(vanilla, pipeline -> compact(pipeline, false));
+            return COMPACT.computeIfAbsent(vanilla, pipeline -> compact(pipeline, false, 0));
 
-        return VISIBLE_COMPACT.computeIfAbsent(vanilla, pipeline -> compact(pipeline, true));
+        int variant = 0;
+
+        return VARIANTS.get(variant).computeIfAbsent(vanilla, pipeline -> compact(pipeline, true, variant));
     }
 
     public static void setSectionsFading(boolean fading) {
@@ -98,7 +107,7 @@ public final class PackedTerrain {
         visibleSource = packedSource && source.contains(FADE_OR_NONE);
     }
 
-    private static RenderPipeline compact(RenderPipeline vanilla, boolean visible) {
+    private static RenderPipeline compact(RenderPipeline vanilla, boolean visible, int variant) {
         Identifier         shader  = vanilla.getShaders().get(ShaderType.VERTEX);
         VertexFormat       block   = vanilla.getVertexFormatBinding(0);
         VertexFormat       chunk   = vanilla.getVertexFormatBinding(1);
@@ -129,9 +138,18 @@ public final class PackedTerrain {
 
         RenderPipeline.Snippet copy = new RenderPipeline.Snippet(vanilla.getShaders(), Optional.of(vanilla.getShaderDefines()), Optional.of(vanilla.getBindGroupLayouts()), targets, targets.length, Optional.ofNullable(vanilla.getDepthStencilState()), Optional.of(vanilla.getPolygonMode()), Optional.of(vanilla.isCull()), formats, Optional.of(vanilla.getPrimitiveTopology()), vanilla.pushConstantSize());
 
-        RenderPipeline.Builder builder = RenderPipeline.builder(copy).withLocation(Identifier.fromNamespaceAndPath("txoptimizations", vanilla.getLocation().getPath() + (visible ? "_packed_visible" : "_packed"))).withShaderDefine(DEFINE);
+        RenderPipeline.Builder builder = RenderPipeline.builder(copy).withLocation(Identifier.fromNamespaceAndPath("txoptimizations", vanilla.getLocation().getPath() + (visible ? "_packed_visible" + variant : "_packed"))).withShaderDefine(DEFINE);
 
-        return (visible ? builder.withShaderDefine(VISIBLE) : builder).build();
+        if (visible)
+            builder.withShaderDefine(VISIBLE);
+
+        if ((variant & 1) != 0)
+            builder.withShaderDefine(SPLIT_MVP);
+
+        if ((variant & 2) != 0)
+            builder.withShaderDefine(NO_VISIBILITY);
+
+        return builder.build();
     }
 
     private static void requireLayout(VertexFormat vanilla, VertexFormat packed, String name, GpuFormat format, int offset) {

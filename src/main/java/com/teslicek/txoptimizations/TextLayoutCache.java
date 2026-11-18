@@ -4,6 +4,7 @@ import it.unimi.dsi.fastutil.HashCommon;
 import java.util.HashMap;
 import java.util.IdentityHashMap;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.ToIntBiFunction;
 import net.minecraft.client.gui.Font;
 import net.minecraft.locale.Language;
@@ -15,6 +16,9 @@ import net.minecraft.util.FormattedCharSink;
 import org.jspecify.annotations.Nullable;
 
 public final class TextLayoutCache {
+
+    private static final Map<Key, Key> PUBLISHED       = new ConcurrentHashMap<>();
+    private static final Key           PUBLISHED_PROBE = new Key();
 
     private static final int    MAX_ENTRIES         = 4096;
     private static final int    MAX_SEQUENCE_WIDTHS = 16384;
@@ -35,6 +39,14 @@ public final class TextLayoutCache {
 
     public static Font.PreparedText find(Font font, FormattedCharSequence text, float x, float y, int color, boolean dropShadow, int backgroundColor, boolean includeEmpty, boolean outline) {
         return current().find(font, text, x, y, color, dropShadow, backgroundColor, includeEmpty, outline);
+    }
+
+    public static Font.@Nullable PreparedText findPublished(Font font, FormattedCharSequence text, float x, float y, int color, boolean dropShadow, int backgroundColor, boolean includeEmpty, boolean outline) {
+        PUBLISHED_PROBE.set(font, text, x, y, color, dropShadow, backgroundColor, includeEmpty, outline);
+
+        Key entry = PUBLISHED.get(PUBLISHED_PROBE);
+
+        return entry == null ? null : entry.prepared;
     }
 
     public static Font.@Nullable PreparedText ensure(Font font, FormattedCharSequence text, float x, float y, int color, boolean dropShadow, int backgroundColor, boolean outline) {
@@ -146,6 +158,9 @@ public final class TextLayoutCache {
             if (this.entries.size() >= MAX_ENTRIES) {
                 this.entries.clear();
                 this.entryClears ++;
+
+                if (this.render)
+                    PUBLISHED.clear();
             }
 
             Key key = new Key();
@@ -154,6 +169,9 @@ public final class TextLayoutCache {
             key.prepared = prepared;
             key.frame    = ClientClock.frame();
             this.entries.put(key, key);
+
+            if (this.render)
+                PUBLISHED.put(key, key);
 
             return prepared;
         }
@@ -238,6 +256,10 @@ public final class TextLayoutCache {
 
         private void clear() {
             this.entries.clear();
+
+            if (this.render)
+                PUBLISHED.clear();
+
             this.widths.clear();
             this.sequenceWidths.clear();
             this.stringWidths.clear();
@@ -252,7 +274,15 @@ public final class TextLayoutCache {
 
             this.lastEviction = frame;
 
-            this.entries.values().removeIf(entry -> frame - entry.frame > UNUSED_FRAMES);
+            this.entries.values().removeIf(entry -> {
+                if (frame - entry.frame <= UNUSED_FRAMES)
+                    return false;
+
+                if (this.render)
+                    PUBLISHED.remove(entry);
+
+                return true;
+            });
             this.widths.values().removeIf(width -> frame - width.frame > UNUSED_FRAMES);
             this.sequenceWidths.values().removeIf(width -> frame - width.frame > UNUSED_FRAMES);
             this.stringWidths.values().removeIf(width -> frame - width.frame > UNUSED_FRAMES);

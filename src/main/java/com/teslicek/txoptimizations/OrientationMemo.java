@@ -17,7 +17,7 @@ public final class OrientationMemo {
     }
 
     public static Quaternionf rotationYXZ(Quaternionf target, float angleYValue, float angleXValue, float angleZValue) {
-        if (!RenderThreadStack.isOwner())
+        if (!RenderThreadStack.ownsOrientation())
             return target.rotationYXZ(angleYValue, angleXValue, angleZValue);
 
         int bitsY = Float.floatToRawIntBits(angleYValue);

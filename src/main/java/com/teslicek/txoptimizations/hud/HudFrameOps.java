@@ -40,6 +40,11 @@ public final class HudFrameOps {
         pending.add(new Clear(target));
     }
 
+    static void tiles(HudTileMask tiles, RenderTarget source, int serial) {
+        requireExtraction();
+        pending.add(new Tiles(tiles, source, serial));
+    }
+
     public static List<Op> takeForFrame() {
         requireExtraction();
 
@@ -64,6 +69,7 @@ public final class HudFrameOps {
             switch (op) {
                 case Flush flush -> runFlush(flush);
                 case Clear clear -> RenderSystem.getDevice().createCommandEncoder().clearColorTexture(clear.target.getColorTexture(), CLEAR_COLOR);
+                case Tiles tiles -> tiles.tiles.render(tiles.source, tiles.serial);
             }
         }
     }
@@ -107,12 +113,15 @@ public final class HudFrameOps {
             throw new IllegalStateException("HUD cache operations were recorded on the render worker");
     }
 
-    public sealed interface Op permits Flush, Clear {
+    public sealed interface Op permits Flush, Clear, Tiles {
     }
 
     private record Flush(GuiRenderState state, RenderTarget target) implements Op {
     }
 
     private record Clear(RenderTarget target) implements Op {
+    }
+
+    private record Tiles(HudTileMask tiles, RenderTarget source, int serial) implements Op {
     }
 }

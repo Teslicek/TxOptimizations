@@ -172,10 +172,10 @@ public final class HudCache {
         }
 
         replayDeferred(graphics.guiRenderState);
-        List<ScreenRectangle> areas = buffers.frontAreas();
+        HudBlitAreas areas = buffers.frontAreas();
 
-        if (!areas.isEmpty())
-            graphics.guiRenderState.addGuiElement(new HudBlit(buffers.front(), areas, buffers.frontBounds()));
+        if (!areas.areas().isEmpty())
+            graphics.guiRenderState.addGuiElement(new HudBlit(buffers.front(), areas.areas(), areas.bounds()));
     }
 
     public static void include(ScreenRectangle bounds) {

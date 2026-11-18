@@ -28,6 +28,7 @@ final class FeatureWorker {
     private final StagedVertexBuffer        shard;
     private final Thread                    thread;
     private volatile boolean                done    = true;
+    private volatile boolean                parked;
     private volatile Throwable              failure;
     private volatile long                   jobNanos;
     private FeatureFrameContext             context;
@@ -87,7 +88,9 @@ final class FeatureWorker {
         this.failure   = null;
         this.claimed.set(0);
         this.job.set(() -> this.prepare(worker));
-        LockSupport.unpark(this.thread);
+
+        if (this.parked)
+            LockSupport.unpark(this.thread);
     }
 
     void prepareUnstarted() {
@@ -173,12 +176,21 @@ final class FeatureWorker {
             Runnable next = this.job.getAndSet(null);
 
             if (next == null) {
-                LockSupport.park();
+                this.awaitJob();
                 continue;
             }
 
             this.run(next);
         }
+    }
+
+    private void awaitJob() {
+        this.parked = true;
+
+        if (this.job.get() == null)
+            LockSupport.park();
+
+        this.parked = false;
     }
 
     private void run(Runnable next) {

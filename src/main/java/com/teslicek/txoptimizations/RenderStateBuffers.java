@@ -15,6 +15,7 @@ import org.jspecify.annotations.Nullable;
 public final class RenderStateBuffers {
 
     private static final boolean[] ALWAYS_ON_TOP_GIZMOS = new boolean[2];
+    private static final boolean[] BOSS_FOG             = new boolean[2];
 
     private static GameRenderState @Nullable []   trees;
     private static SubmitNodeStorage @Nullable [] storages;
@@ -77,6 +78,17 @@ public final class RenderStateBuffers {
 
     public static boolean renderAlwaysOnTopGizmos() {
         return ALWAYS_ON_TOP_GIZMOS[renderParity];
+    }
+
+    public static void setBossFog(boolean fog) {
+        if (RenderWorker.isCurrent())
+            throw new IllegalStateException("Boss fog was recorded on the render worker");
+
+        BOSS_FOG[current] = fog;
+    }
+
+    public static boolean renderBossFog() {
+        return BOSS_FOG[renderParity];
     }
 
     public static void bindRender(Minecraft minecraft) {

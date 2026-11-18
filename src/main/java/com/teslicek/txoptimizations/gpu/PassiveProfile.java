@@ -155,7 +155,10 @@ public final class PassiveProfile {
     static void announce() {
         Minecraft minecraft = Minecraft.getInstance();
 
-        minecraft.execute(() -> minecraft.gui.hud.getChat().addClientSystemMessage(Component.literal(FINISHED)));
+        minecraft.execute(() -> {
+            if (minecraft.level != null)
+                minecraft.gui.hud.getChat().addClientSystemMessage(Component.literal(FINISHED));
+        });
     }
 
     private static String summary(Minecraft minecraft, String name, double seconds) {

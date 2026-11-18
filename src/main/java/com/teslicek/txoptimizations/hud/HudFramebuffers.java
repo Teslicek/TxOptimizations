@@ -10,13 +10,14 @@ import net.minecraft.client.gui.navigation.ScreenRectangle;
 
 final class HudFramebuffers {
 
-    private final HudAreas backAreas = new HudAreas();
+    private final HudAreas    backAreas = new HudAreas();
+    private final HudTileMask tiles     = new HudTileMask();
 
-    private RenderTarget          back       = new TextureTarget("txoptimizations_hud_back", 1, 1, GpuFormat.RGBA8_UNORM, null);
-    private RenderTarget          front      = new TextureTarget("txoptimizations_hud_front", 1, 1, GpuFormat.RGBA8_UNORM, null);
-    private List<ScreenRectangle> frontAreas = List.of();
-    private ScreenRectangle       frontBounds = ScreenRectangle.empty();
-    private boolean               dropFrame;
+    private RenderTarget back       = new TextureTarget("txoptimizations_hud_back", 1, 1, GpuFormat.RGBA8_UNORM, null);
+    private RenderTarget front      = new TextureTarget("txoptimizations_hud_front", 1, 1, GpuFormat.RGBA8_UNORM, null);
+    private HudBlitAreas frontAreas = HudBlitAreas.EMPTY;
+    private HudBlitAreas fullScreen = HudBlitAreas.EMPTY;
+    private boolean      dropFrame;
     private int                   serial;
     private int                   catchUpSerial;
     private int                   width;
@@ -36,11 +37,12 @@ final class HudFramebuffers {
         this.width      = window.getWidth();
         this.height     = window.getHeight();
         this.guiScale   = window.getGuiScale();
-        this.frontAreas  = List.of();
-        this.frontBounds = ScreenRectangle.empty();
+        this.frontAreas = HudBlitAreas.EMPTY;
+        this.fullScreen = HudBlitAreas.of(List.of(new ScreenRectangle(0, 0, window.getGuiScaledWidth(), window.getGuiScaledHeight())));
         this.backAreas.clear();
         this.back.resize(this.width, this.height);
         this.front.resize(this.width, this.height);
+        this.tiles.resize(window);
         this.markForCatchUp();
     }
 
@@ -53,9 +55,9 @@ final class HudFramebuffers {
 
             this.front      = this.back;
             this.back       = previousFront;
-            this.frontAreas  = this.backAreas.rectangles(window.getGuiScaledWidth(), window.getGuiScaledHeight());
-            this.frontBounds = this.frontAreas.isEmpty() ? ScreenRectangle.empty() : union(this.frontAreas);
+            this.frontAreas = HudBlitAreas.of(this.backAreas.rectangles(window.getGuiScaledWidth(), window.getGuiScaledHeight()));
             this.serial ++;
+            HudFrameOps.tiles(this.tiles, this.front, this.serial);
         }
 
         this.backAreas.clear();
@@ -86,12 +88,16 @@ final class HudFramebuffers {
         return this.back;
     }
 
-    List<ScreenRectangle> frontAreas() {
-        return this.frontAreas;
-    }
+    HudBlitAreas frontAreas() {
+        if (this.frontAreas.areas().isEmpty() || !HudShaderOverrides.isMoved())
+            return this.frontAreas;
 
-    ScreenRectangle frontBounds() {
-        return this.frontBounds;
+        HudBlitAreas tiled = this.tiles.areas(this.serial);
+
+        if (tiled == null)
+            return this.fullScreen;
+
+        return tiled;
     }
 
     void include(ScreenRectangle bounds) {
@@ -99,21 +105,5 @@ final class HudFramebuffers {
             return;
 
         this.backAreas.include(bounds.left(), bounds.top(), bounds.right(), bounds.bottom());
-    }
-
-    private static ScreenRectangle union(List<ScreenRectangle> areas) {
-        int left   = Integer.MAX_VALUE;
-        int top    = Integer.MAX_VALUE;
-        int right  = Integer.MIN_VALUE;
-        int bottom = Integer.MIN_VALUE;
-
-        for (ScreenRectangle area : areas) {
-            left   = Math.min(left, area.left());
-            top    = Math.min(top, area.top());
-            right  = Math.max(right, area.right());
-            bottom = Math.max(bottom, area.bottom());
-        }
-
-        return new ScreenRectangle(left, top, right - left, bottom - top);
     }
 }

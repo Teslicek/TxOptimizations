@@ -76,6 +76,15 @@ public abstract class PreparedRenderTypeEarlyMixin {
     }
 
     @Unique
+    private static RenderPipeline txoptimizations$sortedPipeline(GpuCubeDraw cubes, RenderPipeline renderPipeline) {
+        return switch (cubes.txoptimizations$sortedMode()) {
+            case 1 -> GpuCubes.variant(renderPipeline);
+            case 2 -> renderPipeline;
+            default -> throw new IllegalStateException("A sorted draw with GPU cubes was not sorted before drawing");
+        };
+    }
+
+    @Unique
     private static int txoptimizations$hash(OitPipelineSet pipelines) {
         if (pipelines == null)
             return 0;
@@ -94,7 +103,9 @@ public abstract class PreparedRenderTypeEarlyMixin {
         GpuCubeDraw cubes = GpuCubes.takePending();
 
         if (cubes == null) {
-            this.txoptimizations$bind(renderPass, renderPipeline);
+            this.txoptimizations$setPipeline(renderPass, renderPipeline);
+            RenderSystem.bindDefaultUniforms(renderPass);
+            this.txoptimizations$bindUniforms(renderPass);
             this.txoptimizations$drawVertices(info, renderPass, 0, info.indexCount());
             renderPass.popDebugGroup();
 
@@ -102,7 +113,10 @@ public abstract class PreparedRenderTypeEarlyMixin {
         }
 
         if (cubes.txoptimizations$isSorted()) {
-            this.txoptimizations$drawSorted(cubes, renderPass, renderPipeline);
+            this.txoptimizations$setPipeline(renderPass, txoptimizations$sortedPipeline(cubes, renderPipeline));
+            RenderSystem.bindDefaultUniforms(renderPass);
+            this.txoptimizations$bindUniforms(renderPass);
+            this.txoptimizations$drawSorted(cubes, renderPass);
             renderPass.popDebugGroup();
 
             return;
@@ -112,39 +126,36 @@ public abstract class PreparedRenderTypeEarlyMixin {
             int start  = cubes.txoptimizations$segmentStart(segment);
             int length = cubes.txoptimizations$segmentLength(segment);
 
-            int kind = cubes.txoptimizations$segmentKind(segment);
+            int     kind = cubes.txoptimizations$segmentKind(segment);
+            boolean raw  = kind == GpuCubeDraw.RAW;
 
-            if (kind != GpuCubeDraw.RAW) {
-                this.txoptimizations$bind(renderPass, GpuCubes.variant(renderPipeline));
-                GpuCubes.bindCubes(renderPass, cubes.txoptimizations$batch());
-                GpuCubes.drawShapes(renderPass, kind, start, length);
+            if (raw && (start % 4 != 0 || length % 4 != 0))
+                throw new IllegalStateException("Vertices between GPU cubes do not form whole quads: " + length + " vertices from " + start);
+
+            this.txoptimizations$setPipeline(renderPass, raw ? renderPipeline : GpuCubes.variant(renderPipeline));
+            RenderSystem.bindDefaultUniforms(renderPass);
+            this.txoptimizations$bindUniforms(renderPass);
+
+            if (raw) {
+                this.txoptimizations$drawVertices(info, renderPass, start / 4 * 6, length / 4 * 6);
                 continue;
             }
 
-            if (start % 4 != 0 || length % 4 != 0)
-                throw new IllegalStateException("Vertices between GPU cubes do not form whole quads: " + length + " vertices from " + start);
-
-            this.txoptimizations$bind(renderPass, renderPipeline);
-            this.txoptimizations$drawVertices(info, renderPass, start / 4 * 6, length / 4 * 6);
+            GpuCubes.bindCubes(renderPass, cubes.txoptimizations$batch());
+            GpuCubes.drawShapes(renderPass, kind, start, length);
         }
 
         renderPass.popDebugGroup();
     }
 
     @Unique
-    private void txoptimizations$drawSorted(GpuCubeDraw cubes, RenderPass renderPass, RenderPipeline renderPipeline) {
+    private void txoptimizations$drawSorted(GpuCubeDraw cubes, RenderPass renderPass) {
         GpuBuffer buffer = cubes.txoptimizations$batch().sortedBuffer();
-        int       mode   = cubes.txoptimizations$sortedMode();
 
-        if (mode == 1) {
-            this.txoptimizations$bind(renderPass, GpuCubes.variant(renderPipeline));
+        if (cubes.txoptimizations$sortedMode() == 1)
             GpuCubes.bindCubes(renderPass, cubes.txoptimizations$batch());
-        } else if (mode == 2) {
-            this.txoptimizations$bind(renderPass, renderPipeline);
+        else
             renderPass.setVertexBuffer(0, buffer.slice(cubes.txoptimizations$vertexOffset(), cubes.txoptimizations$vertexBytes()));
-        } else {
-            throw new IllegalStateException("A sorted draw with GPU cubes was not sorted before drawing");
-        }
 
         renderPass.setIndexBuffer(buffer, IndexType.INT);
         renderPass.drawIndexed(cubes.txoptimizations$indexCount(), 1, cubes.txoptimizations$firstIndex(), 0, 0);
@@ -160,13 +171,15 @@ public abstract class PreparedRenderTypeEarlyMixin {
     }
 
     @Unique
-    private void txoptimizations$bind(RenderPass renderPass, RenderPipeline renderPipeline) {
+    private void txoptimizations$setPipeline(RenderPass renderPass, RenderPipeline renderPipeline) {
         renderPass.setPipeline(RenderSystem.getCompiledPipeline(renderPipeline));
 
         if (this.scissorState.enabled())
             renderPass.enableScissor(this.scissorState.x(), this.scissorState.y(), this.scissorState.width(), this.scissorState.height());
+    }
 
-        RenderSystem.bindDefaultUniforms(renderPass);
+    @Unique
+    private void txoptimizations$bindUniforms(RenderPass renderPass) {
         renderPass.setUniform("DynamicTransforms", this.dynamicTransforms);
 
         if (this.textures instanceof TextureList list) {

@@ -4,6 +4,7 @@ import com.llamalad7.mixinextras.injector.ModifyReturnValue;
 import com.mojang.blaze3d.systems.RenderSystem;
 import com.mojang.renderpearl.api.buffers.GpuBufferSlice;
 import com.mojang.renderpearl.api.pipeline.PrimitiveTopology;
+import com.teslicek.txoptimizations.FixedTransformType;
 import com.teslicek.txoptimizations.LastWrittenData;
 import com.teslicek.txoptimizations.OutlineModelView;
 import com.teslicek.txoptimizations.ParallelFeatures;
@@ -26,7 +27,7 @@ import org.spongepowered.asm.mixin.injection.Redirect;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 @Mixin(RenderType.class)
-public abstract class RenderTypeMixin {
+public abstract class RenderTypeMixin implements FixedTransformType {
 
     @Unique
     private static final Matrix4f MODEL_VIEW = new Matrix4f();
@@ -102,7 +103,18 @@ public abstract class RenderTypeMixin {
 
     @Inject(method = "<init>(Ljava/lang/String;Lnet/minecraft/client/renderer/rendertype/RenderSetup;)V", at = @At("RETURN"))
     private void txoptimizations$keepConsolidation(String name, RenderSetup state, CallbackInfo ci) {
-        this.txoptimizations$consolidates = !this.primitiveTopology().connectedPrimitives;
+        RenderSetupTransformAccessor transforms = (RenderSetupTransformAccessor) (Object) state;
+
+        this.txoptimizations$consolidates   = !this.primitiveTopology().connectedPrimitives;
+        this.txoptimizations$fixedTransform = transforms.txoptimizations$textureTransform() == TextureTransform.DEFAULT_TEXTURING && transforms.txoptimizations$layeringTransform().getModifier() == null && !this.isOutline();
+    }
+
+    @Unique
+    private boolean txoptimizations$fixedTransform;
+
+    @Override
+    public boolean txoptimizations$fixedTransform() {
+        return this.txoptimizations$fixedTransform;
     }
 
     @Overwrite

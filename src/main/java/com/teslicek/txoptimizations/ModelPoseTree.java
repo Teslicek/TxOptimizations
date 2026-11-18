@@ -11,9 +11,24 @@ public final class ModelPoseTree {
 
     private PoseStack.Pose[] poses = new PoseStack.Pose[0];
     private int              depth;
+    private PoseStack.Pose[] chain = new PoseStack.Pose[INITIAL_DEPTH];
 
     private ModelPoseTree() {
         this.grow(INITIAL_DEPTH);
+    }
+
+    public PoseStack.Pose[] chain(int length) {
+        if (this.chain.length < length)
+            this.chain = new PoseStack.Pose[length * 2];
+
+        return this.chain;
+    }
+
+    public PoseStack.Pose at(int slot) {
+        if (slot >= this.poses.length)
+            this.grow(slot * 2);
+
+        return this.poses[slot];
     }
 
     public PoseStack.Pose push() {

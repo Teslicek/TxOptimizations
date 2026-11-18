@@ -17,7 +17,7 @@ public abstract class DisplayRendererOrientationMixin {
 
     @Redirect(method = "submit", at = @At(value = "NEW", target = "()Lorg/joml/Quaternionf;"), require = 1)
     private Quaternionf txoptimizations$reuseOrientation() {
-        return RenderThreadStack.isOwner() ? ORIENTATION : new Quaternionf();
+        return RenderThreadStack.ownsOrientation() ? ORIENTATION : new Quaternionf();
     }
 
     @Redirect(method = "calculateOrientation", at = @At(value = "INVOKE", target = "Lorg/joml/Quaternionf;rotationYXZ(FFF)Lorg/joml/Quaternionf;"), require = 4)

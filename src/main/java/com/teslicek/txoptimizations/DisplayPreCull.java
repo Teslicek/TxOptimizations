@@ -26,6 +26,7 @@ public final class DisplayPreCull {
 
     private static final float HITBOX_REACH = 3.5F;
     private static final float RADIUS_SLACK = 1.0E-3F;
+    private static final float NOT_CULLABLE = -1.0F;
 
     private static final Matrix4f[]          PROJECTIONS     = {new Matrix4f(), new Matrix4f()};
     private static final Matrix4f[]          VIEWS           = {new Matrix4f(), new Matrix4f()};
@@ -112,15 +113,10 @@ public final class DisplayPreCull {
         if (cache.txoptimizations$matches(renderState, display.itemRenderState(), models))
             return;
 
-        if (plainModel(display) == null) {
-            cache.txoptimizations$forget();
-            return;
-        }
-
-        AABB box = ((ItemCullingBounds) state.item).txoptimizations$cullingBounds();
+        AABB box = plainModel(display) == null ? null : ((ItemCullingBounds) state.item).txoptimizations$cullingBounds();
 
         if (box == null) {
-            cache.txoptimizations$forget();
+            cache.txoptimizations$remember(renderState, display.itemRenderState(), models, NOT_CULLABLE);
             return;
         }
 
@@ -146,6 +142,9 @@ public final class DisplayPreCull {
             return false;
 
         if (!cache.txoptimizations$matches(renderState, display.itemRenderState(), Minecraft.getInstance().getModelManager().bakedItemStackModels) || display.calculateInterpolationProgress(partialTicks) != 1.0F)
+            return false;
+
+        if (cache.txoptimizations$radius() == NOT_CULLABLE)
             return false;
 
         float  radius = Math.max(cache.txoptimizations$radius(), Math.abs(display.getEyeHeight()) + HITBOX_REACH) + RADIUS_SLACK;

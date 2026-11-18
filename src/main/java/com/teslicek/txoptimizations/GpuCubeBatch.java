@@ -40,9 +40,12 @@ public final class GpuCubeBatch implements AutoCloseable {
     private int                 refCapacity  = INITIAL_REFS;
     private int                 refCount;
     private int                 longestRun;
+
     private @Nullable GpuBuffer current;
     private @Nullable GpuBuffer sortedBuffer;
     private long                half;
+    private GpuBufferSlice.@Nullable MappedView copyView;
+    private boolean             copyQueued;
     private boolean[]           hiddenQuads  = new boolean[0];
 
     public GpuCubeBatch(String label) {
@@ -79,6 +82,27 @@ public final class GpuCubeBatch implements AutoCloseable {
         return this.refCount ++;
     }
 
+    public int addRefs(int[] shapes, int pose) {
+        int first = this.refCount;
+
+        if (first + shapes.length > this.refCapacity) {
+            this.refCapacity = Math.max(this.refCapacity * 2, first + shapes.length);
+            this.refs        = reallocate(this.refs, (long) this.refCapacity * GpuCubes.REF_BYTES);
+        }
+
+        long at = this.refs + (long) first * GpuCubes.REF_BYTES;
+
+        for (int index = 0; index < shapes.length; index ++) {
+            MemoryUtil.memPutInt(at, shapes[index]);
+            MemoryUtil.memPutInt(at + 4L, pose);
+            at += GpuCubes.REF_BYTES;
+        }
+
+        this.refCount = first + shapes.length;
+
+        return first;
+    }
+
     public void noteRun(int indices) {
         this.longestRun = Math.max(this.longestRun, indices);
     }
@@ -97,11 +121,15 @@ public final class GpuCubeBatch implements AutoCloseable {
         this.current = this.texels.acquire(device, 2L * Math.max(poseBytes, refBytes));
         this.half    = this.current.size() / 2L;
 
-        try (GpuBufferSlice.MappedView view = this.current.slice(0L, this.half + poseBytes).map(false, true)) {
-            long target = MemoryUtil.memAddress(view.data());
+        if (this.copyQueued) {
+            try (GpuBufferSlice.MappedView view = this.current.slice(0L, this.half + poseBytes).map(false, true)) {
+                long target = MemoryUtil.memAddress(view.data());
 
-            MemoryUtil.memCopy(this.refs, target, refBytes);
-            MemoryUtil.memCopy(this.poses, target + this.half, poseBytes);
+                MemoryUtil.memCopy(this.refs, target, refBytes);
+                MemoryUtil.memCopy(this.poses, target + this.half, poseBytes);
+            }
+        } else {
+            this.copyView = this.current.slice(0L, this.half + poseBytes).map(false, true);
         }
 
         GpuCubes.uploadStatic(device);
@@ -109,6 +137,40 @@ public final class GpuCubeBatch implements AutoCloseable {
 
         if (!this.sortedDraws.isEmpty())
             this.uploadSorted(device);
+    }
+
+    public void queueCopies(VertexCopy copies) {
+        if (this.copyView == null || this.copyQueued)
+            return;
+
+        long target = MemoryUtil.memAddress(this.copyView.data());
+
+        copies.add(this.refs, target, this.refCount * GpuCubes.REF_BYTES);
+        copies.add(this.poses, target + this.half, this.poseCount * GpuCubes.POSE_BYTES);
+
+        this.copyQueued = true;
+    }
+
+    public void copyUnqueued() {
+        if (this.copyView == null || this.copyQueued)
+            return;
+
+        long target = MemoryUtil.memAddress(this.copyView.data());
+
+        MemoryUtil.memCopy(this.refs, target, (long) this.refCount * GpuCubes.REF_BYTES);
+        MemoryUtil.memCopy(this.poses, target + this.half, (long) this.poseCount * GpuCubes.POSE_BYTES);
+
+        this.copyView.close();
+        this.copyView = null;
+    }
+
+    public void finishCopies() {
+        if (!this.copyQueued)
+            return;
+
+        this.copyView.close();
+        this.copyView   = null;
+        this.copyQueued = false;
     }
 
     public void bind(RenderPass renderPass) {

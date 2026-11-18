@@ -13,6 +13,7 @@ import com.mojang.renderpearl.api.pipeline.PrimitiveTopology;
 import com.mojang.renderpearl.api.vertex.VertexFormat;
 import com.mojang.renderpearl.api.vertex.VertexFormatElement;
 import com.teslicek.txoptimizations.BackgroundVertexCopy;
+import com.teslicek.txoptimizations.CubeBatchOwner;
 import com.teslicek.txoptimizations.DistanceSorting;
 import com.teslicek.txoptimizations.InFlightVertexCopy;
 import com.teslicek.txoptimizations.OutlineDraw;
@@ -101,6 +102,7 @@ public abstract class StagedVertexBufferDirectCopyMixin implements BackgroundVer
             this.txoptimizations$vertexView = vertexGpuBuffer.slice(0L, vertexBufferSize).map(false, true);
             this.txoptimizations$vertexCopy.begin();
             this.txoptimizations$copyDraws(draws, this.txoptimizations$vertexView.data(), false);
+            ((CubeBatchOwner) this).txoptimizations$cubes().queueCopies(this.txoptimizations$vertexCopy);
             this.txoptimizations$vertexCopy.seal();
             this.txoptimizations$writeIndices(draws, indexGpuBuffer, indexBufferSize);
 
@@ -353,6 +355,7 @@ public abstract class StagedVertexBufferDirectCopyMixin implements BackgroundVer
             return;
 
         this.txoptimizations$vertexCopy.finish();
+        ((CubeBatchOwner) this).txoptimizations$cubes().finishCopies();
         this.txoptimizations$vertexView.close();
         this.txoptimizations$vertexView = null;
         InFlightVertexCopy.clear(this);

@@ -1,14 +1,18 @@
 package com.teslicek.txoptimizations.mixin;
 
 import com.llamalad7.mixinextras.injector.ModifyExpressionValue;
+import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
+import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
 import com.llamalad7.mixinextras.sugar.Local;
 import com.mojang.blaze3d.ProjectionType;
 import com.mojang.blaze3d.vertex.DefaultVertexFormat;
+import com.teslicek.txoptimizations.FixedTransformType;
 import com.teslicek.txoptimizations.GpuCubeDraw;
 import com.teslicek.txoptimizations.OutlineDraw;
 import com.teslicek.txoptimizations.OutlineDrawGroup;
 import com.teslicek.txoptimizations.ParallelFeatures;
-import it.unimi.dsi.fastutil.objects.Reference2IntOpenHashMap;
+import it.unimi.dsi.fastutil.objects.Object2IntOpenHashMap;
+import it.unimi.dsi.fastutil.objects.Reference2ObjectOpenHashMap;
 import java.util.List;
 import net.minecraft.client.renderer.StagedVertexBuffer;
 import net.minecraft.client.renderer.rendertype.PreparedRenderType;
@@ -18,6 +22,7 @@ import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;
+import org.spongepowered.asm.mixin.injection.Coerce;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.Redirect;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
@@ -73,7 +78,7 @@ public abstract class RenderTypeFeatureRendererGroupMixin implements OutlineDraw
     private static final int LINEAR_SEARCH_LIMIT = 8;
 
     @Unique
-    private Reference2IntOpenHashMap<PreparedRenderType> txoptimizations$index;
+    private Object2IntOpenHashMap<PreparedRenderType> txoptimizations$index;
 
     @Redirect(method = "getOrAddDraw", at = @At(value = "INVOKE", target = "Ljava/util/List;indexOf(Ljava/lang/Object;)I"))
     private int txoptimizations$findIndexed(List<PreparedRenderType> list, Object type) {
@@ -81,7 +86,7 @@ public abstract class RenderTypeFeatureRendererGroupMixin implements OutlineDraw
             return this.txoptimizations$index.getInt(type);
 
         for (int position = 0; position < list.size(); position ++) {
-            if (list.get(position) == type)
+            if (list.get(position).equals(type))
                 return position;
         }
 
@@ -99,7 +104,7 @@ public abstract class RenderTypeFeatureRendererGroupMixin implements OutlineDraw
         }
 
         if (list.size() > LINEAR_SEARCH_LIMIT) {
-            Reference2IntOpenHashMap<PreparedRenderType> index = new Reference2IntOpenHashMap<>(list.size() * 2);
+            Object2IntOpenHashMap<PreparedRenderType> index = new Object2IntOpenHashMap<>(list.size() * 2);
 
             index.defaultReturnValue(NOT_FOUND);
 
@@ -110,5 +115,28 @@ public abstract class RenderTypeFeatureRendererGroupMixin implements OutlineDraw
         }
 
         return added;
+    }
+
+    @Shadow
+    @Final
+    private boolean canReorder;
+
+    @Unique
+    private final Reference2ObjectOpenHashMap<RenderType, StagedVertexBuffer.Draw> txoptimizations$drawByType = new Reference2ObjectOpenHashMap<>();
+
+    @WrapOperation(method = "getVertexBuilder", at = @At(value = "INVOKE", target = "Lnet/minecraft/client/renderer/feature/RenderTypeFeatureRenderer$Group;getOrAddDraw(Lnet/minecraft/client/renderer/rendertype/RenderType;)Lnet/minecraft/client/renderer/StagedVertexBuffer$Draw;"), require = 1)
+    private StagedVertexBuffer.Draw txoptimizations$reuseDrawByType(@Coerce Object group, RenderType renderType, Operation<StagedVertexBuffer.Draw> original) {
+        if (!this.canReorder || !renderType.canConsolidateConsecutiveGeometry() || !((FixedTransformType) renderType).txoptimizations$fixedTransform())
+            return original.call(group, renderType);
+
+        StagedVertexBuffer.Draw draw = this.txoptimizations$drawByType.get(renderType);
+
+        if (draw != null)
+            return draw;
+
+        draw = original.call(group, renderType);
+        this.txoptimizations$drawByType.put(renderType, draw);
+
+        return draw;
     }
 }

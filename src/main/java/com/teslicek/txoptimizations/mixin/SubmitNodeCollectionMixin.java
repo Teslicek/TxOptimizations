@@ -41,7 +41,7 @@ public abstract class SubmitNodeCollectionMixin {
 
     @Redirect(method = "submitText", at = @At(value = "NEW", target = "(FFLnet/minecraft/util/FormattedCharSequence;ZIII)Lnet/minecraft/client/renderer/feature/TextFeatureRenderer$Content$Text;"))
     private TextFeatureRenderer.Content.Text txoptimizations$reuseText(float x, float y, FormattedCharSequence string, boolean dropShadow, int color, int backgroundColor, int outlineColor) {
-        if (!RenderThreadStack.isOwner())
+        if (!RenderThreadStack.ownsTextContent())
             return new TextFeatureRenderer.Content.Text(x, y, string, dropShadow, color, backgroundColor, outlineColor);
 
         return TextContentCache.text(x, y, string, dropShadow, color, backgroundColor, outlineColor);

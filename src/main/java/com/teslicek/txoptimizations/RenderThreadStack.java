@@ -39,6 +39,14 @@ public final class RenderThreadStack {
         return RenderWorker.isCurrent();
     }
 
+    public static boolean ownsOrientation() {
+        return isMain();
+    }
+
+    public static boolean ownsTextContent() {
+        return isOwner() || isMain();
+    }
+
     public static MemoryStack mainStack() {
         return mainStack;
     }

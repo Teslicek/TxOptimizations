@@ -10,6 +10,7 @@ import com.teslicek.txoptimizations.GpuCube;
 import com.teslicek.txoptimizations.GpuCubeBatch;
 import com.teslicek.txoptimizations.GpuCubeDraw;
 import com.teslicek.txoptimizations.GpuCubes;
+import com.teslicek.txoptimizations.ItemShapes;
 import com.teslicek.txoptimizations.NormalCache;
 import java.util.List;
 import net.minecraft.client.renderer.feature.ItemFeatureRenderer;
@@ -98,12 +99,27 @@ public abstract class ItemFeatureQuadLoopMixin {
 
         List<BakedQuad>               quads    = submit.quads();
         ItemStackRenderState.FoilType foilType = submit.foilType();
-        int                           end      = from + 1;
+        GpuCubeDraw                   draw     = submit.displayContext() == ItemDisplayContext.GUI ? null : GpuCubes.beginItem(builder, submit.overlayCoords());
+
+        if (draw != null && from == 0) {
+            int[] shapes = ItemShapes.of(quads).shapes();
+
+            if (shapes != null) {
+                BakedQuad.MaterialInfo material    = quads.getFirst().materialInfo();
+                GpuCubeBatch           batch       = draw.txoptimizations$batch();
+                int                    rawVertices = draw.txoptimizations$rawVertices() + direct.txoptimizations$vertexCount();
+                int                    slot        = GpuCubes.itemPose(batch, submit.pose(), getLayerColorSafe(submit.tintLayers(), material), LightCoordsUtil.lightCoordsWithEmission(submit.lightCoords(), material.lightEmission()));
+
+                draw.txoptimizations$addRefs(GpuCubeDraw.QUADS, batch.addRefs(shapes, slot), shapes.length, rawVertices);
+
+                return shapes.length;
+            }
+        }
+
+        int end = from + 1;
 
         while (end < quads.size() && txoptimizations$renderType(quads.get(end).materialInfo(), foilType) == renderType)
             end ++;
-
-        GpuCubeDraw draw = submit.displayContext() == ItemDisplayContext.GUI ? null : GpuCubes.beginItem(builder, submit.overlayCoords());
 
         if (draw == null)
             return this.txoptimizations$putEntityRun(direct, submit, from, end);

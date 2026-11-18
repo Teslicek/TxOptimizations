@@ -119,7 +119,7 @@ public final class DisplayCulling {
                 case CENTER -> width / 2.0F - line.width() / 2.0F;
             };
 
-            Font.PreparedText text = TextLayoutCache.find(font, line.contents(), offset, y, color, shadow, 0, false, false);
+            Font.PreparedText text = TextLayoutCache.findPublished(font, line.contents(), offset, y, color, shadow, 0, false, false);
 
             if (text == null)
                 return null;
